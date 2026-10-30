@@ -252,6 +252,70 @@ function readTiff(tiff: Uint8Array): PhotoDetails | undefined {
 }
 
 /**
+ * Takes the location out of TIFF bytes in place, keeping their length, so nothing
+ * around them moves. The GPS list and its values are blanked, and the main list's
+ * pointer to it is removed. Everything else, such as the date taken, is untouched.
+ * Throws when the bytes can't be read, so a copy never claims to have no location
+ * when it may still have one.
+ */
+function blankLocation(tiff: Uint8Array): void {
+  const littleEndian = ascii(tiff, 0, 2) === 'II';
+  const view = new DataView(tiff.buffer, tiff.byteOffset, tiff.byteLength);
+  const zero = (at: number, length: number) => {
+    if (at + length > tiff.length) throw new RangeError('Photo details run past the end');
+    tiff.fill(0, at, at + length);
+  };
+
+  const mainAt = view.getUint32(4, littleEndian);
+  const mainCount = view.getUint16(mainAt, littleEndian);
+  const mainEnd = mainAt + 2 + mainCount * 12 + 4; // The entries and the next-list mark.
+  if (mainEnd > tiff.length) throw new RangeError('Photo details run past the end');
+  const index = Array.from({ length: mainCount }, (_, i) => mainAt + 2 + i * 12).find(
+    (at) => view.getUint16(at, littleEndian) === tags.gpsList,
+  );
+  if (index === undefined) return;
+
+  const gpsAt = view.getUint32(index + 8, littleEndian);
+  const gpsCount = view.getUint16(gpsAt, littleEndian);
+  for (let i = 0; i < gpsCount; i++) {
+    const at = gpsAt + 2 + i * 12;
+    const size = typeSizes[view.getUint16(at + 2, littleEndian)];
+    if (!size) throw new RangeError('Unknown kind of location value');
+    const length = size * view.getUint32(at + 4, littleEndian);
+    if (length > 4) zero(view.getUint32(at + 8, littleEndian), length);
+  }
+  // The GPS list's own next-list mark is left alone: some files put a value there.
+  zero(gpsAt, 2 + gpsCount * 12);
+
+  // Drop the pointer, moving the later entries and the next-list mark up. Entries stay sorted.
+  tiff.copyWithin(index, index + 12, mainEnd);
+  zero(mainEnd - 12, 12);
+  view.setUint16(mainAt, mainCount - 1, littleEndian);
+}
+
+const isTiff = (bytes: Uint8Array) => ['II*\0', 'MM\0*'].includes(ascii(bytes, 0, 4));
+
+/**
+ * A copy of a JPEG with the location taken out of its photo details, byte for byte
+ * the same otherwise: the same length, picture and date taken. Every set of details in
+ * the file is cleaned, including those of extra pictures stored after the main one.
+ * A JPEG with no location comes back unchanged.
+ */
+export function jpegWithoutLocation(jpeg: Uint8Array): Uint8Array {
+  const copy = jpeg.slice();
+  const view = new DataView(copy.buffer);
+  // The picture's own bytes can never hold FF E1, so every match is a details segment.
+  for (let at = 2; at + 18 <= copy.length; at++) {
+    if (copy[at] !== 0xff || copy[at + 1] !== 0xe1 || ascii(copy, at + 4, 6) !== exifPrefix) {
+      continue;
+    }
+    const tiff = copy.subarray(at + 10, at + 2 + view.getUint16(at + 2));
+    if (isTiff(tiff)) blankLocation(tiff);
+  }
+  return copy;
+}
+
+/**
  * TIFF bytes holding the date taken, the right-way-up mark (the pixels are already
  * upright) and, when `keepLocation`, the location.
  */
