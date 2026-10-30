@@ -86,6 +86,17 @@ export const text = {
     failedLine: "Didn't work. {reason}",
     // The reason shown when the Tool gave none of its own.
     failedFallback: 'This file may be damaged or not supported.',
+    // Tools the person types into instead of choosing files (input mode "none").
+    typed: {
+      // The label on the box, unless the Tool gives its own.
+      label: 'Type here',
+      // Read out when a new result is ready to save.
+      ready: 'Ready to save.',
+      // The reason shown when the Tool gave none of its own.
+      failedFallback: "That didn't work. Try changing what you typed.",
+      // The alt text on the result picture. {noun} is the Tool's noun, {typed} what was typed.
+      pictureLabel: '{noun} that says: {typed}',
+    },
   },
   footer: {
     label: 'More about the Site',

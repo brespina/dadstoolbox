@@ -3,7 +3,8 @@
 //   because plain Node reads it too: the browser lock and the generated page test)
 // - run.ts: exports `run`, the Tool's job, in plain TypeScript
 // - Options.svelte: the Tool's options, bound to an options object
-// - sample.<ext>: the file the generated page test chooses
+// - sample.<ext>: the file the generated page test chooses (sample.txt: the text it
+//   types, for input mode "none")
 // Folders starting with "_" are skipped by discovery.
 
 import { fillText, text } from '../text';
@@ -38,6 +39,8 @@ export interface ToolDeclarationInput<Options extends object> {
   /** File types for the Choose button, such as "application/pdf" or ".pdf". */
   accept: readonly string[];
   input: InputMode;
+  /** The label on the box a person types into (input mode "none"). */
+  typeLabel?: string;
   needs: readonly BrowserFeature[];
   /** Files bigger than this (in bytes) get a note on their Ready row. */
   largeFileLimit: number;
@@ -67,6 +70,7 @@ export function defineTool<Options extends object>(
   return {
     privacyLine: fillText(text.tool.privacyLine, { noun: input.noun.many }),
     allDone: text.tool.allDone,
+    typeLabel: text.tool.typed.label,
     reasons: {},
     ...input,
   };
@@ -82,6 +86,7 @@ export function declarationText(tool: ToolDeclaration): string[] {
     tool.startButton,
     tool.privacyLine,
     tool.allDone,
+    tool.typeLabel,
     ...Object.values(tool.reasons),
   ];
 }
@@ -110,3 +115,9 @@ export class ToolFailure extends Error {
     this.name = 'ToolFailure';
   }
 }
+
+/** A Tool's job for what the person typed (input mode "none"). It may return any number of results. */
+export type ToolTextRun<Options extends object = object> = (
+  typed: string,
+  options: Options,
+) => Promise<ToolResult[]>;
