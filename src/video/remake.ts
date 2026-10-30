@@ -3,8 +3,8 @@
 // video calls `remakeVideo` from its `run`, in the worker.
 //
 // It grows one setting at a time (spec #41): Make a video smaller adds a longest side,
-// Trim a video adds a time range, and `onProgress` reports how far along it is. Each one
-// is a new field of RemakeSettings.
+// Trim a video adds a time range, and the progress hook arrives with #48. Each one is a
+// new field of RemakeSettings.
 //
 // Mediabunny is big, so a Tool imports this module with a dynamic import() inside its
 // `run`, under context.gettingReady.

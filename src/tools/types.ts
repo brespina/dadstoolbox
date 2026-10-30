@@ -184,7 +184,9 @@ export interface ToolRunContext {
  * finished. Anything that isn't a number counts as 0.
  */
 export function wholePercent(fraction: number): number {
-  return Number.isFinite(fraction) ? Math.min(100, Math.max(0, Math.floor(fraction * 100))) : 0;
+  if (!Number.isFinite(fraction)) return 0;
+  // The small nudge keeps 0.29 at 29: 0.29 * 100 is 28.999… in floating point.
+  return Math.min(100, Math.max(0, Math.floor(fraction * 100 + 1e-9)));
 }
 
 /** A line on a chosen file's Ready row, such as how big the result may be. */

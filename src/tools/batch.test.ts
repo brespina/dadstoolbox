@@ -519,16 +519,15 @@ describe('a Tool whose run is marked worker', () => {
 
   it('shows how far along the file in the worker is', async () => {
     const page = inWorker(async (_f, _options, context) => {
-      for (const fraction of [0.1, 0.105, 0.5]) context!.progress(fraction);
-      // Messages from the worker arrive in order, so the last one is in before this.
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      for (const fraction of [0.1, 0.105, 0.29, 0.5]) context!.progress(fraction);
       return [pdf()];
     });
     const seen: (number | undefined)[] = [];
     page.subscribe((state) => state.batches[0] && seen.push(state.batches[0].items[0]!.percent));
     page.add([file('a.pdf')]);
     await page.start({});
-    expect([...new Set(seen)]).toEqual([undefined, 10, 50]);
+    // Progress comes on its own line, so it may arrive just after the result.
+    await vi.waitFor(() => expect([...new Set(seen)]).toEqual([undefined, 10, 29, 50]));
   });
 
   it('shows Getting ready while the worker loads something', async () => {

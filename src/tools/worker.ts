@@ -22,8 +22,8 @@ export type AnyRun = (
 interface PageLine {
   /** The worker starts or stops waiting for something to load. */
   loading(on: boolean): void;
-  /** How far along the file is, as a whole percent. */
-  progress(percent: number): void;
+  /** How far along the file is, from 0 to 1. */
+  progress(fraction: number): void;
 }
 
 /**
@@ -52,7 +52,7 @@ export function serveRuns(
           const percent = wholePercent(fraction);
           if (percent === sent) return;
           sent = percent;
-          void page.progress(percent);
+          void page.progress(fraction);
         },
         async gettingReady(loading) {
           if (loads++ === 0) page.loading(true);
@@ -97,8 +97,8 @@ export function runInWorker(
         if (on) void context?.gettingReady(new Promise<void>((resolve) => (loaded = resolve)));
         else loaded?.();
       },
-      progress(percent) {
-        context?.progress(percent / 100);
+      progress(fraction) {
+        context?.progress(fraction);
       },
     });
     try {
