@@ -33,7 +33,7 @@ describe('Combine PDFs', () => {
     );
     expect(failure).toBeInstanceOf(ToolFailure);
     expect((failure as ToolFailure).reason).toBe(
-      'sample-password.pdf: This PDF has a password. Remove it and try again.',
+      'sample-password.pdf has a password. Remove the password and try again.',
     );
   });
 

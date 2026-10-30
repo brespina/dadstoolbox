@@ -13,7 +13,8 @@ export const tool = defineTool({
   largeFileLimit: 100_000_000,
   startButton: 'Combine PDFs',
   reasons: {
-    password: 'This PDF has a password. Remove it and try again.',
+    // {name} is the file's name: several files make one row, so it says which one.
+    password: '{name} has a password. Remove the password and try again.',
   },
   worker: false,
   outsideAddresses: [],

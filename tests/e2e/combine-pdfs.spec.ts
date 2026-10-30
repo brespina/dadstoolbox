@@ -69,7 +69,7 @@ test('a PDF with a password fails the combined PDF with the plain reason', async
   await page.getByRole('button', { name: 'Combine PDFs' }).click();
   await expect(
     page.getByText(
-      "Didn't work. sample-password.pdf: This PDF has a password. Remove it and try again.",
+      "Didn't work. sample-password.pdf has a password. Remove the password and try again.",
       { exact: true },
     ),
   ).toBeVisible();

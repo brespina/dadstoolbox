@@ -1,4 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
+import { fillText } from '../../text';
 import { ToolFailure, type ToolRunTogether } from '../types';
 import { tool } from './declaration';
 
@@ -8,8 +9,9 @@ export const run: ToolRunTogether<typeof tool.defaultOptions> = async (files) =>
   for (const file of files) {
     // pdf-lib's own EncryptedPDFError fails `instanceof`, so load anyway and ask.
     const source = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
-    // Several files make one row, so the reason says which file it was.
-    if (source.isEncrypted) throw new ToolFailure(`${file.name}: ${tool.reasons.password!}`);
+    if (source.isEncrypted) {
+      throw new ToolFailure(fillText(tool.reasons.password!, { name: file.name }));
+    }
     const pages = await combined.copyPages(source, source.getPageIndices());
     for (const page of pages) combined.addPage(page);
   }

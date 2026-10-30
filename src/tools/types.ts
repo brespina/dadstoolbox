@@ -108,7 +108,8 @@ export type ToolRunTogether<Options extends object = object> = (
 
 /**
  * Thrown by `run` with a plain-language reason the Tool wrote itself, shown on that
- * file's row. Any other error shows the shared fallback.
+ * row only (one row per file, or one for all files together). Any other error shows
+ * the shared fallback.
  */
 export class ToolFailure extends Error {
   constructor(public readonly reason: string) {

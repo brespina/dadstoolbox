@@ -144,7 +144,7 @@ function makeToolPage<Options extends object>(
   }
 
   /** Runs one row's work and records its named results, or why it didn't work. */
-  async function finish(item: BatchItem, original: string, work: () => Promise<ToolResult[]>) {
+  async function runRow(item: BatchItem, original: string, work: () => Promise<ToolResult[]>) {
     try {
       const results = await work();
       const named = results.map((result) => ({
@@ -163,7 +163,7 @@ function makeToolPage<Options extends object>(
   }
 
   const runOne = (item: BatchItem, file: File, options: Options) =>
-    finish(item, file.name, () => (run as ToolRun<Options>)(file, options));
+    runRow(item, file.name, () => (run as ToolRun<Options>)(file, options));
 
   const countLabel = (total: number) => `${total} ${total === 1 ? tool.noun.one : tool.noun.many}`;
 
@@ -190,7 +190,7 @@ function makeToolPage<Options extends object>(
     changed();
     updateItem(item.id, { status: 'working' });
     // Results of this mode are named after "combined", as in combined_dtb.pdf.
-    await finish(item, 'combined', () => (run as ToolRunTogether<Options>)(files, options));
+    await runRow(item, 'combined', () => (run as ToolRunTogether<Options>)(files, options));
     working = false;
     updateNewest((batch) => ({ ...batch, progress: null }));
   }

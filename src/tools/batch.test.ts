@@ -265,7 +265,7 @@ describe('all files together', () => {
     expect(page.saveAllFiles().map((r) => r.name)).toEqual(['combined_dtb.pdf']);
   });
 
-  it('names a second Batch combined_dtb_2, and never takes a chosen file’s name', async () => {
+  it('names a repeat combined_dtb_2, skipping a name a chosen file already has', async () => {
     const page = createToolPage(together, async () => [pdf()]);
     page.add([file('a.pdf')]);
     await page.start({});
