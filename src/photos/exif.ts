@@ -5,6 +5,9 @@
 //
 // Values are copied byte for byte, so the new details keep the original's byte order.
 // Any file this can't read simply has no details to keep.
+//
+// Remove photo location doesn't redraw: `jpegWithoutLocation` blanks the location in
+// the file's own bytes and leaves the rest as it was.
 
 /** One TIFF entry. `value` holds the entry's bytes in the original's byte order. */
 interface Entry {
@@ -300,7 +303,10 @@ const isTiff = (bytes: Uint8Array) => ['II*\0', 'MM\0*'].includes(ascii(bytes, 0
 
 const xmpPrefix = 'http://ns.adobe.com/xap/1.0/\0';
 /** Location fields in XMP text: an attribute's value, or an element's whole content. */
-const xmpLocation = [/\w+:GPS\w*\s*=\s*(["'])[^]*?\1/g, /<(\w+:GPS\w*)[^>]*>[^]*?<\/\1>/g];
+const xmpLocation = [
+  /\w+:GPS\w*\s*=\s*(["'])[^]*?\1/g,
+  /<(\w+:GPS\w*)(?:[^>]*[^/>])?>[^]*?<\/\1>/g,
+];
 
 /**
  * Takes the location out of XMP text in place, the details some photo apps write as
