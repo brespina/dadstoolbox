@@ -23,3 +23,7 @@ _Avoid_: Convertor
 **Batch**:
 The results from one press of a Tool's start button. Earlier Batches stay on the page when a person changes the options and runs the Tool again.
 _Avoid_: Run, job, session
+
+**Promise**:
+What the Site guarantees every visitor: no name, email or account asked for, no ads, no trackers or visitor counters, and a person's files are never kept or sent anywhere.
+_Avoid_: Privacy policy, guarantee
