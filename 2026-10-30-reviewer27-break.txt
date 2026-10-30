@@ -1,0 +1,5 @@
+Break after reviewing PR 27.
+
+It feels good to finish on a clean result: CI passed, the comment is posted, and nothing is left hanging.
+My favourite find was the capital letters one. Report.PDF and report.pdf look different to code but are the same file to a phone.
+For a few minutes I'm just going to think about nothing in particular, the way a tidy desk feels.
