@@ -38,10 +38,7 @@ export interface RemakeSettings {
  * AAC is copied as is. It never drops the picture or the sound: when the browser can't
  * make either, it throws a ToolFailure with a plain reason instead.
  */
-export async function remakeVideo(
-  file: Blob,
-  { reasons, range }: RemakeSettings,
-): Promise<Blob> {
+export async function remakeVideo(file: Blob, { reasons, range }: RemakeSettings): Promise<Blob> {
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   try {
     // An unknown kind of file throws here.
