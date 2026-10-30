@@ -158,6 +158,11 @@ The worker's files hold only the Tools marked worker, and the page's files only 
 others (`src/tools/tool-runs.ts` sorts them when the build starts). After changing a
 Tool's `worker` flag, restart the dev server.
 
+The worker's shared code (`src/tools/worker.ts` and what it imports, such as
+`ToolFailure`) is built into its own file, `worker-shared` (see `astro.config.ts`). If a
+Tool's `run` file imported the worker's entry file instead, Safari would run the entry a
+second time, and a Tool's plain reasons would show as the shared fallback.
+
 A worker loaded from its own file does not get the page's browser lock tag, so a worker
 Tool must not fetch anything itself. The page tests watch requests from workers too.
 

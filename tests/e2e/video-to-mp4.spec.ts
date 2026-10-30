@@ -33,13 +33,13 @@ async function saveVideo(page: Page, name: string) {
   return {
     kind: (await input.getFormat()).name,
     picture: video && {
-      codec: video.codec,
+      codec: await video.getCodec(),
       width: await video.getDisplayWidth(),
       height: await video.getDisplayHeight(),
       // Turned the right way up in the picture, not by a note a player may ignore.
       rotation: await video.getRotation(),
     },
-    sound: sound?.codec ?? null,
+    sound: sound ? await sound.getCodec() : null,
     seconds: Math.round(await input.computeDuration()),
   };
 }
@@ -101,7 +101,7 @@ test.describe('with the video features', () => {
     browserName,
   }) => {
     test.skip(browserName === 'chromium', 'Chromium here cannot make AAC sound');
-    await make(page, `${folder}opus.webm`);
+    await make(page, `${folder}opus.mp4`);
     expect(await saveVideo(page, 'opus_dtb.mp4')).toMatchObject({
       picture: { codec: 'avc', width: 320, height: 180 },
       sound: 'aac',
@@ -113,7 +113,7 @@ test.describe('with the video features', () => {
     browserName,
   }) => {
     test.skip(browserName !== 'chromium', 'Only Chromium here cannot make AAC sound');
-    await make(page, `${folder}opus.webm`);
+    await make(page, `${folder}opus.mp4`);
     await expect(failedWith(page, tool.reasons.cantKeepSound!)).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole('button', { name: /^Save / })).toHaveCount(0);
   });
