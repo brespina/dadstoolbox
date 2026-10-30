@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import exifr from 'exifr';
 import { describe, expect, it } from 'vitest';
-import { readDetails } from '../../photos/exif';
+import { isHeif, readDetails } from '../../photos/exif';
 import { ToolFailure } from '../types';
 import { tool } from './declaration';
 import { run } from './run';
@@ -117,15 +117,44 @@ describe('Remove photo location', () => {
     expect(failure).not.toBeInstanceOf(ToolFailure);
   });
 
-  it('points an iPhone photo (HEIC) to Change a photo to JPG for now', async () => {
+  it('takes the location out of an iPhone photo (HEIC), keeping it a HEIC', async () => {
+    const original = bytes('iphone.heic');
+    const before = readDetails(original)!;
+    expect(before.location).toHaveLength(7);
     // Its file type is often missing.
-    const heic = file(bytes('iphone.heic'), 'iphone.heic', '');
-    const failure = await run(heic, tool.defaultOptions).catch((e: unknown) => e);
-    expect(failure).toBeInstanceOf(ToolFailure);
-    expect((failure as ToolFailure).reason).toBe(
-      "This can't take the location out of an iPhone photo (HEIC) yet. Use Change a photo to JPG with Remove location ticked.",
-    );
+    const [result] = await run(file(original, 'iphone.heic', ''), tool.defaultOptions);
+    expect(result!.blob.type).toBe('image/heic');
+    const out = new Uint8Array(await result!.blob.arrayBuffer());
+    expect(isHeif(out)).toBe(true);
+    const after = readDetails(out)!;
+    expect(after.location).toEqual([]);
+    expect(after.dates).toEqual(before.dates);
+    expect(after.main).toEqual(before.main);
+    expect(out.length).toBe(original.length);
+    // Only the photo details item changes: it starts at byte 559 (from the sample's item
+    // list). The boxes before it and the picture itself (bytes 489 to 559) stay the same.
+    original.forEach((byte, at) => {
+      if (byte !== out[at]) expect(at >= 559, `byte ${at}`).toBe(true);
+    });
   });
+
+  it.each([
+    // Bytes 113–116 of the sample: where its photo details item starts. Point it past the end.
+    ["stored somewhere it can't reach", 113, [0x7f, 0xff, 0xff, 0xff]],
+    // Byte 562: the last byte of the item's "how far in the details begin". Point it at the picture.
+    ["that aren't photo details", 562, [0x40]],
+  ] as const)(
+    "doesn't save a copy of an iPhone photo (HEIC) with details %s",
+    async (_, at, change) => {
+      const damaged = bytes('iphone.heic');
+      damaged.set(change, at);
+      const failure = await run(file(damaged, 'damaged.heic', 'image/heic'), tool.defaultOptions)
+        .then(() => 'saved')
+        .catch((e: unknown) => e);
+      expect(failure).toBeInstanceOf(Error);
+      expect(failure).not.toBeInstanceOf(ToolFailure);
+    },
+  );
 });
 
 /** Where the first photo details segment (APP1 "Exif") of a JPEG starts and ends. */
