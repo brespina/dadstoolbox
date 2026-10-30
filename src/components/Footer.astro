@@ -1,0 +1,22 @@
+---
+import { text } from '../text';
+import { links } from '../links';
+
+const promise = `${import.meta.env.BASE_URL}/promise/`.replace(/\/+/g, '/');
+---
+
+<footer class="site-footer">
+  <nav aria-label={text.footer.label}>
+    <ul>
+      <li>
+        <a href={promise}>{text.footer.promise}</a>
+      </li>
+      <li>
+        <a href={links.reportProblem}>{text.footer.reportProblem}</a>
+      </li>
+      <li>
+        <a href={links.sponsor}>{text.footer.sponsor}</a>
+      </li>
+    </ul>
+  </nav>
+</footer>

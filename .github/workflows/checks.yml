@@ -1,0 +1,40 @@
+name: Checks
+
+# Runs on every PR and every push to a branch. Pushes to main run these same
+# checks through the deploy workflow, which calls this one.
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Type check
+        run: npm run check
+      - name: Formatting
+        run: npm run format:check
+      - name: Unit tests
+        run: npm test
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium webkit
+      - name: Page tests (phone-sized WebKit and Chromium)
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

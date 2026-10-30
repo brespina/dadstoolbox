@@ -1,0 +1,117 @@
+/* Shared base styles for every page. Sizes are in rem so the phone's text-size
+   setting applies; 1.125rem is 18 px at the default size. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --text: #1b1b1b;
+  --muted: #4a4a4a;
+  --link: #0b57a4;
+  --line: #d4d4d4;
+  --focus: #b8410e;
+  --surface: #f4f4f2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141414;
+    --text: #f2f2f2;
+    --muted: #c4c4c4;
+    --link: #8cc4ff;
+    --line: #3a3a3a;
+    --focus: #ffb27a;
+    --surface: #1f1f1f;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.page {
+  width: 100%;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  flex: 1;
+}
+
+h1 {
+  font-size: 1.75rem;
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+}
+
+p {
+  margin: 0 0 1rem;
+}
+
+a {
+  color: var(--link);
+  text-underline-offset: 0.15em;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.site-footer {
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.site-footer ul {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  max-width: 40rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.5rem;
+}
+
+/* At least 44 x 44 px to tap. */
+.site-footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
