@@ -1,0 +1,321 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Do not build on this file.
+  Question: What does a Tool page look like on a phone? (issue #5)
+  Plan: three structurally different home + Tool page designs, switchable via ?variant=A|B|C,
+  with one working Tool (image converter: HEIC/PNG/WebP/JPG -> JPG/PNG) running in the browser.
+  Run: python3 -m http.server 8000 --bind 0.0.0.0 -d prototype/tool-page   then open http://<laptop-ip>:8000 on a phone.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dad's Toolbox prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,500..800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: one narrow phone column, big thumb-sized targets, primary action low on the screen. */
+:root {
+  --paper: #f2f5f4; --card: #ffffff; --ink: #14201e; --muted: #56676a; --line: #d3dcda;
+  --accent: #f2b705; --accent-ink: #14201e; --ok: #1d7748; --warn: #9a5800; --bad: #b3261e;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --paper: #0f1615; --card: #182220; --ink: #e8efed; --muted: #9caaa7; --line: #2b3734;
+    --accent: #f5c22a; --accent-ink: #14201e; --ok: #4cc38a; --warn: #f0a54a; --bad: #ff8a80; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 17px/1.5 var(--body);
+  padding: 0 max(16px, env(safe-area-inset-right)) calc(88px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+#app { max-width: 520px; margin: 0 auto; padding-top: max(12px, env(safe-area-inset-top)); }
+h1, h2, h3 { font-family: var(--display); font-stretch: 85%; line-height: 1.1; text-wrap: balance; margin: 0; }
+h1 { font-size: 30px; font-weight: 800; } h2 { font-size: 24px; font-weight: 750; } h3 { font-size: 19px; font-weight: 700; }
+p { margin: 0; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.muted { color: var(--muted); }
+.small { font-size: 15px; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.row { display: flex; align-items: center; gap: 12px; }
+.brand { font-family: var(--display); font-weight: 800; font-stretch: 110%; letter-spacing: .02em; font-size: 15px; text-transform: uppercase; }
+.btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px; width: 100%;
+  border-radius: 14px; border: 2px solid var(--ink); background: var(--card); font-weight: 700; padding: 0 18px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.big { min-height: 120px; font-size: 21px; flex-direction: column; border-style: dashed; }
+.btn[disabled] { opacity: .45; cursor: default; }
+.link { background: none; border: 0; padding: 8px 0; color: var(--ink); text-decoration: underline; font-weight: 700; }
+.back { background: none; border: 0; padding: 10px 0; font-weight: 700; }
+.privacy { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; color: var(--muted); }
+.privacy b { color: var(--ink); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; border: 2px solid var(--ink); border-radius: 14px; overflow: hidden; }
+.seg button { min-height: 52px; border: 0; background: var(--card); font-weight: 700; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.chip { display: inline-block; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 99px; border: 1.5px solid currentColor; white-space: nowrap; }
+.chip.ok { color: var(--ok); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); } .chip.wait { color: var(--muted); }
+.thumb { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; background: var(--line); flex: none; }
+.bar { height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--ok); transition: width .3s; }
+.note { border-left: 4px solid var(--warn); padding: 8px 12px; background: var(--card); font-size: 15px; }
+.sticky { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom)); background: var(--paper); padding: 12px 0; display: flex; flex-direction: column; gap: 10px; }
+.minw0 { min-width: 0; }
+.ellip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Variant A: one long page */
+.a-cat { display: flex; flex-direction: column; border-top: 2px solid var(--ink); }
+.a-cat > .label { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 14px 0 6px; }
+.a-tool { display: flex; align-items: center; gap: 14px; padding: 14px 0; border: 0; border-bottom: 1px solid var(--line); background: none; text-align: left; width: 100%; }
+.a-tool .ico { width: 44px; height: 44px; flex: none; border-radius: 10px; background: var(--card); border: 1.5px solid var(--line); display: grid; place-items: center; font-family: var(--display); font-weight: 800; font-size: 13px; }
+.a-tool .go { margin-left: auto; font-size: 22px; color: var(--muted); }
+.a-result { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+
+/* Variant B: steps */
+.b-dots { display: flex; gap: 6px; } .b-dots i { flex: 1; height: 6px; border-radius: 99px; background: var(--line); } .b-dots i.on { background: var(--ink); }
+.b-search { width: 100%; min-height: 56px; border-radius: 14px; border: 2px solid var(--ink); background: var(--card); color: var(--ink); font: inherit; padding: 0 16px; }
+.b-task { text-align: left; padding: 16px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--card); display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.b-task b { font-size: 18px; }
+.b-step { min-height: 52vh; display: flex; flex-direction: column; gap: 20px; justify-content: center; }
+.b-big { font-family: var(--display); font-size: 56px; font-weight: 800; font-stretch: 80%; font-variant-numeric: tabular-nums; }
+
+/* Variant C: file first */
+.c-drop { min-height: 260px; border-radius: 22px; border: 3px dashed var(--ink); background: var(--card); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 24px; width: 100%; }
+.c-drop .plus { font-family: var(--display); font-size: 64px; line-height: 1; font-weight: 800; }
+.c-card { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 16px; background: var(--card); border: 1.5px solid var(--line); }
+.c-offer { text-align: left; padding: 16px; border-radius: 16px; border: 2px solid var(--ink); background: var(--card); width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.c-all { display: flex; flex-wrap: wrap; gap: 8px; }
+.c-all button { border: 1.5px solid var(--line); background: var(--card); border-radius: 99px; padding: 8px 14px; font-size: 15px; }
+
+/* Prototype switcher (not part of any design) */
+#sw { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 50;
+  display: flex; align-items: center; gap: 4px; background: #e0007a; color: #fff; border-radius: 99px; padding: 4px; box-shadow: 0 4px 18px rgba(0,0,0,.35);
+  font: 700 14px/1 system-ui, sans-serif; max-width: calc(100vw - 24px); }
+#sw button { background: rgba(255,255,255,.18); color: #fff; border: 0; width: 44px; height: 44px; border-radius: 99px; font-size: 20px; }
+#sw span { padding: 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<input type="file" id="picker" multiple accept="image/*,.heic,.heif" hidden>
+<div id="sw" role="toolbar" aria-label="Prototype variant switcher">
+  <button id="sw-prev" aria-label="Previous variant">‹</button><span id="sw-label"></span><button id="sw-next" aria-label="Next variant">›</button>
+</div>
+<script>
+// ---------- shared data and real Tool logic (shared logic is fine; layouts are not shared) ----------
+const TOOLS = [
+  { id: 'image', cat: 'Photos', name: 'Change a photo to JPG', blurb: 'iPhone photo won’t open or upload? Turn HEIC into JPG.', icon: 'JPG', ready: true },
+  { id: 'shrink', cat: 'Photos', name: 'Make a photo smaller', blurb: 'Too big to email or upload.', icon: 'S/M' },
+  { id: 'merge', cat: 'PDFs', name: 'Combine PDFs', blurb: 'Put several PDFs into one.', icon: 'PDF' },
+  { id: 'split', cat: 'PDFs', name: 'Split a PDF', blurb: 'Take out the pages you need.', icon: 'PDF' },
+  { id: 'gif', cat: 'Video', name: 'Turn a video into a GIF', blurb: 'A short clip you can send anywhere.', icon: 'GIF', needs: () => 'VideoDecoder' in window },
+  { id: 'qr', cat: 'Other', name: 'Make a QR code', blurb: 'For a link, Wi-Fi password or text.', icon: 'QR' },
+];
+const tool = id => TOOLS.find(t => t.id === id);
+const cats = () => [...new Set(TOOLS.map(t => t.cat))];
+const unsupported = t => t.needs && !t.needs();
+
+const S = { view: 'home', tool: null, files: [], fmt: 'jpg', results: [], step: 1, query: '', picked: null };
+
+const isHeic = f => /image\/hei[cf]/.test(f.type) || /\.hei[cf]$/i.test(f.name);
+const kb = n => n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' KB';
+let heicLoaded = null;
+function loadHeic() { // only fetched when a HEIC photo shows up and the browser can't read it itself
+  return heicLoaded ||= new Promise((ok, no) => { const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js'; s.onload = ok; s.onerror = () => no(new Error('Could not load the HEIC reader. Check your connection and try again.')); document.head.append(s); });
+}
+async function toBitmap(file) {
+  try { return await createImageBitmap(file); } catch (e) {
+    if (!isHeic(file)) throw new Error('This file isn’t a photo this browser can read.');
+    await loadHeic(); const png = await heic2any({ blob: file, toType: 'image/png' });
+    return createImageBitmap(Array.isArray(png) ? png[0] : png);
+  }
+}
+async function convert(file, fmt) {
+  const bmp = await toBitmap(file);
+  const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+  const g = c.getContext('2d'); if (fmt === 'jpg') { g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); }
+  g.drawImage(bmp, 0, 0); // redrawing through canvas drops EXIF, including location
+  const type = fmt === 'jpg' ? 'image/jpeg' : 'image/png';
+  const blob = await new Promise(r => c.toBlob(r, type, 0.9));
+  return { blob, outName: file.name.replace(/\.[^.]+$/, '') + '.' + fmt, size: blob.size };
+}
+async function run() {
+  S.results = S.files.map(f => ({ name: f.name, before: f.size, status: 'waiting', big: f.size > 25e6 }));
+  render();
+  for (let i = 0; i < S.files.length; i++) {
+    const r = S.results[i]; r.status = 'working'; render();
+    try { Object.assign(r, await convert(S.files[i], S.fmt)); r.url = URL.createObjectURL(r.blob); r.status = 'done'; }
+    catch (e) { r.status = 'error'; r.msg = e.message; }
+    render();
+  }
+  if (VARIANT === 'B') { S.step = 4; render(); }
+}
+const doneCount = () => S.results.filter(r => r.status === 'done' || r.status === 'error').length;
+const allDone = () => S.results.length && doneCount() === S.results.length;
+async function save(list) {
+  const files = list.filter(r => r.blob).map(r => new File([r.blob], r.outName, { type: r.blob.type }));
+  if (navigator.canShare && navigator.canShare({ files })) { // phones: lets people "Save to Photos"
+    try { await navigator.share({ files }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  for (const f of files) { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); await new Promise(r => setTimeout(r, 400)); }
+}
+const canShareFiles = () => !!navigator.canShare;
+const saveWord = () => canShareFiles() ? 'Save' : 'Download';
+const statusChip = r => ({ waiting: '<span class="chip wait">Waiting</span>', working: '<span class="chip warn">Working…</span>',
+  done: '<span class="chip ok">Done</span>', error: '<span class="chip bad">Didn’t work</span>' })[r.status];
+const PRIVACY = '<div class="privacy"><span aria-hidden="true">🔒</span><p><b>Your photos stay on your device.</b> Nothing is uploaded. It even works with Wi-Fi off once the page has loaded.</p></div>';
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const notBuilt = t => `<div class="stack"><button class="back" data-a="home">‹ All tools</button><h1>${t.name}</h1>
+  <p class="note">Prototype: only “Change a photo to JPG” works. This Tool isn’t built yet.</p></div>`;
+const fmtSeg = () => `<div class="seg" role="group" aria-label="Save as">
+  <button data-a="fmt" data-v="jpg" aria-pressed="${S.fmt === 'jpg'}">JPG <span class="small muted">&nbsp;opens anywhere</span></button>
+  <button data-a="fmt" data-v="png" aria-pressed="${S.fmt === 'png'}">PNG <span class="small muted">&nbsp;sharper</span></button></div>`;
+
+// ---------- Variant A: one long page, everything top to bottom ----------
+const A = { name: 'One page', render() {
+  if (S.view === 'home') return `<div class="stack">
+    <div class="brand">Dad’s Toolbox</div>
+    <h1>Free tools for everyday files</h1>
+    <p class="muted">No sign-up, no ads. Pick what you want to do.</p>
+    ${cats().map(c => `<div class="a-cat"><div class="label">${c}</div>
+      ${TOOLS.filter(t => t.cat === c).map(t => `<button class="a-tool" data-a="open" data-v="${t.id}">
+        <span class="ico">${t.icon}</span><span class="minw0"><b>${t.name}</b><br><span class="small muted">${unsupported(t) ? 'Doesn’t work on this browser yet' : t.blurb}</span></span><span class="go">›</span></button>`).join('')}
+    </div>`).join('')}
+    ${PRIVACY}</div>`;
+  const t = tool(S.tool); if (!t.ready) return notBuilt(t);
+  return `<div class="stack">
+    <button class="back" data-a="home">‹ All tools</button>
+    <h1>${t.name}</h1><p class="muted">${t.blurb}</p>
+    <div class="stack"><b>1. Save as</b>${fmtSeg()}</div>
+    <div class="stack"><b>2. Choose photos</b>
+      <button class="btn big" data-a="pick"><span>＋ Choose photos</span><span class="small muted">from your photo library or files</span></button></div>
+    ${S.results.length ? `<div class="stack"><b>3. Your photos</b>
+      <div class="bar" aria-label="Progress"><i style="width:${100 * doneCount() / S.results.length}%"></i></div>
+      <p class="small muted">${allDone() ? 'All done. Location data removed.' : `Working on ${Math.min(doneCount() + 1, S.results.length)} of ${S.results.length}…`}</p>
+      <div>${S.results.map((r, i) => `<div class="a-result">
+        ${r.url ? `<img class="thumb" src="${r.url}" alt="">` : '<div class="thumb"></div>'}
+        <div class="minw0" style="flex:1"><div class="ellip"><b>${esc(r.outName || r.name)}</b></div>
+          <div class="small muted">${r.status === 'done' ? `${kb(r.before)} → ${kb(r.size)}` : r.msg ? esc(r.msg) : kb(r.before)}${r.big ? ' · large file, may be slow' : ''}</div></div>
+        ${r.status === 'done' ? `<button class="btn" style="width:auto;min-height:44px" data-a="save1" data-v="${i}">${saveWord()}</button>` : statusChip(r)}</div>`).join('')}</div>
+      ${allDone() && S.results.length > 1 ? `<button class="btn primary" data-a="saveall">${saveWord()} all ${S.results.length}</button>` : ''}
+    </div>` : ''}
+    ${PRIVACY}</div>`;
+}};
+
+// ---------- Variant B: guided steps, one question per screen ----------
+const B = { name: 'Steps', render() {
+  if (S.view === 'home') {
+    const q = S.query.toLowerCase();
+    const hits = TOOLS.filter(t => !q || (t.name + ' ' + t.blurb + ' ' + t.cat + ' heic iphone pdf video').toLowerCase().includes(q));
+    return `<div class="stack">
+      <div class="brand">Dad’s Toolbox</div>
+      <h1>What do you need to do?</h1>
+      <label for="b-q" class="small muted">Type a word like “iPhone photo” or “PDF”</label>
+      <input id="b-q" class="b-search" type="search" value="${esc(S.query)}" placeholder="Search tools" autocomplete="off">
+      <div class="stack" id="b-hits">${hits.map(t => `<button class="b-task" data-a="open" data-v="${t.id}"><b>${t.name}</b><span class="small muted">${unsupported(t) ? 'Doesn’t work on this browser yet' : t.blurb}</span></button>`).join('') || '<p class="muted">No tool for that yet.</p>'}</div>
+      ${PRIVACY}</div>`;
+  }
+  const t = tool(S.tool); if (!t.ready) return notBuilt(t);
+  const dots = `<div class="b-dots" aria-label="Step ${S.step} of 4">${[1, 2, 3, 4].map(n => `<i class="${n <= S.step ? 'on' : ''}"></i>`).join('')}</div>`;
+  const top = `<div class="row" style="justify-content:space-between"><button class="back" data-a="${S.step === 1 || S.step === 3 ? 'home' : 'bstep'}" data-v="${S.step - 1}">‹ ${S.step === 1 ? 'All tools' : S.step === 3 ? 'Cancel' : 'Back'}</button><span class="small muted">Step ${S.step} of 4</span></div>${dots}`;
+  let body = '', act = '';
+  if (S.step === 1) { body = `<p class="small muted">${t.name}</p><h1>Which photos?</h1><p class="muted">You can pick more than one.</p>${PRIVACY}`;
+    act = `<button class="btn primary" data-a="pick">Choose photos</button>`; }
+  if (S.step === 2) { body = `<h1>${S.files.length} photo${S.files.length > 1 ? 's' : ''} picked</h1><p class="muted">How should they be saved?</p>${fmtSeg()}
+      ${S.files.some(f => f.size > 25e6) ? '<p class="note">One photo is very large. It may be slow on a phone.</p>' : ''}`;
+    act = `<button class="btn primary" data-a="bgo">Change ${S.files.length} photo${S.files.length > 1 ? 's' : ''} to ${S.fmt.toUpperCase()}</button>`; }
+  if (S.step === 3) { body = `<p class="muted">Working on it…</p><div class="b-big">${doneCount()} of ${S.results.length}</div>
+      <div class="bar"><i style="width:${100 * doneCount() / S.results.length}%"></i></div><p class="small muted">Keep this page open. This happens on your phone, so big photos take a moment.</p>`; }
+  if (S.step === 4) { const ok = S.results.filter(r => r.status === 'done'); const bad = S.results.filter(r => r.status === 'error');
+    body = `<h1>Done. ${ok.length} photo${ok.length !== 1 ? 's are' : ' is'} ready.</h1>
+      ${ok[0] ? `<img src="${ok[0].url}" alt="Preview of the first photo" style="width:100%;max-height:40vh;object-fit:contain;border-radius:14px;background:var(--line)">` : ''}
+      <p class="small muted">Location data removed. ${ok.map(r => esc(r.outName)).slice(0, 3).join(', ')}${ok.length > 3 ? ` and ${ok.length - 3} more` : ''}</p>
+      ${bad.map(r => `<p class="note">${esc(r.name)}: ${esc(r.msg)}</p>`).join('')}`;
+    act = `<button class="btn primary" data-a="saveall">${canShareFiles() ? 'Save to Photos' : 'Download'}${ok.length > 1 ? ` (${ok.length})` : ''}</button><button class="btn" data-a="again">Do more photos</button>`; }
+  return `<div class="stack">${top}<div class="b-step">${body}</div>${act ? `<div class="sticky">${act}</div>` : ''}</div>`;
+}};
+
+// ---------- Variant C: file first; the Site suggests what it can do with it ----------
+const C = { name: 'File first', render() {
+  if (S.view === 'home') {
+    if (S.picked) { const f = S.picked[0]; const heic = isHeic(f); const img = /^image\//.test(f.type) || heic;
+      const offers = img ? [['image', heic ? 'Change to JPG' : 'Change format', heic ? 'iPhone photo. Most sites want JPG.' : 'Save as JPG or PNG'], ['shrink', 'Make it smaller', `Now ${kb(f.size)}`]] : [];
+      return `<div class="stack"><button class="back" data-a="cclear">‹ Start over</button>
+        <div class="c-card"><div class="thumb"></div><div class="minw0"><div class="ellip"><b>${esc(f.name)}</b></div><div class="small muted">${S.picked.length > 1 ? `and ${S.picked.length - 1} more · ` : ''}${kb(f.size)}</div></div></div>
+        <h2>What do you want to do?</h2>
+        ${offers.map(([id, n, d]) => `<button class="c-offer" data-a="coffer" data-v="${id}"><span><b>${n}</b><br><span class="small muted">${d}</span></span><span>›</span></button>`).join('') || '<p class="note">No tool for this kind of file yet.</p>'}
+        ${PRIVACY}</div>`; }
+    return `<div class="stack">
+      <div class="brand">Dad’s Toolbox</div>
+      <button class="c-drop" data-a="pick"><span class="plus">＋</span><h2>Choose a file</h2><span class="muted">A photo, PDF or video. We’ll show what you can do with it.</span></button>
+      ${PRIVACY}
+      <p class="small muted">Or pick a tool:</p>
+      <div class="c-all">${TOOLS.map(t => `<button data-a="open" data-v="${t.id}">${t.name}</button>`).join('')}</div></div>`;
+  }
+  const t = tool(S.tool); if (!t.ready) return notBuilt(t);
+  const ok = S.results.filter(r => r.status === 'done');
+  return `<div class="stack">
+    <div class="row" style="justify-content:space-between"><button class="back" data-a="home">‹ Home</button><span class="small muted">${t.name}</span></div>
+    <h2>${allDone() ? 'Ready to save' : S.results.length ? 'Changing to ' + S.fmt.toUpperCase() + '…' : t.name}</h2>
+    ${!S.results.length ? `${fmtSeg()}<button class="btn big" data-a="pick">＋ Add photos</button>` : ''}
+    ${S.results.map((r, i) => `<div class="c-card">
+      ${r.url ? `<img class="thumb" src="${r.url}" alt="">` : '<div class="thumb"></div>'}
+      <div class="minw0" style="flex:1"><div class="ellip"><b>${esc(r.outName || r.name)}</b></div>
+        <div class="small muted">${r.status === 'done' ? `${kb(r.size)} · location removed` : r.msg ? esc(r.msg) : kb(r.before)}</div></div>
+      ${r.status === 'done' ? `<button class="link" data-a="save1" data-v="${i}">${saveWord()}</button>` : statusChip(r)}</div>`).join('')}
+    ${S.results.length ? `<div class="sticky">
+      ${allDone() ? `<button class="btn primary" data-a="saveall">${saveWord()} ${ok.length > 1 ? 'all ' + ok.length : ''}</button><button class="btn" data-a="pick">＋ Add more</button>`
+        : `<div class="bar"><i style="width:${100 * doneCount() / S.results.length}%"></i></div><p class="small muted">${doneCount()} of ${S.results.length} done</p>`}
+    </div>` : PRIVACY}
+  </div>`;
+}};
+
+// ---------- wiring ----------
+const VARIANTS = { A, B, C }; const KEYS = Object.keys(VARIANTS);
+let VARIANT = new URLSearchParams(location.search).get('variant') || 'A'; if (!VARIANTS[VARIANT]) VARIANT = 'A';
+const app = document.getElementById('app'), picker = document.getElementById('picker');
+function render() {
+  const focusQ = document.activeElement && document.activeElement.id === 'b-q';
+  app.innerHTML = VARIANTS[VARIANT].render();
+  document.getElementById('sw-label').textContent = `${VARIANT} (${VARIANTS[VARIANT].name})`;
+  if (focusQ) { const q = document.getElementById('b-q'); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+}
+function reset() { S.files = []; S.results = []; S.step = 1; S.picked = null; picker.value = ''; }
+function go(v) { VARIANT = v; const u = new URL(location); u.searchParams.set('variant', v); history.replaceState(null, '', u); reset(); S.view = 'home'; render(); scrollTo(0, 0); }
+const step = d => go(KEYS[(KEYS.indexOf(VARIANT) + d + KEYS.length) % KEYS.length]);
+document.getElementById('sw-prev').onclick = () => step(-1);
+document.getElementById('sw-next').onclick = () => step(1);
+addEventListener('keydown', e => { if (e.target.closest('input,textarea,[contenteditable]')) return;
+  if (e.key === 'ArrowLeft') step(-1); if (e.key === 'ArrowRight') step(1); });
+app.addEventListener('input', e => { if (e.target.id === 'b-q') { S.query = e.target.value; render(); } });
+app.addEventListener('click', e => {
+  const b = e.target.closest('[data-a]'); if (!b) return; const v = b.dataset.v;
+  ({
+    home: () => { reset(); S.view = 'home'; },
+    open: () => { reset(); S.view = 'tool'; S.tool = v; },
+    pick: () => picker.click(),
+    fmt: () => { S.fmt = v; },
+    save1: () => save([S.results[+v]]),
+    saveall: () => save(S.results),
+    bstep: () => { S.step = Math.max(1, +v); },
+    bgo: () => { S.step = 3; run(); },
+    again: () => { reset(); },
+    cclear: () => { reset(); },
+    coffer: () => { const files = S.picked; reset(); S.view = 'tool'; S.tool = v; if (tool(v).ready) { S.files = files; run(); } },
+  })[b.dataset.a]?.();
+  if (b.dataset.a === 'open' || b.dataset.a === 'home') scrollTo(0, 0);
+  render();
+});
+picker.addEventListener('change', () => {
+  const files = [...picker.files]; picker.value = ''; if (!files.length) return;
+  if (VARIANT === 'C' && S.view === 'home') { S.picked = files; render(); return; }
+  if (VARIANT === 'B') { S.files = files; S.step = 2; render(); return; }
+  S.files = VARIANT === 'C' ? [...S.files, ...files] : files;
+  run();
+});
+render();
+</script>
+</body>
+</html>
