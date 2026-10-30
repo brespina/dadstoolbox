@@ -123,7 +123,7 @@ export const credits: Credit[] = [
     package: 'mediabunny',
     version: '1.61.4',
     license: 'MPL-2.0',
-    does: 'Reads your video when you make a gif from it.',
+    does: 'Reads your videos, and makes new ones from them.',
     ...github('Vanilagy/mediabunny', 'v1.61.4', 'LICENSE'),
   },
   {

@@ -78,7 +78,7 @@ field is required.
 | `noun`             | What the Tool takes, as `{ one, many }`, such as `{ one: 'PDF', many: 'PDFs' }`. Used in the privacy line, the Choose button ("Choose PDFs") and Batch labels ("3 PDFs").                                                                                                                         |
 | `accept`           | File types for the Choose button: types such as `application/pdf` and endings such as `.pdf`. List both, because phones are not consistent.                                                                                                                                                        |
 | `input`            | The input mode: `each`, `together` or `none`. See [Input modes](#input-modes).                                                                                                                                                                                                                     |
-| `needs`            | Browser features `run` needs, such as `webcodecs`. They are checked when the page runs. Where one is missing, the home page row and the Tool page say "Doesn't work on this browser yet" and Choose is greyed out. Add a new feature to the `BrowserFeature` type in `types.ts` if it is missing. |
+| `needs`            | Browser features `run` needs: `webcodecs` (reading video) and `makeVideo` (making video). They are checked when the page runs. Where one is missing, the home page row and the Tool page say "Doesn't work on this browser yet" and Choose is greyed out. Add a new feature to the `BrowserFeature` type in `types.ts` if it is missing. |
 | `largeFileLimit`   | A size in bytes. A file bigger than this gets a note on its Ready row warning it may be slow or stop partway on a phone. It does not stop the file. Set it from what a phone can really handle.                                                                                                    |
 | `largeFileNote`    | Optional. That note. Defaults to "This {noun} is big for a phone. It may take a few minutes or stop partway." with the Tool's noun (one) swapped in.                                                                                                                                          |
 | `typeLabel`        | Optional, for input mode `none`. The label on the box the visitor types into. Has a shared default.                                                                                                                                                                                              |
@@ -160,6 +160,22 @@ Tool's `worker` flag, restart the dev server.
 
 A worker loaded from its own file does not get the page's browser lock tag, so a worker
 Tool must not fetch anything itself. The page tests watch requests from workers too.
+
+## Remaking a video
+
+A Tool that saves a video calls `remakeVideo` from `src/video/remake.ts`, the shared
+video module. It remakes the video as an H.264 MP4 with AAC sound, the picture size
+kept, and copies sound that is already AAC. It asks first whether the browser can make
+this video, and fails with a plain reason rather than save a video missing its picture
+or sound. Make a video play anywhere (`src/tools/video-to-mp4/`) is the worked example:
+
+- Spread `videoReasons` (`src/video/reasons.ts`) into the declaration's `reasons`, and
+  pass `tool.reasons` to `remakeVideo`.
+- Set `needs: ['webcodecs', 'makeVideo']` and `worker: true`.
+- Import the module inside `run` with a dynamic `import()` under `context.gettingReady`,
+  as Mediabunny is big.
+- A new setting, such as a longest side or a time range, is a new field of
+  `RemakeSettings`.
 
 ## Notes on the Ready row
 
