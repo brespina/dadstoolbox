@@ -13,6 +13,8 @@ export default defineConfig({
   integrations: [svelte()],
   // Shiki's inline styles break the browser lock, and the Site has no code samples.
   markdown: { syntaxHighlight: false },
+  // The Tool worker loads each Tool's `run` only when asked, which needs module workers.
+  vite: { worker: { format: 'es' } },
   security: {
     // The browser lock (ADR-0003): each page may only talk to the Site, plus the
     // outside addresses Tools declare.

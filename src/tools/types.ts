@@ -126,16 +126,27 @@ export interface ToolResult {
   detail?: string;
 }
 
+/** What shared code hands a Tool's `run` while it works. Tests may leave it out. */
+export interface ToolRunContext {
+  /**
+   * Shows "Getting ready…" until `loading` settles, and passes on its value. For
+   * something big that loads only once a file is chosen, such as a library.
+   */
+  gettingReady<T>(loading: Promise<T>): Promise<T>;
+}
+
 /** A Tool's job for one file (input mode "each"). It may return any number of results. */
 export type ToolRun<Options extends object = object> = (
   file: File,
   options: Options,
+  context?: ToolRunContext,
 ) => Promise<ToolResult[]>;
 
 /** A Tool's job for all chosen files at once, in the order set (input mode "together"). */
 export type ToolRunTogether<Options extends object = object> = (
   files: File[],
   options: Options,
+  context?: ToolRunContext,
 ) => Promise<ToolResult[]>;
 
 /**

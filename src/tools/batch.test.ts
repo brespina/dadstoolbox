@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createToolPage, type ToolPageState } from './batch';
-import { defineTool, ToolFailure } from './types';
+import { defineTool, ToolFailure, type ToolRun } from './types';
+import { runInWorker, serveRuns, type AnyRun } from './worker';
 
 const tool = defineTool({
   address: 'fake',
@@ -97,6 +98,35 @@ describe('watching a Batch', () => {
       JSON.stringify({ current: 2, total: 2 }),
       'null',
     ]);
+  });
+
+  it('shows Getting ready while a Tool waits for something to load, then carries on', async () => {
+    let loaded!: () => void;
+    const loading = new Promise<void>((resolve) => (loaded = resolve));
+    const page = createToolPage(tool, async (_file, _options, context) => {
+      await context!.gettingReady(loading);
+      return [pdf()];
+    });
+    page.add([file('a.pdf')]);
+    const started = page.start({});
+    await Promise.resolve();
+    expect(page.state().batches[0]!.gettingReady).toBe(true);
+    loaded();
+    await started;
+    expect(page.state().batches[0]!.gettingReady).toBe(false);
+    expect(page.state().batches[0]!.items[0]!.status).toBe('done');
+  });
+
+  it('stops Getting ready when loading fails, and the row says it did not work', async () => {
+    const page = createToolPage(tool, async (_file, _options, context) => {
+      await context!.gettingReady(Promise.reject(new Error('offline')));
+      return [pdf()];
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    page.add([file('a.pdf')]);
+    await page.start({});
+    expect(page.state().batches[0]!.gettingReady).toBe(false);
+    expect(page.state().batches[0]!.items[0]!.status).toBe('failed');
   });
 
   it('labels each Batch with how many files it holds', async () => {
@@ -391,5 +421,55 @@ describe('all files together', () => {
     expect(page.state().batches[0]!.items).toMatchObject([
       { status: 'failed', reason: 'b.pdf has a password.', results: [] },
     ]);
+  });
+});
+
+describe('a Tool whose run is marked worker', () => {
+  // A MessageChannel stands in for the Web Worker: one end is the page, the other the worker.
+  function inWorker(run: ToolRun) {
+    const { port1, port2 } = new MessageChannel();
+    serveRuns(port2, async () => run as AnyRun);
+    return createToolPage({ ...tool, worker: true }, runInWorker(port1, tool.address));
+  }
+
+  it('runs each file there, with results named as usual', async () => {
+    const page = inWorker(async (f) => [{ blob: new Blob([f.name], { type: 'application/pdf' }) }]);
+    page.add([file('a.pdf'), file('b.pdf')]);
+    await page.start({});
+    const results = page.state().batches[0]!.items.flatMap((item) => item.results);
+    expect(results.map((r) => r.name)).toEqual(['a_dtb.pdf', 'b_dtb.pdf']);
+    expect(await results[1]!.blob.text()).toBe('b.pdf');
+  });
+
+  it("shows the Tool's own reason, and the shared one for any other error", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const page = inWorker(async (f) => {
+      if (f.name === 'locked.pdf') throw new ToolFailure('This PDF has a password.');
+      throw new TypeError('xref table broken');
+    });
+    page.add([file('locked.pdf'), file('broken.pdf')]);
+    await page.start({});
+    expect(page.state().batches[0]!.items).toMatchObject([
+      { status: 'failed', reason: 'This PDF has a password.' },
+      { status: 'failed', reason: 'This file may be damaged or not supported.' },
+    ]);
+  });
+
+  it('shows Getting ready while the worker loads something', async () => {
+    let loaded!: () => void;
+    const loading = new Promise<void>((resolve) => (loaded = resolve));
+    const page = inWorker(async (_f, _options, context) => {
+      await context!.gettingReady(loading);
+      return [pdf()];
+    });
+    const seen: boolean[] = [];
+    page.subscribe((state) => state.batches[0] && seen.push(state.batches[0].gettingReady));
+    page.add([file('a.pdf')]);
+    const started = page.start({});
+    await vi.waitFor(() => expect(seen).toContain(true));
+    loaded();
+    await started;
+    expect(page.state().batches[0]!.gettingReady).toBe(false);
+    expect(page.state().batches[0]!.items[0]!.status).toBe('done');
   });
 });

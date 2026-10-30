@@ -83,6 +83,8 @@ export const text = {
     progress: 'Working on {current} of {total}…',
     // Shown instead of the moving progress bar when reduced motion is on.
     working: 'Working…',
+    // Shown while something big the Tool needs is still loading.
+    gettingReady: 'Getting ready…',
     status: {
       ready: 'Ready',
       working: 'Working…',

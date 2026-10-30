@@ -6,7 +6,7 @@ import {
   readDetails,
   webpWithDetails,
 } from '../../photos/exif';
-import { ToolFailure, type ToolRun } from '../types';
+import { ToolFailure, type ToolRun, type ToolRunContext } from '../types';
 import { formatTypes, tool, type Options } from './declaration';
 import { paintOnCanvas } from './canvas';
 
@@ -16,19 +16,19 @@ export interface Painted {
   width: number;
   height: number;
 }
-export type Paint = (file: File, type: string) => Promise<Painted>;
+export type Paint = (file: File, type: string, context?: ToolRunContext) => Promise<Painted>;
 
 /** The Tool's job, with the drawing step passed in so tests can stand in for the canvas. */
 export function makeRun(paint: Paint): ToolRun<Options> {
-  return async (file, options) => {
+  return async (file, options, context) => {
     const original = new Uint8Array(await file.arrayBuffer());
     const type = formatTypes[options.format];
 
     let painted: Painted;
     try {
-      painted = await paint(file, type);
+      painted = await paint(file, type, context);
     } catch (error) {
-      // Only some browsers can open an iPhone photo (HEIC) themselves.
+      // Neither the browser nor the late-loaded decoder could open this iPhone photo.
       if (isHeif(original)) throw new ToolFailure(tool.reasons.heic!);
       throw error;
     }

@@ -8,6 +8,7 @@ import {
   type ToolDeclaration,
   type ToolResult,
   type ToolRun,
+  type ToolRunContext,
   type ToolRunTogether,
 } from './types';
 
@@ -48,6 +49,8 @@ export interface Batch {
   items: BatchItem[];
   /** Which file is being worked on, or null once the Batch is finished. */
   progress: { current: number; total: number } | null;
+  /** True while the Tool waits for something to load, shown as "Getting ready…". */
+  gettingReady: boolean;
   /** The "All done" message for the options this Batch was made with. */
   allDone: string;
 }
@@ -165,6 +168,19 @@ function makeToolPage<Options extends object>(
     return name;
   }
 
+  // Counted, so loads that overlap all finish before "Getting ready…" goes.
+  let loads = 0;
+  const context: ToolRunContext = {
+    async gettingReady(loading) {
+      if (loads++ === 0) updateNewest((batch) => ({ ...batch, gettingReady: true }));
+      try {
+        return await loading;
+      } finally {
+        if (--loads === 0) updateNewest((batch) => ({ ...batch, gettingReady: false }));
+      }
+    },
+  };
+
   /** Runs one row's work and records its named results, or why it didn't work. */
   async function runRow(item: BatchItem, original: string, work: () => Promise<ToolResult[]>) {
     try {
@@ -185,7 +201,7 @@ function makeToolPage<Options extends object>(
   }
 
   const runOne = (item: BatchItem, file: File, options: Options) =>
-    runRow(item, file.name, () => (run as ToolRun<Options>)(file, options));
+    runRow(item, file.name, () => (run as ToolRun<Options>)(file, options, context));
 
   /** Such as "PNG · 3 photos", or "3 photos" when the Tool has no words for its options. */
   const batchLabel = (total: number, options: Options) => {
@@ -211,6 +227,7 @@ function makeToolPage<Options extends object>(
         label: batchLabel(files.length, options),
         items: [item],
         progress: { current: 1, total: 1 },
+        gettingReady: false,
         allDone: wordsFor(tool, options).allDone,
       },
       ...batches,
@@ -218,7 +235,9 @@ function makeToolPage<Options extends object>(
     changed();
     updateItem(item.id, { status: 'working' });
     // Results of this mode are named after "combined", as in combined_dtb.pdf.
-    await runRow(item, 'combined', () => (run as ToolRunTogether<Options>)(files, options));
+    await runRow(item, 'combined', () =>
+      (run as ToolRunTogether<Options>)(files, options, context),
+    );
     working = false;
     updateNewest((batch) => ({ ...batch, progress: null }));
   }
@@ -302,6 +321,7 @@ function makeToolPage<Options extends object>(
           label: batchLabel(total, options),
           items: work.map(({ item }) => item),
           progress: { current: 1, total },
+          gettingReady: false,
           allDone: wordsFor(tool, options).allDone,
         },
         ...batches,

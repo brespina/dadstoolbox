@@ -1,14 +1,20 @@
 // The browser's own drawing step: open the photo, draw it on a canvas and save it.
 // Pixel work runs only in a browser; the page tests cover it.
 
+import { openPhoto } from '../../photos/open';
+import type { ToolRunContext } from '../types';
 import type { Painted } from './run';
 
 /** Most pixels a canvas may hold on an iPhone; bigger ones are tried only where they work. */
 const phoneCanvasLimit = 16_777_216;
 
-export async function paintOnCanvas(file: File, type: string): Promise<Painted> {
+export async function paintOnCanvas(
+  file: File,
+  type: string,
+  context?: ToolRunContext,
+): Promise<Painted> {
   // Opening turns the photo the right way up by itself.
-  const bitmap = await createImageBitmap(file);
+  const bitmap = await openPhoto(file, context);
   try {
     const full = await draw(bitmap, type, 1);
     if (full) return full;
