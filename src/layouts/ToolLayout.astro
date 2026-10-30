@@ -2,6 +2,7 @@
 // The shared Tool page. A Tool's own page is one line: <ToolLayout address="…" />.
 import SiteLayout from './SiteLayout.astro';
 import ToolPage from '../components/ToolPage.svelte';
+import TypedToolPage from '../components/TypedToolPage.svelte';
 import { toolAt } from '../tools/registry';
 import { fillText, text } from '../text';
 import { sitePath } from '../site/paths';
@@ -24,7 +25,11 @@ const tool = toolAt(Astro.props.address);
   <h1>{tool.name}</h1>
   <p>{tool.blurb}</p>
   <p class="privacy-line">{tool.privacyLine}</p>
-  <ToolPage client:load address={tool.address} />
+  {tool.input === 'none' ? (
+    <TypedToolPage client:load address={tool.address} />
+  ) : (
+    <ToolPage client:load address={tool.address} />
+  )}
 </SiteLayout>
 
 <style>

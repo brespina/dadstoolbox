@@ -1,0 +1,99 @@
+// Shared logic for Tools the person types into (input mode "none"), in plain TypeScript
+// with no page or framework code. There is no Choose or start button and no Batch: the
+// result is made again each time typing pauses, and only the newest one is kept.
+
+import { text } from '../text';
+import { ToolFailure, type ToolDeclaration, type ToolTextRun } from './types';
+
+/** The file a typed Tool made, named and ready to save. */
+export interface TypedResult {
+  id: number;
+  name: string;
+  size: number;
+  blob: Blob;
+  /** The text it was made from. */
+  typed: string;
+}
+
+export interface TypedToolPageState {
+  /** The newest result, or null while there is none. */
+  result: TypedResult | null;
+  /** Why there is no result: the Tool's own reason, or the shared one. */
+  reason: string | null;
+  /** True from a keypress until its result is ready, so a stale result isn't saved. */
+  updating: boolean;
+}
+
+const extensions: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/svg+xml': 'svg',
+};
+
+/**
+ * The state of a typed Tool page. `delay` is how long typing must pause, in
+ * milliseconds, before the result is made again.
+ */
+export function createTypedToolPage<Options extends object>(
+  tool: ToolDeclaration<Options>,
+  run: ToolTextRun<Options>,
+  delay = 150,
+) {
+  if (tool.input !== 'none') throw new Error(`"${tool.address}" is not a typed Tool`);
+
+  let nextId = 1;
+  // Each keypress takes a new number; a result is only kept if its number is the newest.
+  let latest = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let current: TypedToolPageState = { result: null, reason: null, updating: false };
+  const listeners = new Set<(state: TypedToolPageState) => void>();
+
+  const set = (next: TypedToolPageState) => {
+    current = next;
+    for (const listener of listeners) listener(current);
+  };
+
+  async function make(typed: string, options: Options, ticket: number) {
+    try {
+      const [made] = await run(typed, options);
+      if (ticket !== latest) return;
+      const ext = made ? extensions[made.blob.type] : undefined;
+      const result = made && {
+        id: nextId++,
+        name: `${tool.address}_dtb${made.detail ? `_${made.detail}` : ''}${ext ? `.${ext}` : ''}`,
+        size: made.blob.size,
+        blob: made.blob,
+        typed,
+      };
+      set({ result: result ?? null, reason: null, updating: false });
+    } catch (error) {
+      if (ticket !== latest) return;
+      let reason: string = text.tool.typed.failedFallback;
+      if (error instanceof ToolFailure) reason = error.reason;
+      else console.error(tool.name, error);
+      set({ result: null, reason, updating: false });
+    }
+  }
+
+  return {
+    state: () => current,
+
+    /** Calls `listener` with the new state on every change. Returns a stop function. */
+    subscribe(listener: (state: TypedToolPageState) => void) {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
+
+    /** What is in the box now. The result follows once typing pauses. */
+    type(typed: string, options: Options) {
+      const ticket = ++latest;
+      clearTimeout(timer);
+      if (typed.trim() === '') {
+        set({ result: null, reason: null, updating: false });
+        return;
+      }
+      set({ ...current, updating: true });
+      timer = setTimeout(() => void make(typed, options, ticket), delay);
+    },
+  };
+}
