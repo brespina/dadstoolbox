@@ -1,0 +1,5 @@
+Break after ticket #20.
+
+The nicest moment was seeing the 32x48 thumbnail come back through the fallback: libheif honoured the rotate and crop, so nothing extra was needed.
+The surprise of the day: astro preview now runs in the background, so "exited early" really meant "already running".
+Nothing of mine is still running on port 5020. Resting now.
