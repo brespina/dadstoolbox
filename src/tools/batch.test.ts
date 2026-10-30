@@ -1,0 +1,217 @@
+import { describe, expect, it, vi } from 'vitest';
+import { createSession, type SessionState } from './batch';
+import { defineTool, ToolFailure } from './types';
+
+const tool = defineTool({
+  address: 'fake',
+  name: 'Do a fake thing',
+  blurb: 'For tests.',
+  category: 'Other',
+  position: 1,
+  noun: { one: 'file', many: 'files' },
+  accept: ['.txt'],
+  input: 'each',
+  needs: [],
+  largeFileLimit: 1000,
+  startButton: 'Do it',
+  worker: false,
+  outsideAddresses: [],
+  defaultOptions: {},
+});
+
+const file = (name: string, size = 10) => new File(['x'.repeat(size)], name);
+
+describe('waiting list', () => {
+  it('shows chosen files as Ready, in the order chosen', () => {
+    const session = createSession(tool, async () => []);
+    session.add([file('a.txt'), file('b.txt')]);
+    expect(session.state().waiting.map((w) => [w.name, w.status])).toEqual([
+      ['a.txt', 'ready'],
+      ['b.txt', 'ready'],
+    ]);
+  });
+
+  it('removes a file without touching the others', () => {
+    const session = createSession(tool, async () => []);
+    session.add([file('a.txt'), file('b.txt'), file('c.txt')]);
+    const b = session.state().waiting[1]!;
+    session.remove(b.id);
+    expect(session.state().waiting.map((w) => w.name)).toEqual(['a.txt', 'c.txt']);
+  });
+
+  it('empties once start is pressed, and a removed file is never run', async () => {
+    const ran: string[] = [];
+    const session = createSession(tool, async (f) => {
+      ran.push(f.name);
+      return [];
+    });
+    session.add([file('a.txt'), file('b.txt')]);
+    session.remove(session.state().waiting[0]!.id);
+    await session.start({});
+    expect(ran).toEqual(['b.txt']);
+    expect(session.state().waiting).toEqual([]);
+  });
+});
+
+const pdf = (detail?: string) => ({
+  blob: new Blob(['%PDF'], { type: 'application/pdf' }),
+  detail,
+});
+
+describe('a Batch', () => {
+  it('has a row per file that ends Done, with its results named after the original', async () => {
+    const session = createSession(tool, async () => [pdf('page1'), pdf('page2')]);
+    session.add([file('report.pdf', 3800)]);
+    await session.start({});
+    const [batch] = session.state().batches;
+    expect(batch!.items).toMatchObject([
+      {
+        name: 'report.pdf',
+        size: 3800,
+        status: 'done',
+        results: [
+          { name: 'report_dtb_page1.pdf', size: 4 },
+          { name: 'report_dtb_page2.pdf', size: 4 },
+        ],
+      },
+    ]);
+  });
+});
+
+describe('watching a Batch', () => {
+  it('reports each row going Ready → Working… → Done, with progress counts', async () => {
+    const session = createSession(tool, async () => [pdf()]);
+    const seen: SessionState[] = [];
+    session.subscribe((state) => seen.push(state));
+    session.add([file('a.pdf'), file('b.pdf')]);
+    await session.start({});
+
+    const during = seen.filter((s) => s.batches.length > 0);
+    const statusesOf = (index: number) => [
+      ...new Set(during.map((s) => s.batches[0]!.items[index]!.status)),
+    ];
+    expect(statusesOf(0)).toEqual(['ready', 'working', 'done']);
+    expect(statusesOf(1)).toEqual(['ready', 'working', 'done']);
+    expect([...new Set(during.map((s) => JSON.stringify(s.batches[0]!.progress)))]).toEqual([
+      JSON.stringify({ current: 1, total: 2 }),
+      JSON.stringify({ current: 2, total: 2 }),
+      'null',
+    ]);
+  });
+
+  it('labels each Batch with how many files it holds', async () => {
+    const session = createSession(tool, async () => [pdf()]);
+    session.add([file('a.pdf')]);
+    await session.start({});
+    session.add([file('b.pdf'), file('c.pdf')]);
+    await session.start({});
+    expect(session.state().batches.map((b) => b.label)).toEqual(['2 files', '1 file']);
+  });
+
+  it('stops telling a listener once it unsubscribes', () => {
+    const session = createSession(tool, async () => []);
+    let calls = 0;
+    const stop = session.subscribe(() => calls++);
+    session.add([file('a.pdf')]);
+    stop();
+    session.add([file('b.pdf')]);
+    expect(calls).toBe(1);
+  });
+});
+
+describe('Save all', () => {
+  it('covers every result of the newest Batch only', async () => {
+    const session = createSession(tool, async () => [pdf('page1'), pdf('page2')]);
+    session.add([file('old.pdf')]);
+    await session.start({});
+    session.add([file('a.pdf'), file('b.pdf')]);
+    await session.start({});
+    expect(session.saveAllFiles().map((r) => r.name)).toEqual([
+      'a_dtb_page1.pdf',
+      'a_dtb_page2.pdf',
+      'b_dtb_page1.pdf',
+      'b_dtb_page2.pdf',
+    ]);
+  });
+
+  it('has nothing to save before any Batch', () => {
+    expect(createSession(tool, async () => []).saveAllFiles()).toEqual([]);
+  });
+});
+
+describe('a file that fails', () => {
+  const runFailing = (error: Error) => async (f: File) => {
+    if (f.name === 'bad.pdf') throw error;
+    return [pdf()];
+  };
+
+  it("shows the Tool's own reason on its row only, and other files carry on", async () => {
+    const session = createSession(tool, runFailing(new ToolFailure('This PDF has a password.')));
+    session.add([file('bad.pdf'), file('good.pdf')]);
+    await session.start({});
+    expect(session.state().batches[0]!.items).toMatchObject([
+      { name: 'bad.pdf', status: 'failed', reason: 'This PDF has a password.', results: [] },
+      { name: 'good.pdf', status: 'done', results: [{ name: 'good_dtb.pdf' }] },
+    ]);
+  });
+
+  it('shows the shared reason for any other error, with the detail in the console only', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const session = createSession(tool, runFailing(new TypeError('xref table broken')));
+    session.add([file('bad.pdf'), file('good.pdf')]);
+    await session.start({});
+    const [bad, good] = session.state().batches[0]!.items;
+    expect(bad).toMatchObject({
+      status: 'failed',
+      reason: 'This file may be damaged or not supported.',
+    });
+    expect(good!.status).toBe('done');
+    expect(String(consoleError.mock.calls.flat())).toContain('xref table broken');
+    consoleError.mockRestore();
+  });
+});
+
+describe('result names', () => {
+  const namesFrom = async (names: string[], results: () => ReturnType<typeof pdf>[]) => {
+    const session = createSession(tool, async () => results());
+    session.add(names.map((n) => file(n)));
+    await session.start({});
+    return session.state().batches[0]!.items.flatMap((i) => i.results.map((r) => r.name));
+  };
+
+  it('add _dtb when there is no detail', async () => {
+    expect(await namesFrom(['IMG_1234.pdf'], () => [pdf()])).toEqual(['IMG_1234_dtb.pdf']);
+  });
+
+  it('take the extension from the result, not the original', async () => {
+    const jpg = { blob: new Blob(['x'], { type: 'image/jpeg' }) };
+    const session = createSession(tool, async () => [jpg]);
+    session.add([file('IMG_1234.HEIC')]);
+    await session.start({});
+    expect(session.state().batches[0]!.items[0]!.results[0]!.name).toBe('IMG_1234_dtb.jpg');
+  });
+
+  it('get _2 and _3 when chosen files share a name', async () => {
+    expect(
+      await namesFrom(['report.pdf', 'report.pdf', 'report.pdf'], () => [pdf('page1')]),
+    ).toEqual(['report_dtb_page1.pdf', 'report_dtb_page1_2.pdf', 'report_dtb_page1_3.pdf']);
+  });
+
+  it('stay different from names in earlier Batches', async () => {
+    const session = createSession(tool, async () => [pdf()]);
+    session.add([file('report.pdf')]);
+    await session.start({});
+    session.add([file('report.pdf')]);
+    await session.start({});
+    const [newest, oldest] = session.state().batches;
+    expect(oldest!.items[0]!.results[0]!.name).toBe('report_dtb.pdf');
+    expect(newest!.items[0]!.results[0]!.name).toBe('report_dtb_2.pdf');
+  });
+
+  it('are never the exact name of a chosen file', async () => {
+    expect(await namesFrom(['report_dtb.pdf', 'report.pdf'], () => [pdf()])).toEqual([
+      'report_dtb_dtb.pdf',
+      'report_dtb_2.pdf',
+    ]);
+  });
+});

@@ -10,7 +10,13 @@ export const text = {
     // Shown under the Site name, and used as the page description for search engines.
     promiseLine:
       'Free tools for your files. No sign-up, no ads, and your files stay on your device.',
-    noToolsYet: 'Tools are coming soon.',
+  },
+  // Category headings on the home page, in their fixed order.
+  categories: {
+    Photos: 'Photos',
+    PDFs: 'PDFs',
+    Video: 'Video',
+    Other: 'Other',
   },
   promisePage: {
     title: "Our promise: Dad's Toolbox",
@@ -43,6 +49,34 @@ export const text = {
       host: "The Site is hosted by GitHub. Like any website host, GitHub may keep basic visit records for security. We can't see them and don't use them.",
       hostLink: "Read GitHub's privacy statement",
     },
+  },
+  tool: {
+    backLink: 'All tools',
+    // {noun} is the Tool's noun, such as "PDFs".
+    privacyLine: 'Your {noun} stay on your device. They are never sent anywhere.',
+    allDone: 'All done.',
+    choose: 'Choose {noun}',
+    remove: 'Remove',
+    // {name} is the file name; for screen readers.
+    removeLabel: 'Remove {name}',
+    waitingHeading: 'Ready to start',
+    save: 'Save',
+    saveLabel: 'Save {name}',
+    saveAll: 'Save all',
+    // {current} and {total} count files in the Batch.
+    progress: 'Working on {current} of {total}…',
+    // Shown instead of the moving progress bar when reduced motion is on.
+    working: 'Working…',
+    status: {
+      ready: 'Ready',
+      working: 'Working…',
+      done: 'Done',
+      failed: "Didn't work",
+    },
+    // {name} is the file name and {status} its new status.
+    announcement: '{name}: {status}',
+    // Shown after "Didn't work." when the Tool gave no reason of its own.
+    failedFallback: 'This file may be damaged or not supported.',
   },
   footer: {
     label: 'More about the Site',
