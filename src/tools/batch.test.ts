@@ -338,6 +338,14 @@ describe('result names', () => {
     expect(page.state().batches[0]!.items[0]!.results[0]!.name).toBe('IMG_1234_dtb.jpg');
   });
 
+  it('end in .mp4 for an MP4 made from an iPhone video (.mov)', async () => {
+    const mp4 = { blob: new Blob(['x'], { type: 'video/mp4' }) };
+    const page = createToolPage(tool, async () => [mp4]);
+    page.add([file('IMG_1234.MOV')]);
+    await page.start({});
+    expect(page.state().batches[0]!.items[0]!.results[0]!.name).toBe('IMG_1234_dtb.mp4');
+  });
+
   it('get _2 and _3 when chosen files share a name', async () => {
     expect(
       await namesFrom(['report.pdf', 'report.pdf', 'report.pdf'], () => [pdf('page1')]),
