@@ -1,16 +1,17 @@
 <script lang="ts">
   // The interactive part of every Tool page. The shared Batch logic holds the state;
   // this only shows it and passes on what the visitor does.
-  import { onMount, type Component } from 'svelte';
+  import { onDestroy, onMount, type Component } from 'svelte';
   import { fillText as fill, text } from '../text';
   import {
     createToolPage,
     type BatchItem,
     type ItemStatus,
+    type ResultFile,
     type ToolPageState,
   } from '../tools/batch';
   import { toolAt } from '../tools/registry';
-  import type { ToolRun } from '../tools/types';
+  import { wordsFor, type ToolRun } from '../tools/types';
   import { saveFiles, type SavableFile } from '../site/save';
   import { formatSize } from '../site/size';
 
@@ -90,6 +91,19 @@
 
   let newest = $derived(state.batches[0]);
   let saveAllFiles = $derived(newest ? toolPage.saveAllFiles() : []);
+  let anyChosen = $derived(state.waiting.length > 0 || state.batches.length > 0);
+  // The start button follows the options, and has work when a file hasn't run with them.
+  let words = $derived(wordsFor(tool, options));
+  let hasWork = $derived(state && toolPage.hasWork($state.snapshot(options)));
+
+  // One address per result picture, kept until the page closes, like the results.
+  const thumbnails = new Map<number, string>();
+  const thumbnail = (result: ResultFile) => {
+    let url = thumbnails.get(result.id);
+    if (!url) thumbnails.set(result.id, (url = URL.createObjectURL(result.blob)));
+    return url;
+  };
+  onDestroy(() => thumbnails.forEach((url) => URL.revokeObjectURL(url)));
 </script>
 
 <div class="tool">
@@ -104,7 +118,7 @@
       disabled={!hydrated}
       onchange={onChoose}
     />
-    {fill(text.tool.choose, { noun: tool.noun.many })}
+    {fill(anyChosen ? text.tool.chooseMore : text.tool.choose, { noun: tool.noun.many })}
   </label>
 
   {#if state.waiting.length > 0}
@@ -132,8 +146,8 @@
   <button
     type="button"
     class="big-button start"
-    disabled={!hydrated || state.waiting.length === 0 || state.working}
-    onclick={() => toolPage.start($state.snapshot(options))}>{tool.startButton}</button
+    disabled={!hydrated || !hasWork || state.working}
+    onclick={() => toolPage.start($state.snapshot(options))}>{words.startButton}</button
   >
 
   {#if newest?.progress}
@@ -144,7 +158,7 @@
       <p class="still">{text.tool.working}</p>
     </div>
   {:else if saveAllFiles.length > 0}
-    <p class="all-done">{tool.allDone}</p>
+    <p class="all-done">{newest!.allDone}</p>
   {/if}
 
   {#each state.batches as batch, index (batch.id)}
@@ -170,6 +184,9 @@
               <ul class="rows">
                 {#each item.results as result (result.id)}
                   <li class="row">
+                    {#if result.blob.type.startsWith('image/')}
+                      <img class="thumbnail" src={thumbnail(result)} alt="" />
+                    {/if}
                     <div class="row-text">
                       <span class="file-name">{result.name}</span>
                       <span class="muted">{formatSize(item.size)} → {formatSize(result.size)}</span>
@@ -279,6 +296,15 @@
   .item > .rows {
     margin-top: 0.5rem;
     padding-left: 1rem;
+  }
+
+  .thumbnail {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.375rem;
+    object-fit: cover;
+    background: var(--line);
+    flex-shrink: 0;
   }
 
   .row-text {

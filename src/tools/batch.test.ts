@@ -171,6 +171,111 @@ describe('a file that fails', () => {
   });
 });
 
+describe('pressing start again', () => {
+  const labelled = defineTool({
+    ...tool,
+    textFor: (options: { format: string }) => ({ batchLabel: options.format.toUpperCase() }),
+    defaultOptions: { format: 'jpg' },
+  });
+  const recording = () => {
+    const runs: string[] = [];
+    const run = async (f: File, options: { format: string }) => {
+      runs.push(`${f.name} ${options.format}`);
+      return [pdf()];
+    };
+    return { runs, page: createToolPage(labelled, run) };
+  };
+
+  it('with changed options runs every chosen file again, in a new Batch on top', async () => {
+    const { runs, page } = recording();
+    page.add([file('a.pdf'), file('b.pdf')]);
+    await page.start({ format: 'jpg' });
+    await page.start({ format: 'png' });
+    expect(runs).toEqual(['a.pdf jpg', 'b.pdf jpg', 'a.pdf png', 'b.pdf png']);
+    expect(page.state().batches.map((b) => b.label)).toEqual(['PNG · 2 files', 'JPG · 2 files']);
+  });
+
+  it('keeps earlier Batches with their own results, and Save all covers the newest only', async () => {
+    const { page } = recording();
+    page.add([file('a.pdf')]);
+    await page.start({ format: 'jpg' });
+    const first = page.state().batches[0]!;
+    await page.start({ format: 'png' });
+    const [newest, earlier] = page.state().batches;
+    expect(earlier).toEqual(first);
+    expect(page.saveAllFiles()).toEqual(newest!.items[0]!.results);
+  });
+
+  it('after Choose more runs only the new files', async () => {
+    const { runs, page } = recording();
+    page.add([file('a.pdf')]);
+    await page.start({ format: 'jpg' });
+    page.add([file('b.pdf')]);
+    expect(page.state().waiting.map((w) => [w.name, w.status])).toEqual([['b.pdf', 'ready']]);
+    await page.start({ format: 'jpg' });
+    expect(runs).toEqual(['a.pdf jpg', 'b.pdf jpg']);
+    expect(page.state().batches[0]!.items.map((i) => i.name)).toEqual(['b.pdf']);
+  });
+
+  it('after Choose more and changed options runs every file', async () => {
+    const { runs, page } = recording();
+    page.add([file('a.pdf')]);
+    await page.start({ format: 'jpg' });
+    page.add([file('b.pdf')]);
+    await page.start({ format: 'png' });
+    expect(runs).toEqual(['a.pdf jpg', 'a.pdf png', 'b.pdf png']);
+  });
+
+  it('has nothing to do once every file has run with these options', async () => {
+    const { runs, page } = recording();
+    page.add([file('a.pdf')]);
+    expect(page.hasWork({ format: 'jpg' })).toBe(true);
+    await page.start({ format: 'jpg' });
+    await page.start({ format: 'png' });
+    expect(page.hasWork({ format: 'jpg' })).toBe(false);
+    expect(page.hasWork({ format: 'webp' })).toBe(true);
+    await page.start({ format: 'jpg' });
+    expect(runs).toEqual(['a.pdf jpg', 'a.pdf png']);
+    expect(page.state().batches).toHaveLength(2);
+  });
+
+  it('treats options as the same whatever order they were set in', async () => {
+    const page = createToolPage({ ...tool, defaultOptions: { a: 1, b: 2 } }, async () => [pdf()]);
+    page.add([file('a.pdf')]);
+    await page.start({ a: 1, b: 2 });
+    expect(page.hasWork({ b: 2, a: 1 })).toBe(false);
+  });
+
+  it('does not run a file that did not work again with the same options', async () => {
+    const runs: string[] = [];
+    const page = createToolPage(labelled, async (f, options) => {
+      runs.push(`${f.name} ${options.format}`);
+      throw new ToolFailure('No.');
+    });
+    page.add([file('a.pdf')]);
+    await page.start({ format: 'jpg' });
+    expect(page.hasWork({ format: 'jpg' })).toBe(false);
+    page.add([file('a.pdf')]);
+    await page.start({ format: 'jpg' });
+    expect(runs).toEqual(['a.pdf jpg', 'a.pdf jpg']);
+  });
+
+  it("gives each Batch the options' own All done message", async () => {
+    const page = createToolPage(
+      defineTool({
+        ...labelled,
+        textFor: (options: { format: string }) =>
+          options.format === 'png' ? { allDone: 'All done. PNG.' } : {},
+      }),
+      async () => [pdf()],
+    );
+    page.add([file('a.pdf')]);
+    await page.start({ format: 'jpg' });
+    await page.start({ format: 'png' });
+    expect(page.state().batches.map((b) => b.allDone)).toEqual(['All done. PNG.', 'All done.']);
+  });
+});
+
 describe('result names', () => {
   const namesFrom = async (names: string[], results: () => ReturnType<typeof pdf>[]) => {
     const page = createToolPage(tool, async () => results());

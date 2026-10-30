@@ -63,6 +63,10 @@ export const text = {
     privacyLine: 'Your {noun} stay on your device. They are never sent anywhere.',
     allDone: 'All done.',
     choose: 'Choose {noun}',
+    // Shown once some files are chosen.
+    chooseMore: 'Choose more {noun}',
+    // A Batch's label: {options} is the Tool's words for its options, {count} as in "3 photos".
+    batchLabel: '{options} · {count}',
     remove: 'Remove',
     // {name} is the file name; for screen readers.
     removeLabel: 'Remove {name}',
@@ -86,6 +90,22 @@ export const text = {
     failedLine: "Didn't work. {reason}",
     // The reason shown when the Tool gave none of its own.
     failedFallback: 'This file may be damaged or not supported.',
+  },
+  // Shared by the photo Tools.
+  photos: {
+    removeLocation: 'Remove location',
+    removeLocationHint: 'So no one can tell where a photo was taken.',
+    allDoneLocationRemoved: 'All done. Location data removed.',
+    // A Batch label when location was kept. {format} is the format's name.
+    locationKeptLabel: '{format}, location kept',
+    saveAs: 'Save as',
+    // {format} is the chosen format's name.
+    startButton: 'Change to {format}',
+    formats: {
+      jpg: { name: 'JPG', hint: 'Opens and sends anywhere.' },
+      png: { name: 'PNG', hint: 'Sharpest, but a bigger file.' },
+      webp: { name: 'WebP', hint: "Small file. Some apps can't open it." },
+    },
   },
   footer: {
     label: 'More about the Site',
