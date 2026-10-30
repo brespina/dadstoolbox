@@ -1,0 +1,246 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Never merge.
+  Answers "How fast is in-browser media work on real phones?" (issue 10).
+  Needs HTTPS (WebCodecs and the share sheet are blocked on plain http LAN addresses).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phone Speed Test</title>
+<style>
+  :root { --bg:#fff; --fg:#111; --muted:#666; --line:#ddd; --accent:#0a58ca; --bad:#b00020; --good:#16794c; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#121212; --fg:#eee; --muted:#9a9a9a; --line:#333; --accent:#6ea8fe; --bad:#ff6b81; --good:#5ad19a; } }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--fg); font:16px/1.45 system-ui, sans-serif; max-width:720px; margin-inline:auto; }
+  h1 { font-size:1.4rem; margin:0 0 4px; } h2 { font-size:1.1rem; margin:28px 0 8px; border-top:1px solid var(--line); padding-top:16px; }
+  .muted { color:var(--muted); font-size:.9rem; }
+  button, label.btn { font:inherit; padding:12px 16px; border-radius:10px; border:1px solid var(--line); background:var(--accent); color:#fff; margin:4px 4px 4px 0; cursor:pointer; display:inline-block; }
+  button.ghost { background:transparent; color:var(--fg); }
+  button:disabled { opacity:.5; }
+  select { font:inherit; padding:8px; }
+  pre { white-space:pre-wrap; word-break:break-word; background:rgba(127,127,127,.12); padding:10px; border-radius:8px; font-size:.8rem; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:6px 0; }
+  .warn { color:var(--bad); font-weight:600; } .ok { color:var(--good); font-weight:600; }
+  img.preview { max-width:100%; max-height:240px; display:block; margin:8px 0; border-radius:6px; }
+  textarea { width:100%; min-height:70px; font:inherit; }
+  progress { width:100%; }
+</style>
+</head>
+<body>
+<h1>Phone speed test</h1>
+<p class="muted">Throwaway test page for Dad's Toolbox. Nothing leaves this phone. Run each test, try Save, then tap <b>Copy results</b> at the bottom and send them over.</p>
+<div id="crash"></div>
+
+<h2>1. This phone</h2>
+<pre id="env">checking…</pre>
+
+<h2>2. HEIC photo → JPG</h2>
+<p class="muted">Use the sample (same for every phone), then try one of your own iPhone photos. Each decoder runs separately so we can compare.</p>
+<div class="row">
+  <button id="heicSample" class="ghost">Use sample 12 MP HEIC</button>
+  <label class="btn">Pick a photo<input id="heicPick" type="file" accept="image/heic,image/heif,.heic,.heif,image/*" hidden></label>
+</div>
+<pre id="heicFile">No photo yet.</pre>
+<div class="row">
+  <button data-heic="native">Built-in decoder</button>
+  <button data-heic="heicto">heic-to (libheif, current)</button>
+  <button data-heic="heic2any">heic2any (old)</button>
+</div>
+<div id="heicOut"></div>
+
+<h2>3. Video → GIF</h2>
+<p class="muted">Mediabunny reads frames with WebCodecs, gifenc writes the gif. Use the sample, then a 30-second clip from your camera.</p>
+<div class="row">
+  <button id="vidSample" class="ghost">Use sample 30 s 1080p mp4</button>
+  <label class="btn">Pick a video<input id="vidPick" type="file" accept="video/*" hidden></label>
+</div>
+<pre id="vidFile">No video yet.</pre>
+<div class="row">
+  Width <select id="gW"><option>320</option><option selected>480</option><option>640</option></select>
+  FPS <select id="gF"><option>8</option><option selected>10</option><option>15</option></select>
+  Length <select id="gL"><option value="0" selected>whole clip</option><option value="10">first 10 s</option></select>
+</div>
+<button id="gifGo">Make GIF</button>
+<progress id="gifProg" value="0" max="1" hidden></progress>
+<div id="gifOut"></div>
+
+<h2>4. Results</h2>
+<p class="muted">Notes (did Save put it in Photos / Files? did the page freeze?)</p>
+<textarea id="notes" placeholder="e.g. Save → share sheet → Save Image worked; gif landed in Photos"></textarea>
+<div class="row">
+  <button id="copy">Copy results</button>
+  <button id="clear" class="ghost">Clear</button>
+</div>
+<pre id="log"></pre>
+
+<script type="module">
+const V = { mediabunny: '1.61.4', heicto: '1.6.6', heic2any: '0.0.4', gifenc: '1.0.3' };
+const $ = (s) => document.querySelector(s);
+const results = [];
+const kb = (n) => n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.round(n / 1e3) + ' KB';
+const ms = (n) => n > 1000 ? (n / 1000).toFixed(1) + ' s' : Math.round(n) + ' ms';
+const heap = () => performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) + ' MB' : 'n/a';
+const tick = () => new Promise((r) => setTimeout(r));
+function log(entry) { results.push({ at: new Date().toISOString().slice(11, 19), ...entry }); render(); }
+function render() { $('#log').textContent = JSON.stringify({ env: ENV, results, notes: $('#notes').value }, null, 1); }
+
+// ---- crash detection: iOS reloads the tab when it runs out of memory ----
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
+const prev = store.get('dtb-running');
+if (prev) { $('#crash').innerHTML = `<p class="warn">The page reloaded or crashed while running: ${prev}. That usually means it ran out of memory.</p>`; }
+const prevLog = store.get('dtb-log'); if (prevLog) try { results.push(...JSON.parse(prevLog)); } catch {}
+if (prev) results.push({ crashed: prev });
+store.set('dtb-running', null);
+const persist = () => store.set('dtb-log', JSON.stringify(results));
+async function running(label, fn) { store.set('dtb-running', label); try { return await fn(); } finally { store.set('dtb-running', null); persist(); } }
+
+// ---- environment ----
+const ENV = {
+  ua: navigator.userAgent,
+  secureContext: isSecureContext,
+  cores: navigator.hardwareConcurrency,
+  deviceMemoryGB: navigator.deviceMemory ?? 'n/a',
+  screen: `${screen.width}x${screen.height}@${devicePixelRatio}`,
+  VideoDecoder: 'VideoDecoder' in window,
+  OffscreenCanvas: 'OffscreenCanvas' in window,
+  share: 'share' in navigator,
+  canShareJpg: !!navigator.canShare?.({ files: [new File([new Uint8Array(1)], 'x.jpg', { type: 'image/jpeg' })] }),
+  canShareGif: !!navigator.canShare?.({ files: [new File([new Uint8Array(1)], 'x.gif', { type: 'image/gif' })] }),
+  versions: V,
+};
+$('#env').textContent = Object.entries(ENV).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('\n');
+render();
+$('#notes').addEventListener('input', render);
+
+// ---- Save: share sheet first, download fallback ----
+function saveButtons(container, blob, name) {
+  const row = document.createElement('div'); row.className = 'row';
+  const share = document.createElement('button'); share.textContent = 'Save (share sheet)';
+  const dl = document.createElement('button'); dl.textContent = 'Download'; dl.className = 'ghost';
+  share.onclick = async () => {
+    const file = new File([blob], name, { type: blob.type });
+    if (!navigator.canShare?.({ files: [file] })) { log({ save: name, how: 'share', outcome: 'canShare=false' }); return; }
+    try { await navigator.share({ files: [file] }); log({ save: name, how: 'share', outcome: 'resolved' }); }
+    catch (e) { log({ save: name, how: 'share', outcome: e.name + ': ' + e.message }); }
+  };
+  dl.onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); log({ save: name, how: 'download', outcome: 'clicked' }); };
+  row.append(share, dl); container.append(row);
+}
+
+async function sample(path, name, type) {
+  const t0 = performance.now(); const r = await fetch(path); const b = await r.blob();
+  log({ fetchedSample: name, size: kb(b.size), took: ms(performance.now() - t0) });
+  return new File([b], name, { type });
+}
+const describe = (f) => `${f.name}\ntype: "${f.type}"  size: ${kb(f.size)}`;
+
+// ---- HEIC → JPG ----
+let photo = null;
+$('#heicSample').onclick = async () => { photo = await sample('sample-12mp.heic', 'sample-12mp.heic', 'image/heic'); $('#heicFile').textContent = describe(photo); };
+$('#heicPick').onchange = (e) => { photo = e.target.files[0]; if (!photo) return; $('#heicFile').textContent = describe(photo) + (/heic|heif/i.test(photo.type + photo.name) ? '' : '\n(note: the phone handed over a non-HEIC file; the picker may have converted it)'); log({ pickedPhoto: photo.name, type: photo.type, size: kb(photo.size) }); };
+
+async function toJpg(source) { // ImageBitmap or Blob → JPG blob at q 0.9
+  const bmp = source instanceof Blob ? await createImageBitmap(source) : source;
+  const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+  const w = bmp.width, h = bmp.height;
+  c.getContext('2d').drawImage(bmp, 0, 0); bmp.close?.();
+  const out = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.9));
+  c.width = c.height = 0; return { out, w, h };
+}
+let heic2anyP;
+const loaders = {
+  native: async () => null,
+  heicto: async () => import(`https://cdn.jsdelivr.net/npm/heic-to@${V.heicto}/+esm`),
+  heic2any: () => heic2anyP ||= new Promise((ok, no) => { const s = document.createElement('script'); s.src = `https://cdn.jsdelivr.net/npm/heic2any@${V.heic2any}/dist/heic2any.min.js`; s.onload = () => ok(window.heic2any); s.onerror = no; document.head.append(s); }),
+};
+const decoders = {
+  native: async (f) => toJpg(await createImageBitmap(f)),
+  heicto: async (f, lib) => { const png = await lib.heicTo({ blob: f, type: 'image/png' }); return toJpg(png); },
+  heic2any: async (f, lib) => { const png = await lib({ blob: f, toType: 'image/png' }); return toJpg(Array.isArray(png) ? png[0] : png); },
+};
+document.querySelectorAll('[data-heic]').forEach((b) => b.onclick = async () => {
+  if (!photo) { alert('Pick a photo or use the sample first.'); return; }
+  const how = b.dataset.heic; const box = document.createElement('div'); $('#heicOut').prepend(box);
+  box.innerHTML = `<p>${how}: working…</p>`;
+  await running(`HEIC→JPG via ${how} (${photo.name}, ${kb(photo.size)})`, async () => {
+    try {
+      const tl = performance.now(); const lib = await loaders[how](); const load = performance.now() - tl;
+      const t0 = performance.now(); const { out, w, h } = await decoders[how](photo, lib); const took = performance.now() - t0;
+      const name = photo.name.replace(/\.[^.]+$/, '') + '_dtb.jpg';
+      log({ test: 'heic→jpg', how, input: photo.name, inSize: kb(photo.size), px: `${w}x${h}`, libLoad: ms(load), convert: ms(took), outSize: kb(out.size), heap: heap() });
+      box.innerHTML = `<p class="ok">${how}: ${ms(took)} (library load ${ms(load)}) → ${w}x${h}, ${kb(out.size)}</p>`;
+      const img = new Image(); img.className = 'preview'; img.src = URL.createObjectURL(out); box.append(img);
+      saveButtons(box, out, name);
+    } catch (e) {
+      log({ test: 'heic→jpg', how, input: photo.name, error: `${e?.name}: ${e?.message ?? e}` });
+      box.innerHTML = `<p class="warn">${how} failed: ${e?.message ?? e}</p>`;
+    }
+  });
+});
+
+// ---- Video → GIF ----
+let video = null;
+$('#vidSample').onclick = async () => { video = await sample('sample-30s-1080p.mp4', 'sample-30s-1080p.mp4', 'video/mp4'); $('#vidFile').textContent = describe(video); };
+$('#vidPick').onchange = (e) => { video = e.target.files[0]; if (!video) return; $('#vidFile').textContent = describe(video); log({ pickedVideo: video.name, type: video.type, size: kb(video.size) }); };
+
+$('#gifGo').onclick = async () => {
+  if (!video) { alert('Pick a video or use the sample first.'); return; }
+  const W = +$('#gW').value, FPS = +$('#gF').value, L = +$('#gL').value;
+  const box = document.createElement('div'); $('#gifOut').prepend(box); const prog = $('#gifProg'); prog.hidden = false; prog.value = 0;
+  $('#gifGo').disabled = true;
+  const label = `mp4→gif ${W}px ${FPS}fps ${L || 'whole'} (${video.name}, ${kb(video.size)})`;
+  await running(label, async () => {
+    const rec = { test: 'mp4→gif', input: video.name, inSize: kb(video.size), width: W, fps: FPS, length: L || 'whole' };
+    try {
+      const tl = performance.now();
+      const [mb, ge] = await Promise.all([import(`https://cdn.jsdelivr.net/npm/mediabunny@${V.mediabunny}/+esm`), import(`https://cdn.jsdelivr.net/npm/gifenc@${V.gifenc}/+esm`)]);
+      rec.libLoad = ms(performance.now() - tl);
+      const input = new mb.Input({ source: new mb.BlobSource(video), formats: mb.ALL_FORMATS });
+      const track = await input.getPrimaryVideoTrack();
+      if (!track) throw new Error('No video track found');
+      rec.codec = await track.getCodecParameterString?.() ?? track.codec;
+      rec.src = `${track.displayWidth}x${track.displayHeight}`;
+      if (!(await track.canDecode())) throw new Error(`This phone can't decode ${rec.codec}`);
+      const dur = await track.computeDuration(); const end = L ? Math.min(L, dur) : dur;
+      rec.seconds = +end.toFixed(1);
+      const n = Math.max(1, Math.floor(end * FPS)); const times = Array.from({ length: n }, (_, i) => i / FPS);
+      const sink = new mb.CanvasSink(track, { width: W, poolSize: 1 });
+      const gif = ge.GIFEncoder(); let frames = 0, tDecode = 0, tEncode = 0, h = 0, last = performance.now();
+      const t0 = performance.now();
+      for await (const wrapped of sink.canvasesAtTimestamps(times)) {
+        if (!wrapped) continue;
+        const c = wrapped.canvas; h = c.height; tDecode += performance.now() - last;
+        const te = performance.now();
+        const data = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        const palette = ge.quantize(data, 256); const index = ge.applyPalette(data, palette);
+        gif.writeFrame(index, c.width, c.height, { palette, delay: 1000 / FPS });
+        tEncode += performance.now() - te; frames++;
+        if (frames % 5 === 0) { prog.value = frames / n; box.innerHTML = `<p>${frames}/${n} frames, ${ms(performance.now() - t0)}</p>`; await tick(); }
+        last = performance.now();
+      }
+      gif.finish(); const out = new Blob([gif.bytes()], { type: 'image/gif' });
+      Object.assign(rec, { frames, outPx: `${W}x${h}`, total: ms(performance.now() - t0), decode: ms(tDecode), quantizeEncode: ms(tEncode), perFrame: ms((performance.now() - t0) / frames), outSize: kb(out.size), heap: heap() });
+      log(rec);
+      box.innerHTML = `<p class="ok">${frames} frames in ${rec.total} (decode ${rec.decode}, gif ${rec.quantizeEncode}) → ${kb(out.size)}</p>`;
+      const img = new Image(); img.className = 'preview'; img.src = URL.createObjectURL(out); box.append(img);
+      saveButtons(box, out, video.name.replace(/\.[^.]+$/, '') + '_dtb.gif');
+    } catch (e) {
+      rec.error = `${e?.name}: ${e?.message ?? e}`; log(rec);
+      box.innerHTML = `<p class="warn">Failed: ${e?.message ?? e}</p>`;
+    } finally { prog.hidden = true; $('#gifGo').disabled = false; }
+  });
+};
+
+// ---- results ----
+$('#copy').onclick = async () => {
+  render(); const text = $('#log').textContent;
+  try { await navigator.clipboard.writeText(text); $('#copy').textContent = 'Copied ✓'; }
+  catch { const r = document.createRange(); r.selectNodeContents($('#log')); getSelection().removeAllRanges(); getSelection().addRange(r); $('#copy').textContent = 'Selected, copy it'; }
+  setTimeout(() => $('#copy').textContent = 'Copy results', 2500);
+};
+$('#clear').onclick = () => { results.length = 0; store.set('dtb-log', null); render(); };
+</script>
+</body>
+</html>
