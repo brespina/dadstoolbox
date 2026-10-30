@@ -1,7 +1,7 @@
 # Adding a Tool
 
-How to add a Tool to the Site, for a future maintainer or an agent. Words in **bold** are
-from [GLOSSARY.md](../GLOSSARY.md): a **Tool** is one task, it sits in one **Category**, a
+How to add a Tool to the Site, for a future maintainer or an agent. It uses the terms in
+[GLOSSARY.md](../GLOSSARY.md): a **Tool** is one task, it sits in one **Category**, a
 **Batch** is the results from one press of the start button, and the **Promise** is what
 the Site guarantees every visitor. `run` is only the name of a Tool's function; don't
 call a Batch "a run".
@@ -10,6 +10,24 @@ Read [ADR-0001](adr/0001-tools-run-in-the-browser.md) (Tools run in the visitor'
 browser) and [ADR-0003](adr/0003-the-site-keeps-no-data-about-visitors.md) (the Site keeps
 no data about visitors) first. A Tool that needs a server or sends files anywhere can't
 be added.
+
+## Not built yet
+
+Some of the machinery this guide describes comes with later Tools. Until those land, a
+new Tool can only use what is built today:
+
+| Part                                                          | Today                           | Built in |
+| ------------------------------------------------------------- | ------------------------------- | -------- |
+| Input mode `together`                                         | The page throws                 | #22      |
+| Input mode `none`                                             | The page throws                 | #23      |
+| `worker: true`                                                | Ignored; `run` runs on the page | #20      |
+| "Getting ready…" while a late library loads                   | Not shown                       | #20      |
+| `needs` checks ("Doesn't work on this browser yet")           | Not checked                     | #24      |
+| The large-file note from `largeFileLimit`                     | Not shown                       | #24      |
+| The credits page for library licences                         | Not there yet                   | #26      |
+
+Fill every declaration field anyway; the fields are already part of the type. When one
+of those tickets lands, it should update this guide.
 
 ## The steps
 
@@ -100,8 +118,8 @@ field is required.
   and is saved like any other result. Leave `accept` empty and write the privacy line
   about what they type.
 
-The template uses `each`. For the others, check the `run` types in `types.ts` for the
-exact signature.
+The template uses `each`, the only mode built so far. `together` and `none` come with
+Combine PDFs (#22) and QR code maker (#23), which add their `run` types to `types.ts`.
 
 ## The `run` contract
 
@@ -127,16 +145,19 @@ try again." Any other error shows the shared fallback, "This file may be damaged
 supported.", and its detail goes only to the console. Don't catch errors just to hide
 them.
 
-**Progress.** Report progress where the job is long enough to need it, using what
-`types.ts` offers for it.
+**Progress.** Shared code shows "Working on 2 of 5…" as it works through the files, so
+`run` reports nothing itself. `types.ts` has no way yet to report progress within one
+file; add one if a Tool needs it.
 
 **Loading.** Import libraries in `run.ts`, never in `declaration.ts`. A small library can
 load with the page. A big one (such as a video library or a fallback photo decoder)
 should load only once a file is chosen, with a dynamic `import()` inside `run`; the page
-shows "Getting ready…" meanwhile. Bundle every library and file from npm or the Site
+will show "Getting ready…" meanwhile (#20). Bundle every library and file from npm or the Site
 itself. Never load anything from another site.
 
 ## The worker flag
+
+The flag is ignored until #20 builds it; until then `run` always runs on the page.
 
 Set `worker: true` when `run` does heavy work that would freeze the page, such as
 building a gif. Shared code then runs `run` in a Web Worker through Comlink, so the page
@@ -195,6 +216,7 @@ locally, `npx playwright test --project chromium-phone` and let CI run WebKit.
 
 ## Licences
 
-A Tool that adds a library must add its licence notice to the Site's credits (issue #26).
+A Tool that adds a library must add its licence notice to the Site's credits, once the
+credits page exists (issue #26).
 Check the licence first: anything that would make the Site's own code change licence
 needs a decision before it is added.
