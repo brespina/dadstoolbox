@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { degrees, PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
+import { ToolFailure } from '../types';
 import { run } from './run';
 
 const sample = (name: string) =>
@@ -35,6 +36,23 @@ describe('Rotate PDF pages', () => {
     expect(await anglesOf(await run(turned, { turn: 'right' }))).toEqual([180, 0, 270]);
     expect(await anglesOf(await run(turned, { turn: 'left' }))).toEqual([0, 180, 90]);
     expect(await anglesOf(await run(turned, { turn: 'upsideDown' }))).toEqual([270, 90, 0]);
+  });
+
+  it('fails with the same reason as Split a PDF for a PDF with a password', async () => {
+    const failure = await run(sample('sample-password.pdf'), { turn: 'right' }).catch(
+      (e: unknown) => e,
+    );
+    expect(failure).toBeInstanceOf(ToolFailure);
+    expect((failure as ToolFailure).reason).toBe(
+      'This PDF has a password. Remove it and try again.',
+    );
+  });
+
+  it('throws an ordinary error for a file that is not a PDF', async () => {
+    const notPdf = new File(['hello'], 'notes.pdf', { type: 'application/pdf' });
+    const failure = await run(notPdf, { turn: 'right' }).catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure).not.toBeInstanceOf(ToolFailure);
   });
 });
 
