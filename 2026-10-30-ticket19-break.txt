@@ -1,0 +1,7 @@
+Ticket 19 break.
+
+The best moment was when the hand-written HEIC box parser read the date out of a
+931-byte file on the first try, after exifr had given up on it. The worst was a
+regex anchor on "Choose photos" costing a full 30-second timeout per test, fourteen times.
+
+Nothing running, nothing pushed. Just stepping away from the bytes for a bit.
