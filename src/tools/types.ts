@@ -116,7 +116,7 @@ export class ToolFailure extends Error {
   }
 }
 
-/** A Tool's job for what the person typed (input mode "none"). It may return any number of results. */
+/** A Tool's job for what the person typed (input mode "none"). It returns one result. */
 export type ToolTextRun<Options extends object = object> = (
   typed: string,
   options: Options,

@@ -59,8 +59,9 @@
     });
   });
 
+  // Derived, so the picture only reloads when the result changes, not on every keypress.
+  let blob = $derived(state.result?.blob);
   $effect(() => {
-    const blob = state.result?.blob;
     if (!blob) return;
     const url = URL.createObjectURL(blob);
     pictureUrl = url;
