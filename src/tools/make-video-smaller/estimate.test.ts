@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { wordsFor } from '../types';
-import { tool } from './declaration';
+import { tool, type Options } from './declaration';
 import { readyLines } from './estimate';
 
 describe('the size estimate on the Ready row', () => {
@@ -39,7 +39,7 @@ describe('the size estimate on the Ready row', () => {
 
 describe('the Batch label', () => {
   it('names the size', () => {
-    expect(wordsFor(tool, { size: 'smaller' }).batchLabel).toBe('Smaller');
-    expect(wordsFor(tool, { size: 'smallest' }).batchLabel).toBe('Smallest');
+    expect(wordsFor<Options>(tool, { size: 'smaller' }).batchLabel).toBe('Smaller');
+    expect(wordsFor<Options>(tool, { size: 'smallest' }).batchLabel).toBe('Smallest');
   });
 });
