@@ -49,7 +49,7 @@ describe('Photos to one PDF', () => {
       const contents = page.node.Contents()!;
       const streams = contents instanceof PDFArray ? contents.asArray() : [contents];
       const steps = streams
-        .map((s) => doc.context.lookup(s, PDFRawStream))
+        .map((s) => doc.context.lookup(s) as PDFRawStream)
         .map((s) => new TextDecoder().decode(decodePDFRawStream(s).decode()))
         .join('\n');
       // pdf-lib moves to the corner ("1 0 0 1 x y cm"), then stretches ("w 0 0 h 0 0 cm").
