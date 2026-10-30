@@ -98,7 +98,7 @@ describe('Make a photo smaller', () => {
     expect(result!.blob.size).toBe(first!.blob.size);
   });
 
-  it("fails with a plain reason for an iPhone photo (HEIC) the browser can't open", async () => {
+  it("fails with a plain reason for an iPhone photo (HEIC) that won't open", async () => {
     const cantOpen = makeRun(async () => {
       throw new DOMException('The source image could not be decoded.', 'InvalidStateError');
     });
@@ -107,7 +107,7 @@ describe('Make a photo smaller', () => {
     const failure = await cantOpen(unnamed, defaults).catch((e: unknown) => e);
     expect(failure).toBeInstanceOf(ToolFailure);
     expect((failure as ToolFailure).reason).toBe(
-      "This browser can't open iPhone photos (HEIC) yet. Try Safari on an iPhone or Mac.",
+      "This iPhone photo (HEIC) wouldn't open. Choose it again, or try another photo.",
     );
   });
 

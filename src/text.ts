@@ -114,6 +114,8 @@ export const text = {
     removeLocation: 'Remove location',
     removeLocationHint: 'So no one can tell where a photo was taken.',
     allDoneLocationRemoved: 'All done. Location data removed.',
+    // Neither the browser nor the late-loaded decoder could open an iPhone photo.
+    heicWontOpen: "This iPhone photo (HEIC) wouldn't open. Choose it again, or try another photo.",
     // A Batch label when location was kept. {format} is the format's name.
     locationKeptLabel: '{format}, location kept',
     saveAs: 'Save as',
