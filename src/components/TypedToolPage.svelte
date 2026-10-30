@@ -2,7 +2,7 @@
   // The interactive part of a Tool page where the person types instead of choosing
   // files (input mode "none"). No Choose or start button: the result follows the typing,
   // or, for a Tool with no type box, the options.
-  import { onMount, type Component } from 'svelte';
+  import { onMount, untrack, type Component } from 'svelte';
   import { fillText as fill, text } from '../text';
   import { createTypedToolPage, type TypedToolPageState } from '../tools/typed';
   import { toolAt } from '../tools/registry';
@@ -71,9 +71,10 @@
   });
 
   // With no type box, the options hold all the input, so each change makes it again.
+  // Untracked, because the new state it sets must not count as an options change.
   $effect(() => {
     const now = $state.snapshot(options);
-    if (hydrated && !tool.typeBox) toolPage.change(now as typeof tool.defaultOptions);
+    if (hydrated && !tool.typeBox) untrack(() => toolPage.change(now));
   });
 
   const save = () => {
