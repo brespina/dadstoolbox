@@ -2,6 +2,7 @@
 import SiteLayout from '../layouts/SiteLayout.astro';
 import { text } from '../text';
 import { links } from '../links';
+import { sitePath } from '../site/paths';
 
 const t = text.promisePage;
 ---
@@ -37,6 +38,9 @@ const t = text.promisePage;
       </li>
       <li>
         <a href={links.reportProblem}>{text.reportProblem}</a>
+      </li>
+      <li>
+        <a href={sitePath('credits')}>{t.freeAndOpen.credits}</a>
       </li>
     </ul>
     <p>
