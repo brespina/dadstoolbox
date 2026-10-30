@@ -124,6 +124,15 @@ export const text = {
       png: { name: 'PNG', hint: 'Sharpest, but a bigger file.' },
       webp: { name: 'WebP', hint: "Small file. Some apps can't open it." },
     },
+    // Make a photo smaller: how small to make it.
+    howSmall: 'How small',
+    // A Batch label when location was kept. {size} is the chosen size's name.
+    sizeLocationKeptLabel: '{size}, location kept',
+    sizes: {
+      medium: { name: 'Medium', hint: 'Sharp on a big screen. Good for email.' },
+      small: { name: 'Small', hint: 'Fine on a phone. For sites with a size limit.' },
+      tiny: { name: 'Tiny', hint: 'Smallest file. Looks soft up close.' },
+    },
   },
   footer: {
     label: 'More about the Site',
