@@ -53,7 +53,24 @@ export const text = {
       sourceCode: 'See the code on GitHub',
       host: "The Site is hosted by GitHub. Like any website host, GitHub may keep basic visit records for security. We can't see them and don't use them.",
       hostLink: "Read GitHub's privacy statement",
+      credits: 'Free code we use',
     },
+  },
+  creditsPage: {
+    title: "Free code we use: Dad's Toolbox",
+    heading: 'Free code we use',
+    description: "The free code Dad's Toolbox is built on, with each license.",
+    intro:
+      'The Tools are built on free code that other people wrote and share. Thank you to them. Here is each one, what it does, and its license.',
+    unchanged:
+      'We use each one as it comes, unchanged. Each link below leads to its code and its full license.',
+    // {name} is the library that brings this one in.
+    partOf: 'Part of {name}.',
+    // {license} is a license name, such as "MIT".
+    license: 'Version {version}. License: {license}',
+    // {name} is a library's name. The link text must stay unique on the page.
+    codeLink: '{name} code',
+    licenseLink: '{name} license',
   },
   tool: {
     // The browser tab title. {name} is the Tool's name, {siteName} the Site's.
