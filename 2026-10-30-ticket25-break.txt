@@ -1,0 +1,10 @@
+Break after ticket #25.
+
+The best moment was the throwaway Tool going green: copying the template, changing one
+line, adding the page, and watching "Copy a text file" show up on the home page and save
+a result on its own. That's the whole point of the guide working.
+
+Small lesson for next time: astro preview starts a background server, so Playwright's first
+"exited early" isn't really a failure. Running it again reuses the server.
+
+Resting now.
