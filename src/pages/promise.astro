@@ -1,0 +1,47 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+import { text } from '../text';
+import { links } from '../links';
+
+const t = text.promisePage;
+---
+
+<SiteLayout title={t.title} description={t.description}>
+  <h1>{t.heading}</h1>
+
+  <section aria-labelledby="the-promise">
+    <h2 id="the-promise">{t.promise.heading}</h2>
+    <ul>
+      {t.promise.points.map((point) => (
+        <li>{point}</li>
+      ))}
+    </ul>
+  </section>
+
+  <section aria-labelledby="how-it-works">
+    <h2 id="how-it-works">{t.howItWorks.heading}</h2>
+    <p>{t.howItWorks.body}</p>
+  </section>
+
+  <section aria-labelledby="check">
+    <h2 id="check">{t.check.heading}</h2>
+    <p>{t.check.airplaneModeCaveat}</p>
+    <p>{t.check.browserLock}</p>
+  </section>
+
+  <section aria-labelledby="free-and-open">
+    <h2 id="free-and-open">{t.freeAndOpen.heading}</h2>
+    <ul class="link-list">
+      <li>
+        <a href={links.sourceCode}>{t.freeAndOpen.sourceCode}</a>
+      </li>
+      <li>
+        <a href={links.reportProblem}>{text.reportProblem}</a>
+      </li>
+    </ul>
+    <p>
+      {t.freeAndOpen.host}
+      <a href={links.hostPrivacy}>{t.freeAndOpen.hostLink}</a>
+    </p>
+  </section>
+</SiteLayout>

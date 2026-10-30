@@ -3,6 +3,8 @@
 
 export const text = {
   siteName: "Dad's Toolbox",
+  // Used in the footer and on the Our promise page.
+  reportProblem: 'Report a problem',
   home: {
     title: "Dad's Toolbox: free tools for your files",
     // Shown under the Site name, and used as the page description for search engines.
@@ -10,10 +12,41 @@ export const text = {
       'Free tools for your files. No sign-up, no ads, and your files stay on your device.',
     noToolsYet: 'Tools are coming soon.',
   },
+  promisePage: {
+    title: "Our promise: Dad's Toolbox",
+    heading: 'Our promise',
+    // The page description for search engines.
+    description: "What Dad's Toolbox promises you, and how to check it yourself.",
+    promise: {
+      heading: 'The promise',
+      points: [
+        'No sign-up. We never ask for your name or email.',
+        'No ads.',
+        'Nothing counts or tracks you.',
+        'Your files stay on your device. We never keep them or send them anywhere.',
+      ],
+    },
+    howItWorks: {
+      heading: 'How it works',
+      body: 'Your phone or computer does all the work.',
+    },
+    check: {
+      heading: 'Check for yourself',
+      airplaneModeCaveat:
+        'Some Tools fetch a helper part from this Site the first time you use them. Use the Tool once with internet on, then turn on airplane mode and try again. It still works.',
+      browserLock:
+        'Each page tells your browser it may only talk to this Site. Your browser blocks anything else.',
+    },
+    freeAndOpen: {
+      heading: 'Free and open',
+      sourceCode: 'See the code on GitHub',
+      host: "The Site is hosted by GitHub. Like any website host, GitHub may keep basic visit records for security. We can't see them and don't use them.",
+      hostLink: "Read GitHub's privacy statement",
+    },
+  },
   footer: {
     label: 'More about the Site',
     promise: 'Our promise',
-    reportProblem: 'Report a problem',
     sponsor: 'Sponsor',
   },
 } as const;
