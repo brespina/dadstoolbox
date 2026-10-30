@@ -32,7 +32,7 @@ export function frameTimes(duration: number): number[] {
 // 13.8 MB). Calm or flat videos come out smaller; busy camera video is the worst case.
 const bytesPerPixel = 0.36;
 
-/** About how many bytes the gif will be. */
+/** At most about how many bytes the gif will be: busy camera video, the worst case. */
 export function estimateBytes(video: VideoFacts, options: Options): number {
   const { width, height } = gifSize(video, options);
   return frameTimes(video.duration).length * width * height * bytesPerPixel;
