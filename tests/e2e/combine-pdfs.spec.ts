@@ -13,7 +13,7 @@ const locked = `${samples}sample-password.pdf`;
 
 async function choose(page: Page, files: string[]) {
   const chooser = page.waitForEvent('filechooser');
-  await page.getByText('Choose PDFs').click();
+  await page.getByText(/Choose (more )?PDFs/).click();
   await (await chooser).setFiles(files);
 }
 

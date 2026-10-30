@@ -24,6 +24,16 @@ export type InputMode = 'each' | 'together' | 'none';
 /** Browser features a Tool may need, checked when the page runs. */
 export type BrowserFeature = 'webcodecs';
 
+/** Words that follow the chosen options. */
+export interface OptionsText {
+  /** Replaces the start button's words, as in "Change to PNG". */
+  startButton?: string;
+  /** Goes before the count in a Batch's label, as in "PNG · 3 photos". */
+  batchLabel?: string;
+  /** Replaces the "All done" message for a Batch made with these options. */
+  allDone?: string;
+}
+
 export interface ToolDeclarationInput<Options extends object> {
   /** Flat address name in plain words, such as "split-pdf". */
   address: string;
@@ -50,6 +60,11 @@ export interface ToolDeclarationInput<Options extends object> {
   privacyLine?: string;
   /** Shown when a Batch finishes. */
   allDone?: string;
+  /**
+   * Words that follow the chosen options, such as "Change to PNG". Each one left out
+   * falls back to the declaration's own.
+   */
+  textFor?: (options: Options) => OptionsText;
   /** The Tool's own plain-language failure reasons, thrown by `run` as ToolFailure. */
   reasons?: Readonly<Record<string, string>>;
   /** Whether `run` runs in a Web Worker. */
@@ -70,9 +85,20 @@ export function defineTool<Options extends object>(
   return {
     privacyLine: fillText(text.tool.privacyLine, { noun: input.noun.many }),
     allDone: text.tool.allDone,
+    textFor: () => ({}),
     typeLabel: text.tool.typed.label,
     reasons: {},
     ...input,
+  };
+}
+
+/** The words for these options, with the declaration's own filling any gaps. */
+export function wordsFor<Options extends object>(tool: ToolDeclaration<Options>, options: Options) {
+  const words = tool.textFor(options);
+  return {
+    startButton: words.startButton ?? tool.startButton,
+    batchLabel: words.batchLabel ?? '',
+    allDone: words.allDone ?? tool.allDone,
   };
 }
 
@@ -86,6 +112,7 @@ export function declarationText(tool: ToolDeclaration): string[] {
     tool.startButton,
     tool.privacyLine,
     tool.allDone,
+    ...Object.values(tool.textFor(tool.defaultOptions)),
     tool.typeLabel,
     ...Object.values(tool.reasons),
   ];
