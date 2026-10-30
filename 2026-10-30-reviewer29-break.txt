@@ -1,0 +1,7 @@
+Break note, reviewer for PR #29.
+
+The part I liked best was a small one. A line said "sample-password.pdf: This PDF has a password."
+Now it says "sample-password.pdf has a password." Same facts, but a person can read it as a sentence.
+A site meant for non-technical people mostly comes down to fixes like that.
+
+Two green CI runs, and nothing left open. That's a good place to stop.
