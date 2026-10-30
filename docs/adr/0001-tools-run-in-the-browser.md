@@ -6,3 +6,7 @@ Dad's Toolbox is a hosted Site for non-technical people, and every Tool on it ru
 
 - The Python command-line tools in OpenGarage (the author's separate learning repo) do not carry over; Tools here are written for the browser.
 - A Tool that cannot run in a browser does not go on the Site (see ADR-0002).
+
+## Note (2026-10)
+
+The decision stands, but the aside about media is out of date. v1 has no ffmpeg (spec #15): Make a gif from a video reads the video with Mediabunny (the browser's own WebCodecs) and builds the gif with gifenc. ffmpeg.wasm, and its license question (#11), come back only if a later Tool needs it.
