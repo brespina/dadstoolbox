@@ -7,8 +7,8 @@ import { makeRun, type Paint } from './run';
 
 const bytes = (name: string) => readFileSync(new URL(name, import.meta.url));
 const sample = (name: string, type: string) => new File([bytes(name)], name, { type });
-const heic = () => sample('IMG_1234.HEIC', 'image/heic');
-const jpg = () => sample('sample.jpg', 'image/jpeg');
+const heic = () => sample('sample.heic', 'image/heic');
+const jpg = () => sample('rotated.jpg', 'image/jpeg');
 
 // Node has no canvas, so this stands in for the browser's own drawing: it hands back a
 // small real file of the asked-for type, made without any photo details.
@@ -65,7 +65,7 @@ describe('Change a photo to JPG', () => {
   });
 
   it('takes a JPG the photo picker handed over, and turns it the right way up', async () => {
-    // sample.jpg is marked "turn a quarter turn" and has a location.
+    // rotated.jpg is marked "turn a quarter turn" and has a location.
     const [result] = await run(jpg(), defaults);
     const found = await details(result!.blob);
     expect(result!.blob.type).toBe('image/jpeg');
@@ -105,16 +105,16 @@ describe('Change a photo to JPG', () => {
     expect(found?.Orientation ?? 1).toBe(1);
   });
 
-  it("fails with a plain reason for an iPhone photo (HEIC) the browser can't open", async () => {
+  it("fails with a plain reason for an iPhone photo (HEIC) that won't open", async () => {
     const cantOpen = makeRun(async () => {
       throw new DOMException('The source image could not be decoded.', 'InvalidStateError');
     });
     // The picker may give no file type, so the photo itself is checked.
-    const unnamed = new File([bytes('IMG_1234.HEIC')], 'IMG_1234.HEIC');
+    const unnamed = new File([bytes('sample.heic')], 'IMG_1234.HEIC');
     const failure = await cantOpen(unnamed, defaults).catch((e: unknown) => e);
     expect(failure).toBeInstanceOf(ToolFailure);
     expect((failure as ToolFailure).reason).toBe(
-      "This browser can't open iPhone photos (HEIC) yet. Try Safari on an iPhone or Mac.",
+      "This iPhone photo (HEIC) wouldn't open. Choose it again, or try another photo.",
     );
   });
 

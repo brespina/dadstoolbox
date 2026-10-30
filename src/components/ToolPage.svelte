@@ -11,7 +11,8 @@
     type ToolPageState,
   } from '../tools/batch';
   import { toolAt } from '../tools/registry';
-  import { wordsFor, type ToolResult } from '../tools/types';
+  import { wordsFor } from '../tools/types';
+  import { runInWorker, type AnyRun } from '../tools/worker';
   import { saveFiles, type SavableFile } from '../site/save';
   import { formatSize } from '../site/size';
 
@@ -23,8 +24,6 @@
     ['../tools/*/Options.svelte', '!../tools/_*/Options.svelte'],
     { eager: true },
   );
-  // A Tool's `run` takes one file or the ordered list, as its input mode says.
-  type AnyRun = (input: File | File[], options: object) => Promise<ToolResult[]>;
   const runModules = import.meta.glob<{ run: AnyRun }>([
     '../tools/*/run.ts',
     '!../tools/_*/run.ts',
@@ -36,9 +35,16 @@
   const Options = optionsComponents[`../tools/${tool.address}/Options.svelte`]!.default;
   const loadRun = runModules[`../tools/${tool.address}/run.ts`]!;
 
+  // A Tool marked worker runs there, and its `run` loads in the worker, not the page.
+  const startWorker = () =>
+    runInWorker(
+      new Worker(new URL('../tools/run.worker.ts', import.meta.url), { type: 'module' }),
+      tool.address,
+    );
+
   let runPromise: Promise<AnyRun> | undefined;
   const getRun = () =>
-    (runPromise ??= loadRun().then(
+    (runPromise ??= (tool.worker ? Promise.resolve({ run: startWorker() }) : loadRun()).then(
       (module) => module.run,
       (error: unknown) => {
         // Forget a failed load, so the next file tries again.
@@ -47,8 +53,8 @@
       },
     ));
 
-  const toolPage = createToolPage(tool, async (input: File | File[], options: object) =>
-    (await getRun())(input, options),
+  const toolPage = createToolPage(tool, async (input: File | File[], options: object, context) =>
+    (await getRun())(input, options, context),
   );
 
   let options = $state(structuredClone(tool.defaultOptions));
@@ -191,8 +197,12 @@
     <div class="progress">
       <progress class="moving" value={newest.progress.current - 1} max={newest.progress.total}
       ></progress>
-      <p class="moving">{fill(text.tool.progress, newest.progress)}</p>
-      <p class="still">{text.tool.working}</p>
+      {#if newest.gettingReady}
+        <p>{text.tool.gettingReady}</p>
+      {:else}
+        <p class="moving">{fill(text.tool.progress, newest.progress)}</p>
+        <p class="still">{text.tool.working}</p>
+      {/if}
     </div>
   {:else if saveAllFiles.length > 0}
     <p class="all-done">{newest!.allDone}</p>

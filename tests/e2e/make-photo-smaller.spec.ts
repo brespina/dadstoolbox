@@ -96,8 +96,21 @@ test('Tiny makes it smaller than Medium, and each press adds a Batch', async ({ 
 test('a photo already under the size keeps its width and height', async ({ page }) => {
   // 32 × 48 once turned the right way up.
   await choose(page, [
-    fileURLToPath(new URL('../../src/tools/photo-to-jpg/sample.jpg', import.meta.url)),
+    fileURLToPath(new URL('../../src/tools/photo-to-jpg/rotated.jpg', import.meta.url)),
   ]);
   await page.getByRole('button', { name: 'Make smaller' }).click();
-  expect(await thumbnailSize(page, 'sample_dtb_small.jpg')).toEqual([32, 48]);
+  expect(await thumbnailSize(page, 'rotated_dtb_small.jpg')).toEqual([32, 48]);
+});
+
+test('an iPhone photo (HEIC) comes out as a JPG, here or through the fallback decoder', async ({
+  page,
+}) => {
+  // Stored 48 × 32 and marked "turn a quarter turn", with a date taken and a location.
+  await choose(page, [`${folder}IMG_1234.HEIC`]);
+  await page.getByRole('button', { name: 'Make smaller' }).click();
+  await expect(page.getByText('All done. Location data removed.')).toBeVisible();
+  expect(await thumbnailSize(page, 'IMG_1234_dtb_small.jpg')).toEqual([32, 48]);
+  const { details } = await saveAndRead(page, 'IMG_1234_dtb_small.jpg');
+  expect(details).toMatchObject({ DateTimeOriginal: '2024:06:01 10:30:00' });
+  expect(details).not.toHaveProperty('latitude');
 });

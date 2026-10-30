@@ -48,7 +48,7 @@ export const tool = defineTool({
       : fillText(text.photos.locationKeptLabel, { format: formatName(options) }),
   }),
   reasons: {
-    heic: "This browser can't open iPhone photos (HEIC) yet. Try Safari on an iPhone or Mac.",
+    heic: text.photos.heicWontOpen,
   },
   worker: false,
   outsideAddresses: [],

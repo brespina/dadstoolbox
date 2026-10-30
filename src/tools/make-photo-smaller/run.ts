@@ -1,5 +1,5 @@
 import { buildTiff, isHeif, jpegWithDetails, readDetails } from '../../photos/exif';
-import { ToolFailure, type ToolRun } from '../types';
+import { ToolFailure, type ToolRun, type ToolRunContext } from '../types';
 import { lowerQuality, sizes, tool, type Options } from './declaration';
 import { shrinkOnCanvas } from './canvas';
 
@@ -9,16 +9,16 @@ export interface How {
   quality: number;
 }
 /** A photo drawn the right way up, no bigger than `how` says, saved as a JPG with no details. */
-export type Shrink = (file: File, how: How) => Promise<Blob>;
+export type Shrink = (file: File, how: How, context?: ToolRunContext) => Promise<Blob>;
 
 /** The Tool's job, with the drawing step passed in so tests can stand in for the canvas. */
 export function makeRun(shrink: Shrink): ToolRun<Options> {
-  return async (file, options) => {
+  return async (file, options, context) => {
     const original = new Uint8Array(await file.arrayBuffer());
     const tiff = buildTiff(readDetails(original), !options.removeLocation);
     const how = sizes[options.size];
     const shrunk = async (quality: number) => {
-      const drawn = await shrink(file, { ...how, quality });
+      const drawn = await shrink(file, { ...how, quality }, context);
       return jpegWithDetails(new Uint8Array(await drawn.arrayBuffer()), tiff);
     };
 
@@ -26,7 +26,7 @@ export function makeRun(shrink: Shrink): ToolRun<Options> {
     try {
       bytes = await shrunk(how.quality);
     } catch (error) {
-      // Only some browsers can open an iPhone photo (HEIC) themselves.
+      // Neither the browser nor the late-loaded decoder could open this iPhone photo.
       if (isHeif(original)) throw new ToolFailure(tool.reasons.heic!);
       throw error;
     }

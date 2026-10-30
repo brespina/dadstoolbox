@@ -8,8 +8,10 @@ import { test, expect } from './fixtures';
 
 const folder = fileURLToPath(new URL('../../src/tools/photo-to-jpg/', import.meta.url));
 // Stored 48 × 32 and marked "turn a quarter turn", with a date taken and a location.
-const sample = `${folder}sample.jpg`;
-const iphone = `${folder}IMG_1234.HEIC`;
+const sample = `${folder}rotated.jpg`;
+// An iPhone photo (HEIC), stored 48 × 32 and marked "turn a quarter turn", with a date
+// taken and a location.
+const iphone = `${folder}sample.heic`;
 const seeThrough = `${folder}transparent.png`;
 
 async function choose(page: Page, files: string[]) {
@@ -54,9 +56,9 @@ test('a photo becomes a JPG the right way up, with the date taken and no locatio
   await choose(page, [sample]);
   await page.getByRole('button', { name: 'Change to JPG' }).click();
   await expect(page.getByText('All done. Location data removed.')).toBeVisible();
-  expect(await thumbnailSize(page, 'sample_dtb.jpg')).toEqual([32, 48]);
+  expect(await thumbnailSize(page, 'rotated_dtb.jpg')).toEqual([32, 48]);
 
-  const found = await saveAndRead(page, 'sample_dtb.jpg');
+  const found = await saveAndRead(page, 'rotated_dtb.jpg');
   expect(found).toMatchObject({ DateTimeOriginal: '2024:06:01 10:30:00' });
   expect(found).not.toHaveProperty('latitude');
   expect(found?.Orientation ?? 1).toBe(1);
@@ -67,7 +69,7 @@ test('unticked, Remove location keeps the location', async ({ page }) => {
   await choose(page, [sample]);
   await page.getByRole('button', { name: 'Change to JPG' }).click();
   await expect(page.getByText('All done.', { exact: true })).toBeVisible();
-  const found = await saveAndRead(page, 'sample_dtb.jpg');
+  const found = await saveAndRead(page, 'rotated_dtb.jpg');
   expect(found!.latitude).toBeCloseTo(30.2672, 4);
   expect(found).toMatchObject({ DateTimeOriginal: '2024:06:01 10:30:00' });
 });
@@ -106,34 +108,65 @@ test('WebP is offered only where the browser can save it', async ({ page }) => {
   await page.getByText('WebP', { exact: true }).click();
   await choose(page, [sample]);
   await page.getByRole('button', { name: 'Change to WebP' }).click();
-  await expect(page.getByRole('button', { name: 'Save sample_dtb.webp' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save rotated_dtb.webp' })).toBeVisible();
 });
 
-test('an iPhone photo (HEIC) becomes IMG_1234_dtb.jpg where the browser can open it', async ({
+test('an iPhone photo (HEIC) becomes a JPG the right way up, with the date taken', async ({
   page,
 }) => {
-  const bytes = [...readFileSync(iphone)];
-  const canOpen = await page.evaluate(async (bytes) => {
-    try {
-      (await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/heic' }))).close();
-      return true;
-    } catch {
-      return false;
-    }
-  }, bytes);
+  const canOpen = await page.evaluate(
+    async (bytes) => {
+      try {
+        (
+          await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/heic' }))
+        ).close();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [...readFileSync(iphone)],
+  );
+
+  // The fallback decoder is big, so it never loads with the page.
+  const decoderAsked: string[] = [];
+  page.on('request', (request) => {
+    if (/\/heic-to\.[^/]*\.js$/.test(request.url())) decoderAsked.push(request.url());
+  });
+  const workers: string[] = [];
+  page.on('worker', (worker) => workers.push(worker.url()));
+  // Hold the decoder back until "Getting ready…" has been seen.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/\/heic-to\.[^/]*\.js$/, async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  expect(decoderAsked, 'the decoder loaded with the page').toEqual([]);
+
   await choose(page, [iphone]);
   await page.getByRole('button', { name: 'Change to JPG' }).click();
+  if (!canOpen) {
+    // Chrome has no decoder of its own, so the fallback loads now.
+    await expect(page.getByText('Getting ready…')).toBeVisible();
+  }
+  release();
+  await expect(page.getByText('All done. Location data removed.')).toBeVisible();
+  expect(await thumbnailSize(page, 'sample_dtb.jpg')).toEqual([32, 48]);
+  const found = await saveAndRead(page, 'sample_dtb.jpg');
+  expect(found).toMatchObject({ DateTimeOriginal: '2024:06:01 10:30:00' });
+  expect(found).not.toHaveProperty('latitude');
+  expect(found?.Orientation ?? 1).toBe(1);
+
   if (canOpen) {
-    const found = await saveAndRead(page, 'IMG_1234_dtb.jpg');
-    expect(found).toMatchObject({ DateTimeOriginal: '2024:06:01 10:30:00' });
-    expect(found).not.toHaveProperty('latitude');
+    // Safari opens it itself, and the fallback never loads.
+    expect(decoderAsked).toEqual([]);
   } else {
-    await expect(
-      page.getByText(
-        "Didn't work. This browser can't open iPhone photos (HEIC) yet. Try Safari on an iPhone or Mac.",
-        { exact: true },
-      ),
-    ).toBeVisible();
+    expect(decoderAsked).toHaveLength(1);
+    // The fallback decodes in its own worker, so the page stays responsive.
+    expect(workers.some((url) => url.startsWith('blob:'))).toBe(true);
   }
 });
 
@@ -159,18 +192,18 @@ test('changing the format and pressing start again adds a Batch on top', async (
 
   await expect(page.locator('section.batch h2')).toHaveText(['PNG · 2 photos', 'JPG · 2 photos']);
   // Earlier Batches keep their own Save buttons.
-  await expect(page.getByRole('button', { name: 'Save sample_dtb.jpg' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save rotated_dtb.jpg' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save all' })).toHaveCount(1);
   await page.getByRole('button', { name: 'Save all' }).click();
   expect(await page.evaluate(() => (window as unknown as { shared: string[][] }).shared)).toEqual([
-    ['sample_dtb.png', 'transparent_dtb.png'],
+    ['rotated_dtb.png', 'transparent_dtb.png'],
   ]);
 });
 
 test('Choose more and start again does only the new photo', async ({ page }) => {
   await choose(page, [sample]);
   await page.getByRole('button', { name: 'Change to JPG' }).click();
-  await expect(page.getByRole('button', { name: 'Save sample_dtb.jpg' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save rotated_dtb.jpg' })).toBeVisible();
 
   await choose(page, [seeThrough]);
   const waiting = page.getByRole('region', { name: 'Ready to start' });

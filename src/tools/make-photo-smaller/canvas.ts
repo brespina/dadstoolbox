@@ -1,11 +1,18 @@
 // The browser's own drawing step: open the photo, draw it smaller on a canvas and save
 // it as a JPG. Pixel work runs only in a browser; the page tests cover it.
 
+import { openPhoto } from '../../photos/open';
+import type { ToolRunContext } from '../types';
 import type { How } from './run';
 
-export async function shrinkOnCanvas(file: File, how: How): Promise<Blob> {
+export async function shrinkOnCanvas(
+  file: File,
+  how: How,
+  context?: ToolRunContext,
+): Promise<Blob> {
   // Opening turns the photo the right way up by itself, so its width and height are as seen.
-  const bitmap = await createImageBitmap(file);
+  // Where the browser can't open an iPhone photo (HEIC), the shared fallback does.
+  const bitmap = await openPhoto(file, context);
   try {
     const scale = Math.min(1, how.longestSide / Math.max(bitmap.width, bitmap.height));
     const width = Math.max(1, Math.round(bitmap.width * scale));
