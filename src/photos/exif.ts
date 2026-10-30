@@ -71,9 +71,12 @@ export function isHeif(file: Uint8Array): boolean {
   );
 }
 
+/** True when the bytes are a JPEG. */
+export const isJpeg = (file: Uint8Array) => file[0] === 0xff && file[1] === 0xd8;
+
 function findTiff(file: Uint8Array): Uint8Array | undefined {
   const view = new DataView(file.buffer, file.byteOffset, file.byteLength);
-  if (view.getUint16(0) === 0xffd8) return findInJpeg(file, view);
+  if (isJpeg(file)) return findInJpeg(file, view);
   if (ascii(file, 1, 3) === 'PNG') return findInPng(file, view);
   if (ascii(file, 0, 4) === 'RIFF' && ascii(file, 8, 4) === 'WEBP') return findInWebp(file, view);
   if (ascii(file, 4, 4) === 'ftyp') return findInHeif(file, view);

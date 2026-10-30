@@ -36,4 +36,43 @@ describe('Remove photo location', () => {
     expect(found).not.toHaveProperty('GPSLatitude');
     expect(readDetails(out)?.location).toEqual([]);
   });
+
+  it('keeps the date taken, the way up and the picture itself', async () => {
+    const original = bytes('sample.jpg');
+    const out = await removed(jpg());
+    expect(await details(out)).toMatchObject({
+      DateTimeOriginal: '2024:06:01 10:30:00',
+      OffsetTimeOriginal: '-05:00',
+      Orientation: 6,
+    });
+    expect(out.length).toBe(original.length);
+    // Only bytes inside the photo details segment change.
+    const [start, end] = detailsSegment(original);
+    original.forEach((byte, at) => {
+      if (byte !== out[at]) expect(at >= start && at < end, `byte ${at}`).toBe(true);
+    });
+  });
+
+  it('still saves a JPG that has no location, unchanged', async () => {
+    const original = bytes('painted.jpg');
+    const out = await removed(file(original, 'painted.jpg', 'image/jpeg'));
+    expect(out).toEqual(original);
+  });
+
+  it('fails plainly for a kind of photo that has no location', async () => {
+    const png = file(bytes('transparent.png'), 'transparent.png', 'image/png');
+    const failure = await run(png, tool.defaultOptions).catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(ToolFailure);
+    expect((failure as ToolFailure).reason).toBe("This kind of photo doesn't carry a location.");
+  });
 });
+
+/** Where the first photo details segment (APP1 "Exif") of a JPEG starts and ends. */
+function detailsSegment(jpeg: Uint8Array): [number, number] {
+  for (let at = 2; jpeg[at] === 0xff && jpeg[at + 1] !== 0xda; ) {
+    const end = at + 2 + ((jpeg[at + 2]! << 8) | jpeg[at + 3]!);
+    if (jpeg[at + 1] === 0xe1) return [at, end];
+    at = end;
+  }
+  throw new Error('No details segment');
+}
