@@ -1,0 +1,9 @@
+Break notes, final reviewer for spec #15.
+
+No preview servers left running; port 5099 is free.
+
+The part I liked most was seeing dist go from 8.1 MB to 4.2 MB. The cause was one glob that pulled every Tool into the worker.
+
+One thing is still open. The HEIC shrinker page test times out on this machine even on the base commit, while CI passes it. Someone should look at it with a longer timeout or after the double-decode fix. It shouldn't just get labelled "flaky" and forgotten.
+
+For now: nothing to watch, nothing to rebuild.
