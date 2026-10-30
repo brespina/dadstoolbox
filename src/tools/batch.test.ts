@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createToolPage, type ToolPageState } from './batch';
-import { defineTool, ToolFailure, type ToolRun } from './types';
+import { defineTool, ToolFailure, type Reason, type ToolRun } from './types';
 import { runInWorker, serveRuns, type AnyRun } from './worker';
 
 const tool = defineTool({
@@ -185,7 +185,10 @@ describe('a file that fails', () => {
   };
 
   it("shows the Tool's own reason on its row only, and other files carry on", async () => {
-    const page = createToolPage(tool, runFailing(new ToolFailure('This PDF has a password.')));
+    const page = createToolPage(
+      tool,
+      runFailing(new ToolFailure('This PDF has a password.' as Reason)),
+    );
     page.add([file('bad.pdf'), file('good.pdf')]);
     await page.start({});
     expect(page.state().batches[0]!.items).toMatchObject([
@@ -289,7 +292,7 @@ describe('pressing start again', () => {
     const runs: string[] = [];
     const page = createToolPage(labelled, async (f, options) => {
       runs.push(`${f.name} ${options.format}`);
-      throw new ToolFailure('No.');
+      throw new ToolFailure('No.' as Reason);
     });
     page.add([file('a.pdf')]);
     await page.start({ format: 'jpg' });
@@ -423,7 +426,7 @@ describe('all files together', () => {
 
   it("shows the Tool's own reason on the one row when it fails", async () => {
     const page = createToolPage(together, async () => {
-      throw new ToolFailure('b.pdf has a password.');
+      throw new ToolFailure('b.pdf has a password.' as Reason);
     });
     page.add([file('a.pdf'), file('b.pdf')]);
     await page.start({});
@@ -453,7 +456,7 @@ describe('a Tool whose run is marked worker', () => {
   it("shows the Tool's own reason, and the shared one for any other error", async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const page = inWorker(async (f) => {
-      if (f.name === 'locked.pdf') throw new ToolFailure('This PDF has a password.');
+      if (f.name === 'locked.pdf') throw new ToolFailure('This PDF has a password.' as Reason);
       throw new TypeError('xref table broken');
     });
     page.add([file('locked.pdf'), file('broken.pdf')]);

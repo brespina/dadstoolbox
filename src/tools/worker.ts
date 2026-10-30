@@ -3,7 +3,7 @@
 // MessageChannel instead of a real worker.
 
 import * as Comlink from 'comlink';
-import { ToolFailure, type ToolResult, type ToolRunContext } from './types';
+import { ToolFailure, type Reason, type ToolResult, type ToolRunContext } from './types';
 
 /** A Tool's `run`, taking one file or the ordered list, as its input mode says. */
 export type AnyRun = (
@@ -83,7 +83,8 @@ export function runInWorker(
     });
     try {
       const answer = await Promise.race([worker.run(address, input, options, page), died]);
-      if ('failure' in answer) throw new ToolFailure(answer.failure);
+      // The worker threw a ToolFailure, so this was a Reason before it crossed over.
+      if ('failure' in answer) throw new ToolFailure(answer.failure as Reason);
       return answer.results;
     } finally {
       loaded?.();

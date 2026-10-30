@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTypedToolPage } from './typed';
-import { defineTool, ToolFailure, type ToolTextRun } from './types';
+import { defineTool, ToolFailure, type Reason, type ToolTextRun } from './types';
 
 const tool = defineTool({
   address: 'fake-code',
@@ -78,7 +78,7 @@ describe('typing', () => {
     const page = createTypedToolPage(
       tool,
       async (typed) => {
-        if (typed === 'long') throw new ToolFailure('Too long.');
+        if (typed === 'long') throw new ToolFailure('Too long.' as Reason);
         throw new Error('broken');
       },
       150,

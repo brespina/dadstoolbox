@@ -10,7 +10,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:webkit": "scripts/e2e-webkit.sh"
   },
   "dependencies": {
     "@astrojs/svelte": "^9.1.2",

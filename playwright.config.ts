@@ -20,9 +20,11 @@ export default defineConfig({
   ],
   webServer: {
     // The browser lock is only written by a real build, so test the built Site.
-    command: `npm run build && npx astro preview --port ${port}`,
+    command: `npm run build && npx astro preview --port ${port} --ignore-lock`,
     url: `http://localhost:${port}/dadstoolbox/`,
-    reuseExistingServer: !process.env.CI,
+    // Always build and serve this checkout. Reusing a running server can test a stale
+    // build, or another checkout's build on the same port.
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });

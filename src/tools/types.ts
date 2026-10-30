@@ -78,9 +78,21 @@ export interface ToolDeclarationInput<Options extends object> {
   defaultOptions: Options;
 }
 
+declare const reasonBrand: unique symbol;
+/**
+ * A failure reason from a declaration's `reasons`, which the banned-words scan reads.
+ * ToolFailure takes only this type, so a reason written inside `run` fails the type check.
+ */
+export type Reason = string & { readonly [reasonBrand]: true };
+
 export type ToolDeclaration<Options extends object = object> = Required<
-  ToolDeclarationInput<Options>
->;
+  Omit<ToolDeclarationInput<Options>, 'reasons'>
+> & { reasons: Readonly<Record<string, Reason>> };
+
+/** Fills a reason's `{placeholders}`, keeping it a Reason. */
+export function fillReason(reason: Reason, values: Record<string, string | number>): Reason {
+  return fillText(reason, values) as Reason;
+}
 
 /** Fills a declaration's defaults. */
 export function defineTool<Options extends object>(
@@ -92,9 +104,9 @@ export function defineTool<Options extends object>(
     largeFileNote: fillText(text.tool.largeFileNote, { noun: input.noun.one }),
     textFor: () => ({}),
     typeLabel: text.tool.typed.label,
-    reasons: {},
     notes: {},
     ...input,
+    reasons: (input.reasons ?? {}) as Readonly<Record<string, Reason>>,
   };
 }
 
@@ -180,7 +192,7 @@ export type ToolRunTogether<Options extends object = object> = (
  * the shared fallback.
  */
 export class ToolFailure extends Error {
-  constructor(public readonly reason: string) {
+  constructor(public readonly reason: Reason) {
     super(reason);
     this.name = 'ToolFailure';
   }
