@@ -1,6 +1,7 @@
 // A smoke test for every declared Tool, made from its declaration: open its page,
 // choose its sample file, press start, and a Save button appears. A Tool with no file
-// (input mode "none") types the text in its sample.txt instead, and a result appears.
+// (input mode "none") types the text in its sample.txt instead, or, with no type box,
+// fills the fields in its sample.json, and a result appears.
 // Adding a Tool adds its test; nothing here is written per Tool.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -22,7 +23,6 @@ for (const { tool, folder } of tools) {
 
     if (tool.input === 'none') {
       test('type the sample, a result appears, and Save saves it', async ({ page }) => {
-        const typed = readFileSync(join(folder, 'sample.txt'), 'utf8').trim();
         // Save normally, so the saved file can be checked.
         await page.addInitScript(() => {
           navigator.canShare = () => false;
@@ -33,12 +33,26 @@ for (const { tool, folder } of tools) {
         await expect(page.getByRole('link', { name: text.tool.backLink })).toBeVisible();
         await expect(page.getByRole('button', { name: tool.startButton })).toHaveCount(0);
 
-        await page.getByLabel(tool.typeLabel).fill(typed);
-        await expect(
-          page.getByRole('img', {
-            name: fillText(text.tool.typed.pictureLabel, { noun: tool.noun.one, typed }),
-          }),
-        ).toBeVisible();
+        if (tool.typeBox) {
+          const typed = readFileSync(join(folder, 'sample.txt'), 'utf8').trim();
+          await page.getByLabel(tool.typeLabel).fill(typed);
+          await expect(
+            page.getByRole('img', {
+              name: fillText(text.tool.typed.pictureLabel, { noun: tool.noun.one, typed }),
+            }),
+          ).toBeVisible();
+        } else {
+          // No type box: sample.json gives each option field's value, by its label.
+          await expect(page.getByLabel(tool.typeLabel)).toHaveCount(0);
+          const fields = JSON.parse(readFileSync(join(folder, 'sample.json'), 'utf8')) as Record<
+            string,
+            string
+          >;
+          for (const [label, value] of Object.entries(fields)) {
+            await page.getByLabel(label, { exact: true }).fill(value);
+          }
+          await expect(page.getByRole('img')).toBeVisible();
+        }
         const saved = page.waitForEvent('download');
         await page.getByRole('button', { name: /^Save / }).click();
         expect((await saved).suggestedFilename()).toMatch(new RegExp(`^${tool.address}_dtb`));

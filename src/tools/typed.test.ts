@@ -101,3 +101,55 @@ describe('typing', () => {
     expect(seen.at(-1)).toBe(false);
   });
 });
+
+describe('describing the picture', () => {
+  it('says what was typed, by default', async () => {
+    const page = createTypedToolPage(tool, echo, 150);
+    page.type('hello', {});
+    await vi.advanceTimersByTimeAsync(150);
+    expect(page.state().result?.label).toBe('code that says: hello');
+  });
+});
+
+describe('a Tool with no type box', () => {
+  const network = defineTool({
+    ...tool,
+    address: 'fake-network',
+    typeBox: false,
+    textFor: (options: { name: string }) => ({ pictureLabel: `Code for ${options.name}` }),
+    defaultOptions: { name: '' },
+  });
+  const byName: ToolTextRun<{ name: string }> = async (typed, { name }) =>
+    name === '' ? [] : [png(`${typed}|${name}`)];
+
+  it('makes the result again once the options stop changing, with no typed text', async () => {
+    const run = vi.fn(byName);
+    const page = createTypedToolPage(network, run, 150);
+    for (const name of ['H', 'Ho', 'Home']) {
+      page.change({ name });
+      await vi.advanceTimersByTimeAsync(50);
+    }
+    expect(page.state().updating).toBe(true);
+    await vi.advanceTimersByTimeAsync(150);
+    expect(run.mock.calls).toEqual([['', { name: 'Home' }]]);
+    const { result } = page.state();
+    expect(await result?.blob.text()).toBe('|Home');
+    expect(result?.name).toBe('fake-network_dtb.png');
+  });
+
+  it('describes the picture from the options it was made with', async () => {
+    const page = createTypedToolPage(network, byName, 150);
+    page.change({ name: 'Home' });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(page.state().result?.label).toBe('Code for Home');
+  });
+
+  it('shows nothing, and no reason, when run makes nothing', async () => {
+    const page = createTypedToolPage(network, byName, 150);
+    page.change({ name: 'Home' });
+    await vi.advanceTimersByTimeAsync(150);
+    page.change({ name: '' });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(page.state()).toEqual({ result: null, reason: null, updating: false });
+  });
+});

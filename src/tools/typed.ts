@@ -1,8 +1,9 @@
 // Shared logic for Tools the person types into (input mode "none"), in plain TypeScript
 // with no page or framework code. There is no Choose or start button and no Batch: the
-// result is made again each time typing pauses, and only the newest one is kept.
+// result is made again each time typing pauses (or, for a Tool with no type box, each
+// time the options stop changing), and only the newest one is kept.
 
-import { text } from '../text';
+import { fillText, text } from '../text';
 import { ToolFailure, type ToolDeclaration, type ToolTextRun } from './types';
 
 /** The file a typed Tool made, named and ready to save. */
@@ -13,6 +14,8 @@ export interface TypedResult {
   blob: Blob;
   /** The text it was made from. */
   typed: string;
+  /** The picture's description: what was typed, or the Tool's own `pictureLabel`. */
+  label: string;
 }
 
 export interface TypedToolPageState {
@@ -20,7 +23,7 @@ export interface TypedToolPageState {
   result: TypedResult | null;
   /** Why there is no result: the Tool's own reason, or the shared one. */
   reason: string | null;
-  /** True from a keypress until its result is ready, so a stale result isn't saved. */
+  /** True from a change until its result is ready, so a stale result isn't saved. */
   updating: boolean;
 }
 
@@ -42,7 +45,7 @@ export function createTypedToolPage<Options extends object>(
   if (tool.input !== 'none') throw new Error(`"${tool.address}" is not a typed Tool`);
 
   let nextId = 1;
-  // Each keypress takes a new number; a result is only kept if its number is the newest.
+  // Each change takes a new number; a result is only kept if its number is the newest.
   let latest = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let current: TypedToolPageState = { result: null, reason: null, updating: false };
@@ -64,6 +67,9 @@ export function createTypedToolPage<Options extends object>(
         size: made.blob.size,
         blob: made.blob,
         typed,
+        label:
+          tool.textFor(options).pictureLabel ??
+          fillText(text.tool.typed.pictureLabel, { noun: tool.noun.one, typed }),
       };
       set({ result: result ?? null, reason: null, updating: false });
     } catch (error) {
@@ -73,6 +79,11 @@ export function createTypedToolPage<Options extends object>(
       else console.error(tool.name, error);
       set({ result: null, reason, updating: false });
     }
+  }
+
+  function later(typed: string, options: Options, ticket: number) {
+    set({ ...current, updating: true });
+    timer = setTimeout(() => void make(typed, options, ticket), delay);
   }
 
   return {
@@ -92,8 +103,17 @@ export function createTypedToolPage<Options extends object>(
         set({ result: null, reason: null, updating: false });
         return;
       }
-      set({ ...current, updating: true });
-      timer = setTimeout(() => void make(typed, options, ticket), delay);
+      later(typed, options, ticket);
+    },
+
+    /**
+     * For a Tool with no type box: the options now. The result follows once they stop
+     * changing, and `run` gets "" as the typed text.
+     */
+    change(options: Options) {
+      const ticket = ++latest;
+      clearTimeout(timer);
+      later('', options, ticket);
     },
   };
 }

@@ -55,7 +55,7 @@ new Tool shows on the home page under its Category and gets its own page test on
 | `run.ts`         | Exports `run`, the Tool's job, in plain TypeScript. Its libraries load only on the Tool's own page.                                                                                  |
 | `Options.svelte` | The Tool's options, shown above Choose.                                                                                                                                              |
 | `run.test.ts`    | The Vitest test of `run`.                                                                                                                                                            |
-| `sample.<ext>`   | The file the generated page test chooses. Extra test files, such as `sample-password.pdf`, can sit beside it. For input mode `none`, `sample.txt` holds the text the test types.  |
+| `sample.<ext>`   | The file the generated page test chooses. Extra test files, such as `sample-password.pdf`, can sit beside it. For input mode `none`, `sample.txt` holds the text the test types, or, with no type box, `sample.json` holds each field's value by its label. |
 | `ready.ts`       | Optional. Lines for a chosen file's Ready row, such as an estimated size. See [Notes on the Ready row](#notes-on-the-ready-row).                                                   |
 
 `src/tools/types.ts` defines the declaration and `run` types. It is the source of truth:
@@ -65,7 +65,7 @@ example.
 ## The declaration
 
 `defineTool` fills the defaults for the fields marked optional below (`largeFileNote`,
-`privacyLine`, `allDone`, `textFor`, `typeLabel`, `reasons` and `notes`). Every other
+`privacyLine`, `allDone`, `textFor`, `typeLabel`, `typeBox`, `reasons` and `notes`). Every other
 field is required.
 
 | Field              | What it does                                                                                                                                                                                                                                                                                       |
@@ -82,10 +82,11 @@ field is required.
 | `largeFileLimit`   | A size in bytes. A file bigger than this gets a note on its Ready row warning it may be slow or stop partway on a phone. It does not stop the file. Set it from what a phone can really handle.                                                                                                    |
 | `largeFileNote`    | Optional. That note. Defaults to "This {noun} is big for a phone. It may take a few minutes or stop partway." with the Tool's noun (one) swapped in.                                                                                                                                          |
 | `typeLabel`        | Optional, for input mode `none`. The label on the box the visitor types into. Has a shared default.                                                                                                                                                                                              |
+| `typeBox`          | Optional, for input mode `none`. Defaults to `true`. Set it to `false` when the options hold all the input, as in Make a Wi-Fi QR code: the page shows no type box, and the result is made again whenever the options change. See [Input modes](#input-modes). |
 | `startButton`      | Words on the start button that say what will happen: "Split into pages", "Combine PDFs".                                                                                                                                                                                                          |
 | `privacyLine`      | Optional. Defaults to the Promise line with the noun swapped in: "Your PDFs stay on your device. They are never sent anywhere." A Tool with no file says something like "What you type stays on your device."                                                                                    |
 | `allDone`          | Optional. Shown when a Batch finishes. Defaults to "All done."                                                                                                                                                                                                                                     |
-| `textFor`          | Optional. A function from the options to words that follow them: `startButton` ("Change to PNG"), `batchLabel` (the "PNG" in "PNG · 3 photos") and `allDone`. Each one left out falls back to the field above. With default options it must give the same `startButton`, because the page test presses that. |
+| `textFor`          | Optional. A function from the options to words that follow them: `startButton` ("Change to PNG"), `batchLabel` (the "PNG" in "PNG · 3 photos"), `allDone`, and for input mode `none`, `pictureLabel` (the result picture's description, which defaults to "{noun} that says: {typed}"). Each one left out falls back to the field above. With default options it must give the same `startButton`, because the page test presses that. |
 | `reasons`          | Optional. The Tool's own plain-language failure reasons, by key. `run` throws them as `ToolFailure` (see below).                                                                                                                                                                                  |
 | `notes`            | Optional. Other words the Tool shows, by key, such as its option names or the lines its `ready.ts` gives. They are scanned for plain words like every other field.                                                                                                                             |
 | `worker`           | Whether `run` runs in a Web Worker. See [The worker flag](#the-worker-flag).                                                                                                                                                                                                                       |
@@ -101,14 +102,24 @@ field is required.
   ordered list of every waiting file. The waiting list gets ↑ / ↓ buttons to set the
   order. Results are named after `combined` instead of an original, as in
   `combined_dtb.pdf`.
-- **`none`, no file** (QR code maker). The visitor types instead, and `run` gets the
+- **`none`, no file** (Make a QR code). The visitor types instead, and `run` gets the
   typed text. There is no Choose or start button: the result updates as the visitor types
   and is saved like any other result. Leave `accept` empty and write the privacy line
   about what they type.
 
+  A Tool whose options hold all the input (Make a Wi-Fi QR code: a network name and a
+  password) sets `typeBox: false`. The page hides the type box, `run` gets `""` as the
+  typed text and reads everything from the options, and the result is made again
+  whenever the options change. `run` returns `[]` while there is nothing to make yet,
+  such as an empty network name: the page then shows no result and no reason. Give
+  `textFor` a `pictureLabel`, so the picture is described from the options, without
+  anything private such as a password.
+
 The template uses `each`. Each mode has its own `run` type in `types.ts`: `ToolRun`
 (`each`), `ToolRunTogether` (`together`) and `ToolTextRun` (`none`). Combine PDFs and
-QR code maker are the worked examples for `together` and `none`.
+QR code maker are the worked examples for `together` and `none`, and Make a Wi-Fi QR code
+for `none` with no type box. The QR code Tools share their drawing, `qrPng` in
+`src/qr/draw.ts`.
 
 ## The `run` contract
 
@@ -215,7 +226,9 @@ Options must work for phones and keyboards: every tappable thing at least 44 × 
 - **The generated page test** (`tests/e2e/tools.spec.ts`, Playwright, phone-sized WebKit
   and Chromium). Nothing to write: for every discovered Tool it checks the Tool is listed
   on the home page under its Category, then opens the page, chooses `sample.<ext>`,
-  presses start and waits for Save and the "All done" message. Each page test also runs
+  presses start and waits for Save and the "All done" message. A Tool in input mode
+  `none` types `sample.txt` instead, or, with no type box, fills each field named in
+  `sample.json`, then waits for the picture and saves it. Each page test also runs
   an accessibility check in both themes and fails on any request that leaves the Site.
 
 Ports, WebKit on this machine, and slow tests: see `docs/agents/testing.md`.
