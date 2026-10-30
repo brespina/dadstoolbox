@@ -38,7 +38,7 @@ test.describe('with the video features', () => {
   test('the sample becomes a gif 480 px wide, made in a worker', async ({ page }) => {
     await choose(page, [`${folder}sample.mp4`]);
     // Half a second of 1280 × 720: 5 frames of 480 × 270.
-    await expect(page.getByText('The gif will be about 233 KB.')).toBeVisible();
+    await expect(page.getByText('The gif may be up to about 233 KB.')).toBeVisible();
     await page.getByRole('button', { name: 'Make a gif' }).click();
     await expect(page.getByText('All done.')).toBeVisible({ timeout: 20_000 });
     // The gif was made off the page, so the page stayed responsive.
@@ -55,11 +55,11 @@ test.describe('with the video features', () => {
 
   test('a long video warns before start that the gif is big, and Small helps', async ({ page }) => {
     await choose(page, [`${folder}long.mp4`]);
-    await expect(page.getByText('The gif will be about 28 MB.')).toBeVisible();
+    await expect(page.getByText('The gif may be up to about 28 MB.')).toBeVisible();
     await expect(page.getByText(tool.notes.tooBig!)).toBeVisible();
 
     await page.getByText('Small', { exact: true }).click();
-    await expect(page.getByText('The gif will be about 12 MB.')).toBeVisible();
+    await expect(page.getByText('The gif may be up to about 12 MB.')).toBeVisible();
     await expect(page.getByText(tool.notes.tooBig!)).toHaveCount(0);
   });
 

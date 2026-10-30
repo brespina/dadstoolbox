@@ -11,17 +11,6 @@ browser) and [ADR-0003](adr/0003-the-site-keeps-no-data-about-visitors.md) (the 
 no data about visitors) first. A Tool that needs a server or sends files anywhere can't
 be added.
 
-## Not built yet
-
-Some of the machinery this guide describes comes with later Tools. Until those land, a
-new Tool can only use what is built today:
-
-| Part                                  | Today         | Built in |
-| ------------------------------------- | ------------- | -------- |
-| The credits page for library licences | Not there yet | #26      |
-
-When that ticket lands, it should update this guide.
-
 ## The steps
 
 1. **Copy the template.** Copy `src/tools/_template/` to `src/tools/<address>/`, where
@@ -66,7 +55,8 @@ new Tool shows on the home page under its Category and gets its own page test on
 | `run.ts`         | Exports `run`, the Tool's job, in plain TypeScript. Its libraries load only on the Tool's own page.                                                                                  |
 | `Options.svelte` | The Tool's options, shown above Choose.                                                                                                                                              |
 | `run.test.ts`    | The Vitest test of `run`.                                                                                                                                                            |
-| `sample.<ext>`   | The file the generated page test chooses. Extra test files, such as `sample-password.pdf`, can sit beside it.                                                                       |
+| `sample.<ext>`   | The file the generated page test chooses. Extra test files, such as `sample-password.pdf`, can sit beside it. For input mode `none`, `sample.txt` holds the text the test types.  |
+| `ready.ts`       | Optional. Lines for a chosen file's Ready row, such as an estimated size. See [Notes on the Ready row](#notes-on-the-ready-row).                                                   |
 
 `src/tools/types.ts` defines the declaration and `run` types. It is the source of truth:
 if this guide and that file disagree, the file wins. `src/tools/split-pdf/` is a worked
@@ -74,7 +64,8 @@ example.
 
 ## The declaration
 
-`defineTool` fills the defaults (`privacyLine`, `allDone` and `reasons`). Every other
+`defineTool` fills the defaults for the fields marked optional below (`largeFileNote`,
+`privacyLine`, `allDone`, `textFor`, `typeLabel`, `reasons` and `notes`). Every other
 field is required.
 
 | Field              | What it does                                                                                                                                                                                                                                                                                       |
@@ -90,6 +81,7 @@ field is required.
 | `needs`            | Browser features `run` needs, such as `webcodecs`. They are checked when the page runs. Where one is missing, the home page row and the Tool page say "Doesn't work on this browser yet" and Choose is greyed out. Add a new feature to the `BrowserFeature` type in `types.ts` if it is missing. |
 | `largeFileLimit`   | A size in bytes. A file bigger than this gets a note on its Ready row warning it may be slow or stop partway on a phone. It does not stop the file. Set it from what a phone can really handle.                                                                                                    |
 | `largeFileNote`    | Optional. That note. Defaults to "This {noun} is big for a phone. It may take a few minutes or stop partway." with the Tool's noun (one) swapped in.                                                                                                                                          |
+| `typeLabel`        | Optional, for input mode `none`. The label on the box the visitor types into. Has a shared default.                                                                                                                                                                                              |
 | `startButton`      | Words on the start button that say what will happen: "Split into pages", "Combine PDFs".                                                                                                                                                                                                          |
 | `privacyLine`      | Optional. Defaults to the Promise line with the noun swapped in: "Your PDFs stay on your device. They are never sent anywhere." A Tool with no file says something like "What you type stays on your device."                                                                                    |
 | `allDone`          | Optional. Shown when a Batch finishes. Defaults to "All done."                                                                                                                                                                                                                                     |
@@ -114,8 +106,9 @@ field is required.
   and is saved like any other result. Leave `accept` empty and write the privacy line
   about what they type.
 
-The template uses `each`, the only mode built so far. `together` and `none` come with
-Combine PDFs (#22) and QR code maker (#23), which add their `run` types to `types.ts`.
+The template uses `each`. Each mode has its own `run` type in `types.ts`: `ToolRun`
+(`each`), `ToolRunTogether` (`together`) and `ToolTextRun` (`none`). Combine PDFs and
+QR code maker are the worked examples for `together` and `none`.
 
 ## The `run` contract
 
@@ -161,6 +154,10 @@ elements. `OffscreenCanvas`, `createImageBitmap` and `fetch` to the Site are fin
 Tool doesn't make the worker itself; shared code does. Most Tools use `worker: false`.
 Make a gif from a video (`src/tools/video-to-gif/`) is the worked example.
 
+The worker's files hold only the Tools marked worker, and the page's files only the
+others (`src/tools/tool-runs.ts` sorts them when the build starts). After changing a
+Tool's `worker` flag, restart the dev server.
+
 A worker loaded from its own file does not get the page's browser lock tag, so a worker
 Tool must not fetch anything itself. The page tests watch requests from workers too.
 
@@ -199,9 +196,12 @@ Every line a visitor reads follows the wording rules (issue #13):
 
 The **banned-words scan** (`src/wording.test.ts`, rules in `src/wording.ts`) checks the
 shared text in `src/text.ts` and every discovered Tool's declaration text: name, blurb,
-noun, start button, privacy line, "All done" message and reasons. It does **not** check
-words in `Options.svelte`, so follow the rules there by hand. Shared page text lives in
-`src/text.ts`; Tool text lives in the declaration.
+noun, start button, privacy line, "All done" message, large-file note, type label,
+reasons, notes, and the `textFor` words for the default options (`declarationText` in
+`types.ts`). It does **not** check words written straight into `Options.svelte`, or
+`textFor` words for other options, so put option names in `notes` (or shared text) and
+follow the rules by hand for the rest. Shared page text lives in `src/text.ts`; Tool text
+lives in the declaration.
 
 Options must work for phones and keyboards: every tappable thing at least 44 × 44 px
 (`2.75rem`), a visible label on each control, nothing that only works on hover.
@@ -224,7 +224,10 @@ locally, `npx playwright test --project chromium-phone` and let CI run WebKit.
 
 ## Licences
 
-A Tool that adds a library must add its licence notice to the Site's credits, once the
-credits page exists (issue #26).
+A Tool that adds a library must add it to the Site's credits page (`/credits/`, linked
+from Our promise). The list lives in `src/site/credits.ts`: name, license, what it does in
+plain words, and links to its code and license at the shipped version. Add the packages
+the library brings in too. `src/site/credits.test.ts` fails if a library in
+`package.json` is missing, or a version or license no longer matches `node_modules`.
 Check the licence first: anything that would make the Site's own code change licence
 needs a decision before it is added.

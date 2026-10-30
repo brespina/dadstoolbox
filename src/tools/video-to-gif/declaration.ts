@@ -47,7 +47,7 @@ export const tool = defineTool({
     smallName,
     smallHint: 'Smaller file. Fine on a phone screen.',
     // {size} is the estimated size, such as "4.2 MB".
-    estimate: 'The gif will be about {size}.',
+    estimate: 'The gif may be up to about {size}.',
     tooBig: "That's big to send. Try a shorter clip, or choose Small.",
   },
   worker: true,

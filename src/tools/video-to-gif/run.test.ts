@@ -113,19 +113,19 @@ describe('the size estimate on the Ready row', () => {
   it('allows about 0.36 bytes a pixel a frame, as a real iPhone clip made (#10)', () => {
     // 94 frames of 270 × 480.
     const [estimate] = readyLines({ width: 1080, height: 1920, duration: 9.4 }, normal);
-    expect(estimate).toEqual({ text: 'The gif will be about 4.4 MB.' });
+    expect(estimate).toEqual({ text: 'The gif may be up to about 4.4 MB.' });
   });
 
   it('warns about a gif over about 15 MB, suggesting a shorter clip or Small', () => {
     expect(readyLines({ width: 1920, height: 1080, duration: 60 }, normal)).toEqual([
-      { text: 'The gif will be about 28 MB.' },
+      { text: 'The gif may be up to about 28 MB.' },
       { text: "That's big to send. Try a shorter clip, or choose Small.", warning: true },
     ]);
   });
 
   it('gets smaller with Small', () => {
     expect(readyLines({ width: 1920, height: 1080, duration: 60 }, { size: 'small' })).toEqual([
-      { text: 'The gif will be about 12 MB.' },
+      { text: 'The gif may be up to about 12 MB.' },
     ]);
   });
 });
