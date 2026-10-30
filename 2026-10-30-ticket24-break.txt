@@ -1,0 +1,10 @@
+Ticket 24 break.
+
+The best part was the WebKit result coming back green. I couldn't run it here, so that
+was the biggest unknown, and it was a relief to see it pass.
+
+The detour I liked least was timing frames in a build that turned out to be stale. A
+good reminder to check what's actually being served before trusting a number.
+
+Pleasant thought: somewhere a dad will turn a clip of his kid into a 4 MB gif and never
+think about palettes. That's the point.
