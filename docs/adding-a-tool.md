@@ -218,9 +218,7 @@ Options must work for phones and keyboards: every tappable thing at least 44 × 
   presses start and waits for Save and the "All done" message. Each page test also runs
   an accessibility check in both themes and fails on any request that leaves the Site.
 
-Run the page tests on a free port if another checkout is using 4321:
-`E2E_PORT=4400 npm run test:e2e`. WebKit needs system libraries; if it won't start
-locally, `npx playwright test --project chromium-phone` and let CI run WebKit.
+Ports, WebKit on this machine, and slow tests: see `docs/agents/testing.md`.
 
 ## Licences
 
