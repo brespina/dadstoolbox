@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { PDFDocument } from 'pdf-lib';
+import { degrees, PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { run } from './run';
 
@@ -19,4 +19,29 @@ describe('Rotate PDF pages', () => {
     const results = await run(sample('sample.pdf'), { turn: 'right' });
     expect(await anglesOf(results)).toEqual([90, 90, 90]);
   });
+
+  it('turns every page left', async () => {
+    const results = await run(sample('sample.pdf'), { turn: 'left' });
+    expect(await anglesOf(results)).toEqual([270, 270, 270]);
+  });
+
+  it('turns every page upside down', async () => {
+    const results = await run(sample('sample.pdf'), { turn: 'upsideDown' });
+    expect(await anglesOf(results)).toEqual([180, 180, 180]);
+  });
+
+  it('adds to the turn a page already had, staying under a full turn', async () => {
+    const turned = await pdfWithPages([90, 270, 180]);
+    expect(await anglesOf(await run(turned, { turn: 'right' }))).toEqual([180, 0, 270]);
+    expect(await anglesOf(await run(turned, { turn: 'left' }))).toEqual([0, 180, 90]);
+    expect(await anglesOf(await run(turned, { turn: 'upsideDown' }))).toEqual([270, 90, 0]);
+  });
 });
+
+/** A PDF whose pages are already turned by these amounts. */
+async function pdfWithPages(angles: number[]) {
+  const doc = await PDFDocument.create();
+  for (const angle of angles) doc.addPage([300, 200]).setRotation(degrees(angle));
+  const bytes = await doc.save();
+  return new File([bytes as Uint8Array<ArrayBuffer>], 'turned.pdf', { type: 'application/pdf' });
+}
