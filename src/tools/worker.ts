@@ -60,8 +60,16 @@ export function serveRuns(
   Comlink.expose(served, endpoint);
 }
 
-/** The page's side: a `run` that hands the work to the worker at `endpoint`. */
-export function runInWorker(endpoint: Comlink.Endpoint, address: string): AnyRun {
+/**
+ * The page's side: a `run` that hands the work to the worker at `endpoint`. `died`
+ * rejects if the worker stops (it failed to load, or the phone ran out of memory);
+ * without it, a run waiting on a dead worker would never finish.
+ */
+export function runInWorker(
+  endpoint: Comlink.Endpoint,
+  address: string,
+  died: Promise<never> = new Promise<never>(() => {}),
+): AnyRun {
   const worker = Comlink.wrap<{
     run(address: string, input: File | File[], options: object, page: Loading): Promise<Answer>;
   }>(endpoint);
@@ -74,7 +82,7 @@ export function runInWorker(endpoint: Comlink.Endpoint, address: string): AnyRun
       },
     });
     try {
-      const answer = await worker.run(address, input, options, page);
+      const answer = await Promise.race([worker.run(address, input, options, page), died]);
       if ('failure' in answer) throw new ToolFailure(answer.failure);
       return answer.results;
     } finally {

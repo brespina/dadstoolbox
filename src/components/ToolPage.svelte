@@ -42,11 +42,26 @@
   const loadReady = readyModules[`../tools/${tool.address}/ready.ts`];
 
   // A Tool marked worker runs there, and its `run` loads in the worker, not the page.
-  const startWorker = () =>
-    runInWorker(
-      new Worker(new URL('../tools/run.worker.ts', import.meta.url), { type: 'module' }),
-      tool.address,
+  // If the worker stops, the file it was on fails, and the next file starts a new one.
+  const startWorker = () => {
+    const worker = new Worker(new URL('../tools/run.worker.ts', import.meta.url), {
+      type: 'module',
+    });
+    const died = new Promise<never>((_, reject) =>
+      worker.addEventListener(
+        'error',
+        (event) => {
+          worker.terminate();
+          runPromise = undefined;
+          reject(new Error(`The worker stopped: ${event.message}`));
+        },
+        { once: true },
+      ),
     );
+    // A worker that never stops leaves this unwatched.
+    died.catch(() => {});
+    return runInWorker(worker, tool.address, died);
+  };
 
   let runPromise: Promise<AnyRun> | undefined;
   const getRun = () =>

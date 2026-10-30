@@ -464,6 +464,29 @@ describe('a Tool whose run is marked worker', () => {
     ]);
   });
 
+  it('fails the file it was on when the worker stops, and the others carry on', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    let stop!: (error: Error) => void;
+    const died = new Promise<never>((_, reject) => (stop = reject));
+    const { port1, port2 } = new MessageChannel();
+    // The first file never finishes, as when the phone runs out of memory.
+    serveRuns(port2, async () => (() => new Promise(() => {})) as AnyRun);
+    const deadWorker = runInWorker(port1, tool.address, died);
+    let calls = 0;
+    const page = createToolPage({ ...tool, worker: true }, async (input, options, context) =>
+      calls++ === 0 ? deadWorker(input, options, context) : [pdf()],
+    );
+    page.add([file('a.pdf'), file('b.pdf')]);
+    const started = page.start({});
+    await vi.waitFor(() => expect(page.state().batches[0]!.items[0]!.status).toBe('working'));
+    stop(new Error('The worker stopped'));
+    await started;
+    expect(page.state().batches[0]!.items).toMatchObject([
+      { status: 'failed', reason: 'This file may be damaged or not supported.' },
+      { status: 'done' },
+    ]);
+  });
+
   it('shows Getting ready while the worker loads something', async () => {
     let loaded!: () => void;
     const loading = new Promise<void>((resolve) => (loaded = resolve));
