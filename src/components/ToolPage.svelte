@@ -16,19 +16,17 @@
   import { saveFiles, type SavableFile } from '../site/save';
   import { formatSize } from '../site/size';
   import { browserCanRun } from '../site/features';
+  import pageRuns from 'virtual:tool-runs/page';
 
   let { address }: { address: string } = $props();
 
   // Options components are small, so every page has them all and they render with the
-  // page. Each Tool's `run` (and its library) loads only on its own page.
+  // page. Each Tool's `run` (and its library) loads only on its own page, or only in the
+  // worker for a Tool marked worker.
   const optionsComponents = import.meta.glob<{ default: Component<{ options: object }> }>(
     ['../tools/*/Options.svelte', '!../tools/_*/Options.svelte'],
     { eager: true },
   );
-  const runModules = import.meta.glob<{ run: AnyRun }>([
-    '../tools/*/run.ts',
-    '!../tools/_*/run.ts',
-  ]);
   // A Tool's own lines for a Ready row, such as an estimated size. Few Tools have one.
   const readyModules = import.meta.glob<{ readyNote: ReadyNote }>([
     '../tools/*/ready.ts',
@@ -39,7 +37,8 @@
   // svelte-ignore state_referenced_locally
   const tool = toolAt(address);
   const Options = optionsComponents[`../tools/${tool.address}/Options.svelte`]!.default;
-  const loadRun = runModules[`../tools/${tool.address}/run.ts`]!;
+  // This page takes files, so its `run` does too. A worker Tool has none here.
+  const loadRun = pageRuns[tool.address] as (() => Promise<{ run: AnyRun }>) | undefined;
   const loadReady = readyModules[`../tools/${tool.address}/ready.ts`];
 
   // A Tool marked worker runs there, and its `run` loads in the worker, not the page.
@@ -51,7 +50,7 @@
 
   let runPromise: Promise<AnyRun> | undefined;
   const getRun = () =>
-    (runPromise ??= (tool.worker ? Promise.resolve({ run: startWorker() }) : loadRun()).then(
+    (runPromise ??= (tool.worker ? Promise.resolve({ run: startWorker() }) : loadRun!()).then(
       (module) => module.run,
       (error: unknown) => {
         // Forget a failed load, so the next file tries again.

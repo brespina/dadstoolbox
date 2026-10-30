@@ -7,6 +7,8 @@
   import { toolAt } from '../tools/registry';
   import type { ToolTextRun } from '../tools/types';
   import { saveFiles } from '../site/save';
+  // Each Tool's `run` (and its library) loads only on its own page.
+  import pageRuns from 'virtual:tool-runs/page';
 
   let { address }: { address: string } = $props();
 
@@ -14,21 +16,17 @@
     ['../tools/*/Options.svelte', '!../tools/_*/Options.svelte'],
     { eager: true },
   );
-  const runModules = import.meta.glob<{ run: ToolTextRun<object> }>([
-    '../tools/*/run.ts',
-    '!../tools/_*/run.ts',
-  ]);
-
   // The address never changes on a page, so reading it once is right.
   // svelte-ignore state_referenced_locally
   const tool = toolAt(address);
   const Options = optionsComponents[`../tools/${tool.address}/Options.svelte`]!.default;
-  const loadRun = runModules[`../tools/${tool.address}/run.ts`]!;
+  const loadRun = pageRuns[tool.address]!;
 
   let runPromise: Promise<ToolTextRun<object>> | undefined;
   const getRun = () =>
     (runPromise ??= loadRun().then(
-      (module) => module.run,
+      // This page is only for input mode "none", whose `run` takes the typed text.
+      (module) => module.run as ToolTextRun<object>,
       (error: unknown) => {
         // Forget a failed load, so the next keypress tries again.
         runPromise = undefined;
