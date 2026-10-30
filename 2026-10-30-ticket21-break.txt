@@ -1,0 +1,7 @@
+Break after #21 (Make a photo smaller).
+
+The part I liked best was the plasma test photo: a made-up 4032×3024 cloud carrying a real date taken and a location in Austin. It came out 1536×2048 and the right way up on the first try.
+
+One thing I'm keeping in mind: the shrinker still opens photos with plain createImageBitmap, so until #20 adds its fallback there, Chrome users get "Try Safari" for iPhone photos.
+
+Resting now.
