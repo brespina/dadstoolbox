@@ -2,7 +2,7 @@
 // with no page or framework code. There is no Choose or start button and no Batch: the
 // result is made again each time typing pauses, and only the newest one is kept.
 
-import { text } from '../text';
+import { fillText, text } from '../text';
 import { ToolFailure, type ToolDeclaration, type ToolTextRun } from './types';
 
 /** The file a typed Tool made, named and ready to save. */
@@ -13,6 +13,8 @@ export interface TypedResult {
   blob: Blob;
   /** The text it was made from. */
   typed: string;
+  /** The picture's description: what was typed, or the Tool's own `pictureLabel`. */
+  label: string;
 }
 
 export interface TypedToolPageState {
@@ -64,6 +66,9 @@ export function createTypedToolPage<Options extends object>(
         size: made.blob.size,
         blob: made.blob,
         typed,
+        label:
+          tool.textFor(options).pictureLabel ??
+          fillText(text.tool.typed.pictureLabel, { noun: tool.noun.one, typed }),
       };
       set({ result: result ?? null, reason: null, updating: false });
     } catch (error) {
@@ -73,6 +78,11 @@ export function createTypedToolPage<Options extends object>(
       else console.error(tool.name, error);
       set({ result: null, reason, updating: false });
     }
+  }
+
+  function later(typed: string, options: Options, ticket: number) {
+    set({ ...current, updating: true });
+    timer = setTimeout(() => void make(typed, options, ticket), delay);
   }
 
   return {
@@ -92,8 +102,17 @@ export function createTypedToolPage<Options extends object>(
         set({ result: null, reason: null, updating: false });
         return;
       }
-      set({ ...current, updating: true });
-      timer = setTimeout(() => void make(typed, options, ticket), delay);
+      later(typed, options, ticket);
+    },
+
+    /**
+     * For a Tool with no type box: the options now. The result follows once they stop
+     * changing, and `run` gets "" as the typed text.
+     */
+    change(options: Options) {
+      const ticket = ++latest;
+      clearTimeout(timer);
+      later('', options, ticket);
     },
   };
 }

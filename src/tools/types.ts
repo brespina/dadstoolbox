@@ -32,6 +32,12 @@ export interface OptionsText {
   batchLabel?: string;
   /** Replaces the "All done" message for a Batch made with these options. */
   allDone?: string;
+  /**
+   * The description of a typed Tool's result picture. Defaults to "{noun} that says:
+   * {typed}". A Tool with no type box (`typeBox: false`) sets it, so the picture is
+   * described from its options.
+   */
+  pictureLabel?: string;
 }
 
 export interface ToolDeclarationInput<Options extends object> {
@@ -51,6 +57,12 @@ export interface ToolDeclarationInput<Options extends object> {
   input: InputMode;
   /** The label on the box a person types into (input mode "none"). */
   typeLabel?: string;
+  /**
+   * Input mode "none" only: whether the page shows the shared type box. Defaults to true.
+   * With false, the options hold all the input: `run` gets "" as the typed text, and the
+   * result is made again whenever the options change.
+   */
+  typeBox?: boolean;
   needs: readonly BrowserFeature[];
   /** Files bigger than this (in bytes) get a note on their Ready row. */
   largeFileLimit: number;
@@ -104,6 +116,7 @@ export function defineTool<Options extends object>(
     largeFileNote: fillText(text.tool.largeFileNote, { noun: input.noun.one }),
     textFor: () => ({}),
     typeLabel: text.tool.typed.label,
+    typeBox: true,
     notes: {},
     ...input,
     reasons: (input.reasons ?? {}) as Readonly<Record<string, Reason>>,

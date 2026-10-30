@@ -1,6 +1,7 @@
 <script lang="ts">
   // The interactive part of a Tool page where the person types instead of choosing
-  // files (input mode "none"). No Choose or start button: the result follows the typing.
+  // files (input mode "none"). No Choose or start button: the result follows the typing,
+  // or, for a Tool with no type box, the options.
   import { onMount, type Component } from 'svelte';
   import { fillText as fill, text } from '../text';
   import { createTypedToolPage, type TypedToolPageState } from '../tools/typed';
@@ -69,6 +70,12 @@
     };
   });
 
+  // With no type box, the options hold all the input, so each change makes it again.
+  $effect(() => {
+    const now = $state.snapshot(options);
+    if (hydrated && !tool.typeBox) toolPage.change(now as typeof tool.defaultOptions);
+  });
+
   const save = () => {
     if (!state.result || state.updating) return;
     saveFiles([state.result]).catch((error: unknown) => console.error('Could not save', error));
@@ -78,23 +85,22 @@
 <div class="tool">
   <Options bind:options />
 
-  <label class="typed">
-    <span class="label">{tool.typeLabel}</span>
-    <textarea
-      rows="3"
-      disabled={!hydrated}
-      oninput={(event) => toolPage.type(event.currentTarget.value, $state.snapshot(options))}
-    ></textarea>
-  </label>
+  {#if tool.typeBox}
+    <label class="typed">
+      <span class="label">{tool.typeLabel}</span>
+      <textarea
+        rows="3"
+        disabled={!hydrated}
+        oninput={(event) => toolPage.type(event.currentTarget.value, $state.snapshot(options))}
+      ></textarea>
+    </label>
+  {/if}
 
   {#if state.reason}
     <p class="failed">{state.reason}</p>
   {:else if state.result && pictureUrl}
     <figure class="result">
-      <img
-        src={pictureUrl}
-        alt={fill(text.tool.typed.pictureLabel, { noun: tool.noun.one, typed: state.result.typed })}
-      />
+      <img src={pictureUrl} alt={state.result.label} />
       <figcaption class="row">
         <span class="file-name">{state.result.name}</span>
         <button
