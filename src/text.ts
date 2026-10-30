@@ -133,6 +133,10 @@ export const text = {
     },
   },
   // Shared by the photo Tools.
+  pdfs: {
+    // Split a PDF and Rotate PDF pages can't open a PDF with a password.
+    password: 'This PDF has a password. Remove it and try again.',
+  },
   photos: {
     removeLocation: 'Remove location',
     removeLocationHint: 'So no one can tell where a photo was taken.',
