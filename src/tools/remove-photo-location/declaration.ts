@@ -8,8 +8,7 @@ export const tool = defineTool({
   category: 'Photos',
   position: 3,
   noun: { one: 'photo', many: 'photos' },
-  // iPhone photos (HEIC) come in #43.
-  accept: ['image/jpeg', '.jpg', '.jpeg'],
+  accept: ['image/heic', 'image/heif', 'image/jpeg', '.heic', '.heif', '.jpg', '.jpeg'],
   input: 'each',
   needs: [],
   largeFileLimit: 50_000_000,
@@ -17,8 +16,6 @@ export const tool = defineTool({
   allDone: text.photos.allDoneLocationRemoved,
   reasons: {
     notCarried: "This kind of photo doesn't carry a location.",
-    // Until #43 adds iPhone photos (HEIC) to this Tool.
-    heic: "This can't take the location out of an iPhone photo (HEIC) yet. Use Change a photo to JPG with Remove location ticked.",
   },
   worker: false,
   outsideAddresses: [],
