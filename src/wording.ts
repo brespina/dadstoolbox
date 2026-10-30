@@ -14,7 +14,7 @@ const banned: { word: string; pattern: RegExp }[] = [
   { word: 'metadata', pattern: /\bmetadata\b/i },
   { word: 'exif', pattern: /\bexif\b/i },
   { word: 'codec', pattern: /\bcodecs?\b/i },
-  { word: 'encod', pattern: /\bencod/i },
+  { word: 'encode/encoding', pattern: /\bencod/i },
   { word: 'worker', pattern: /\bworkers?\b/i },
   { word: 'cache', pattern: /\bcache/i },
   { word: 'client-side', pattern: /\bclient[- ]side\b/i },

@@ -8,6 +8,8 @@
  */
 export function cspDirectives(outsideAddresses: readonly string[]) {
   const connect = ["'self'", 'blob:', 'data:', ...new Set(outsideAddresses)].join(' ');
+  // `as const` keeps each entry's literal type, which Astro's config checks;
+  // the spread hands Astro the mutable array it asks for.
   const directives = [
     "default-src 'self'",
     `connect-src ${connect}`,

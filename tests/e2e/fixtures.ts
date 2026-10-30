@@ -25,7 +25,13 @@ export const test = base.extend<{ siteChecks: void }>({
         .getAttribute('content');
       expect(csp, 'browser lock tag').toBeTruthy();
       expect(csp).toMatch(/(^|;)\s*default-src 'self'/);
-      expect(csp).toMatch(/(^|;)\s*connect-src 'self'/);
+      // Exactly the Site plus what stays on the device; Tools that declare outside
+      // addresses will widen this list.
+      const connectSrc = csp!
+        .match(/(?:^|;)\s*connect-src ([^;]*)/)?.[1]
+        .trim()
+        .split(/\s+/);
+      expect(connectSrc, 'where the page may send requests').toEqual(["'self'", 'blob:', 'data:']);
 
       // Both themes must meet AA contrast.
       for (const colorScheme of ['light', 'dark'] as const) {

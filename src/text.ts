@@ -5,8 +5,7 @@ export const text = {
   siteName: "Dad's Toolbox",
   home: {
     title: "Dad's Toolbox: free tools for your files",
-    description:
-      'Free tools for your files. No sign-up, no ads, and your files stay on your device.',
+    // Shown under the Site name, and used as the page description for search engines.
     promiseLine:
       'Free tools for your files. No sign-up, no ads, and your files stay on your device.',
     noToolsYet: 'Tools are coming soon.',

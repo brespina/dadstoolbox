@@ -3,5 +3,4 @@
 export const links = {
   reportProblem: 'https://github.com/brespina/dadstoolbox/issues',
   sponsor: 'https://github.com/sponsors/brespina',
-  repo: 'https://github.com/brespina/dadstoolbox',
 } as const;

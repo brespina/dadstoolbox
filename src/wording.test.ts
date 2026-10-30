@@ -10,7 +10,7 @@ describe('bannedWordsIn', () => {
     ['A free converter', 'converter'],
     ['Removes metadata', 'metadata'],
     ['Strips EXIF', 'exif'],
-    ['Encoding your video', 'encod'],
+    ['Encoding your video', 'encode/encoding'],
     ['Nothing goes to a server', 'server'],
     ['Runs client-side', 'client-side'],
     ['Built on WebAssembly', 'webassembly'],
