@@ -11,7 +11,11 @@ function readFacts(file: File): Promise<VideoFacts | undefined> {
   return new Promise((resolve) => {
     const video = document.createElement('video');
     const url = URL.createObjectURL(file);
+    // Some browsers never say, so stop waiting after a while: no estimate then.
+    const giveUp = setTimeout(() => done(), 5000);
     const done = (found?: VideoFacts) => {
+      clearTimeout(giveUp);
+      video.onloadedmetadata = video.onerror = null;
       URL.revokeObjectURL(url);
       video.removeAttribute('src');
       video.load();
@@ -19,6 +23,7 @@ function readFacts(file: File): Promise<VideoFacts | undefined> {
     };
     video.preload = 'metadata';
     video.muted = true;
+    video.playsInline = true;
     video.onloadedmetadata = () =>
       done(
         video.videoWidth > 0 && Number.isFinite(video.duration)
@@ -28,6 +33,7 @@ function readFacts(file: File): Promise<VideoFacts | undefined> {
     // A video this browser can't play gets no estimate; start says why.
     video.onerror = () => done();
     video.src = url;
+    video.load();
   });
 }
 

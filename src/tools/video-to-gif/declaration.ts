@@ -14,6 +14,8 @@ export const framesPerSecond = 10;
 /** Above about this many bytes, a gif is too big to send easily. */
 export const bigGif = 15_000_000;
 
+const smallName = 'Small';
+
 export const tool = defineTool({
   address: 'video-to-gif',
   name: 'Make a gif from a video',
@@ -30,8 +32,9 @@ export const tool = defineTool({
   largeFileNote:
     'This video is big for a phone. It may take a few minutes or stop partway. A shorter clip works better.',
   startButton: 'Make a gif',
+  // A Batch made Small says so, as in "Small · 1 video".
   textFor: (options: Options) => ({
-    batchLabel: options.size === 'small' ? 'Small' : '',
+    batchLabel: options.size === 'small' ? smallName : '',
   }),
   reasons: {
     notVideo: "This file doesn't look like a video. Choose a video from your phone or computer.",
@@ -41,7 +44,7 @@ export const tool = defineTool({
     sizeHeading: 'Size',
     normalName: 'Normal',
     normalHint: 'Good for chats and email.',
-    smallName: 'Small',
+    smallName,
     smallHint: 'Smaller file. Fine on a phone screen.',
     // {size} is the estimated size, such as "4.2 MB".
     estimate: 'The gif will be about {size}.',
