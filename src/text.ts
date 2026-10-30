@@ -56,6 +56,8 @@ export const text = {
     },
   },
   tool: {
+    // The browser tab title. {name} is the Tool's name, {siteName} the Site's.
+    pageTitle: '{name}: {siteName}',
     backLink: 'All tools',
     // {noun} is the Tool's noun, such as "PDFs".
     privacyLine: 'Your {noun} stay on your device. They are never sent anywhere.',
@@ -80,7 +82,9 @@ export const text = {
     },
     // {name} is the file name and {status} its new status.
     announcement: '{name}: {status}',
-    // Shown after "Didn't work." when the Tool gave no reason of its own.
+    // A row that didn't work. {reason} is the Tool's own reason, or failedFallback.
+    failedLine: "Didn't work. {reason}",
+    // The reason shown when the Tool gave none of its own.
     failedFallback: 'This file may be damaged or not supported.',
   },
   footer: {

@@ -34,7 +34,15 @@
   const loadRun = runModules[`../tools/${tool.address}/run.ts`]!;
 
   let runPromise: Promise<ToolRun<object>> | undefined;
-  const getRun = () => (runPromise ??= loadRun().then((module) => module.run));
+  const getRun = () =>
+    (runPromise ??= loadRun().then(
+      (module) => module.run,
+      (error: unknown) => {
+        // Forget a failed load, so the next file tries again.
+        runPromise = undefined;
+        throw error;
+      },
+    ));
 
   const toolPage = createToolPage(tool, async (file, options) => (await getRun())(file, options));
 
@@ -47,7 +55,7 @@
   /** "Done", or "Didn't work. <reason>". */
   const statusLine = (item: Pick<BatchItem, 'status' | 'reason'>) =>
     item.status === 'failed'
-      ? `${text.tool.status.failed}. ${item.reason}`
+      ? fill(text.tool.failedLine, { reason: item.reason ?? text.tool.failedFallback })
       : text.tool.status[item.status];
 
   onMount(() => {

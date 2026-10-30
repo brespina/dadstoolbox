@@ -78,7 +78,10 @@ export function createToolPage<Options extends object>(
   let waiting: { entry: WaitingFile; file: File }[] = [];
   let batches: Batch[] = [];
   let working = false;
+  // Kept in lower case: phones and Macs treat Report.PDF and report.pdf as one file.
   const takenNames = new Set<string>();
+  const isTaken = (name: string) => takenNames.has(name.toLowerCase());
+  const take = (name: string) => takenNames.add(name.toLowerCase());
   const listeners = new Set<(state: ToolPageState) => void>();
 
   const state = (): ToolPageState => ({
@@ -111,8 +114,8 @@ export function createToolPage<Options extends object>(
     const stem = `${base}_dtb${result.detail ? `_${result.detail}` : ''}`;
     const dotExt = ext ? `.${ext}` : '';
     let name = `${stem}${dotExt}`;
-    for (let n = 2; takenNames.has(name); n++) name = `${stem}_${n}${dotExt}`;
-    takenNames.add(name);
+    for (let n = 2; isTaken(name); n++) name = `${stem}_${n}${dotExt}`;
+    take(name);
     return name;
   }
 
@@ -147,7 +150,7 @@ export function createToolPage<Options extends object>(
     add(files: Iterable<File>) {
       for (const file of files) {
         // A result must never take a chosen file's name, so saving it can't replace one.
-        takenNames.add(file.name);
+        take(file.name);
         waiting.push({
           entry: { id: nextId++, name: file.name, size: file.size, status: 'ready' },
           file,

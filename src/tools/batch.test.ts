@@ -214,4 +214,12 @@ describe('result names', () => {
       'report_dtb_2.pdf',
     ]);
   });
+
+  it('never match a chosen file or each other in any mix of capitals', async () => {
+    // Phones and Macs treat Report.PDF and report.pdf as the same file.
+    expect(await namesFrom(['Report_dtb.PDF', 'report.pdf'], () => [pdf()])).toEqual([
+      'Report_dtb_dtb.pdf',
+      'report_dtb_2.pdf',
+    ]);
+  });
 });

@@ -3,7 +3,7 @@
 import SiteLayout from './SiteLayout.astro';
 import ToolPage from '../components/ToolPage.svelte';
 import { toolAt } from '../tools/registry';
-import { text } from '../text';
+import { fillText, text } from '../text';
 import { sitePath } from '../site/paths';
 
 interface Props {
@@ -13,7 +13,10 @@ interface Props {
 const tool = toolAt(Astro.props.address);
 ---
 
-<SiteLayout title={`${tool.name}: ${text.siteName}`} description={tool.blurb}>
+<SiteLayout
+  title={fillText(text.tool.pageTitle, { name: tool.name, siteName: text.siteName })}
+  description={tool.blurb}
+>
   <a class="back-link" href={sitePath()}>
     <span aria-hidden="true">‹ </span>
     {text.tool.backLink}
