@@ -1,0 +1,7 @@
+Break notes, reviewer for PR #28.
+
+The best part was watching the throwaway "Copy a text file" Tool show up on the home page
+and get its Save button. That was the guide proving itself.
+The guide was written well. It only described things that hadn't been built yet.
+That's an easy mistake when the spec is that clear.
+For the break: nothing to check, nothing to grep. Just a quiet worktree with a clean status.
