@@ -5,6 +5,9 @@
 //
 // Values are copied byte for byte, so the new details keep the original's byte order.
 // Any file this can't read simply has no details to keep.
+//
+// Remove photo location doesn't redraw: `jpegWithoutLocation` blanks the location in
+// the file's own bytes and leaves the rest as it was.
 
 /** One TIFF entry. `value` holds the entry's bytes in the original's byte order. */
 interface Entry {
@@ -71,9 +74,12 @@ export function isHeif(file: Uint8Array): boolean {
   );
 }
 
+/** True when the bytes are a JPEG. */
+export const isJpeg = (file: Uint8Array) => file[0] === 0xff && file[1] === 0xd8;
+
 function findTiff(file: Uint8Array): Uint8Array | undefined {
   const view = new DataView(file.buffer, file.byteOffset, file.byteLength);
-  if (view.getUint16(0) === 0xffd8) return findInJpeg(file, view);
+  if (isJpeg(file)) return findInJpeg(file, view);
   if (ascii(file, 1, 3) === 'PNG') return findInPng(file, view);
   if (ascii(file, 0, 4) === 'RIFF' && ascii(file, 8, 4) === 'WEBP') return findInWebp(file, view);
   if (ascii(file, 4, 4) === 'ftyp') return findInHeif(file, view);
@@ -249,6 +255,105 @@ function readTiff(tiff: Uint8Array): PhotoDetails | undefined {
     dates: exifAt ? readList(exifAt).filter((e) => dateTags.has(e.tag)) : [],
     location: gpsAt ? readList(gpsAt) : [],
   };
+}
+
+/**
+ * Takes the location out of TIFF bytes in place, keeping their length, so nothing
+ * around them moves. The GPS list and its values are blanked, and the main list's
+ * pointer to it is removed. Everything else, such as the date taken, is untouched.
+ * Throws when the bytes can't be read, so a copy never claims to have no location
+ * when it may still have one.
+ */
+function blankLocation(tiff: Uint8Array): void {
+  const littleEndian = ascii(tiff, 0, 2) === 'II';
+  const view = new DataView(tiff.buffer, tiff.byteOffset, tiff.byteLength);
+  const zero = (at: number, length: number) => {
+    if (at + length > tiff.length) throw new RangeError('Photo details run past the end');
+    tiff.fill(0, at, at + length);
+  };
+
+  const mainAt = view.getUint32(4, littleEndian);
+  const mainCount = view.getUint16(mainAt, littleEndian);
+  const mainEnd = mainAt + 2 + mainCount * 12 + 4; // The entries and the next-list mark.
+  if (mainEnd > tiff.length) throw new RangeError('Photo details run past the end');
+  const index = Array.from({ length: mainCount }, (_, i) => mainAt + 2 + i * 12).find(
+    (at) => view.getUint16(at, littleEndian) === tags.gpsList,
+  );
+  if (index === undefined) return;
+
+  const gpsAt = view.getUint32(index + 8, littleEndian);
+  const gpsCount = view.getUint16(gpsAt, littleEndian);
+  for (let i = 0; i < gpsCount; i++) {
+    const at = gpsAt + 2 + i * 12;
+    const size = typeSizes[view.getUint16(at + 2, littleEndian)];
+    if (!size) throw new RangeError('Unknown kind of location value');
+    const length = size * view.getUint32(at + 4, littleEndian);
+    if (length > 4) zero(view.getUint32(at + 8, littleEndian), length);
+  }
+  // The GPS list's own next-list mark is left alone: some files put a value there.
+  zero(gpsAt, 2 + gpsCount * 12);
+
+  // Drop the pointer, moving the later entries and the next-list mark up. Entries stay sorted.
+  tiff.copyWithin(index, index + 12, mainEnd);
+  zero(mainEnd - 12, 12);
+  view.setUint16(mainAt, mainCount - 1, littleEndian);
+}
+
+const isTiff = (bytes: Uint8Array) => ['II*\0', 'MM\0*'].includes(ascii(bytes, 0, 4));
+
+const xmpPrefix = 'http://ns.adobe.com/xap/1.0/\0';
+/** Location fields in XMP text: an attribute's value, or an element's whole content. */
+const xmpLocation = [
+  /\w+:GPS\w*\s*=\s*(["'])[^]*?\1/g,
+  /<(\w+:GPS\w*)(?:[^>]*[^/>])?>[^]*?<\/\1>/g,
+];
+
+/**
+ * Takes the location out of XMP text in place, the details some photo apps write as
+ * text. Each value becomes spaces, so the text keeps its length and stays readable.
+ */
+function blankXmpLocation(xmp: Uint8Array): void {
+  // One character per byte, so places in the text are places in the bytes.
+  let text = '';
+  for (const byte of xmp) text += String.fromCharCode(byte);
+  for (const pattern of xmpLocation) {
+    for (const found of text.matchAll(pattern)) {
+      // Blank the text between tags and inside quotes, keeping the names and marks.
+      const opening = found[0].startsWith('<') ? found[0].indexOf('>') : found[0].search(/["']/);
+      const start = found.index + opening + 1;
+      const end = found.index + found[0].length;
+      for (let at = start, inTag = false; at < end; at++) {
+        const c = text[at];
+        if (c === '<') inTag = true;
+        else if (c === '>') inTag = false;
+        else if (!inTag && !`"'`.includes(c!)) xmp[at] = 0x20;
+      }
+    }
+  }
+}
+
+/**
+ * A copy of a JPEG with the location taken out of its photo details, byte for byte
+ * the same otherwise: the same length, picture and date taken. Every set of details in
+ * the file is cleaned, including those of extra pictures stored after the main one,
+ * and a location some photo apps also write as text (XMP).
+ * A JPEG with no location comes back unchanged.
+ */
+export function jpegWithoutLocation(jpeg: Uint8Array): Uint8Array {
+  const copy = jpeg.slice();
+  const view = new DataView(copy.buffer);
+  // The picture's own bytes can never hold FF E1, so every match is a details segment.
+  for (let at = 2; at + 4 <= copy.length; at++) {
+    if (copy[at] !== 0xff || copy[at + 1] !== 0xe1) continue;
+    const segment = copy.subarray(at + 4, at + 2 + view.getUint16(at + 2));
+    if (ascii(segment, 0, exifPrefix.length) === exifPrefix) {
+      const tiff = segment.subarray(exifPrefix.length);
+      if (isTiff(tiff)) blankLocation(tiff);
+    } else if (ascii(segment, 0, xmpPrefix.length) === xmpPrefix) {
+      blankXmpLocation(segment);
+    }
+  }
+  return copy;
 }
 
 /**
