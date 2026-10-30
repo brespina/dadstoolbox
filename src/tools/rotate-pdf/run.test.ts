@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { degrees, PDFDocument } from 'pdf-lib';
+import { degrees, PDFDocument, PDFName, PDFNumber } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { ToolFailure } from '../types';
 import { run } from './run';
@@ -36,6 +36,18 @@ describe('Rotate PDF pages', () => {
     expect(await anglesOf(await run(turned, { turn: 'right' }))).toEqual([180, 0, 270]);
     expect(await anglesOf(await run(turned, { turn: 'left' }))).toEqual([0, 180, 90]);
     expect(await anglesOf(await run(turned, { turn: 'upsideDown' }))).toEqual([270, 90, 0]);
+  });
+
+  it('adds to a turn the pages get from the PDF as a whole', async () => {
+    const doc = await PDFDocument.create();
+    doc.addPage([300, 200]);
+    doc.addPage([300, 200]);
+    doc.catalog.Pages().set(PDFName.of('Rotate'), PDFNumber.of(90));
+    const bytes = await doc.save();
+    const turned = new File([bytes as Uint8Array<ArrayBuffer>], 'turned.pdf', {
+      type: 'application/pdf',
+    });
+    expect(await anglesOf(await run(turned, { turn: 'right' }))).toEqual([180, 180]);
   });
 
   it('fails with the same reason as Split a PDF for a PDF with a password', async () => {
