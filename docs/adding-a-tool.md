@@ -145,6 +145,12 @@ try again." Any other error shows the shared fallback, "This file may be damaged
 supported.", and its detail goes only to the console. Don't catch errors just to hide
 them.
 
+**Photos.** Open a photo with `openPhoto` (`src/photos/open.ts`): it turns the photo the
+right way up and opens iPhone photos (HEIC) where the browser can't. To draw one as a JPG
+with no photo details, no bigger than a longest side, use `shrinkOnCanvas`
+(`src/photos/shrink.ts`), as Make a photo smaller and Photos to one PDF do. It needs the
+page, so those Tools set `worker: false`.
+
 **Progress.** Shared code shows "Working on 2 of 5…" as it works through the files, so
 `run` reports nothing itself. `types.ts` has no way yet to report progress within one
 file; add one if a Tool needs it.
