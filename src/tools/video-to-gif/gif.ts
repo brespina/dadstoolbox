@@ -4,14 +4,8 @@
 import { formatSize } from '../../site/size';
 import { fillText } from '../../text';
 import type { ReadyLine } from '../types';
+import type { VideoFacts } from '../../video/facts';
 import { bigGif, framesPerSecond, sizes, tool, type Options } from './declaration';
-
-/** A video's shown width and height (already turned the right way up), and its seconds. */
-export interface VideoFacts {
-  width: number;
-  height: number;
-  duration: number;
-}
 
 /** The gif's width and height: the longest side made the chosen size, never bigger. */
 export function gifSize({ width, height }: Pick<VideoFacts, 'width' | 'height'>, options: Options) {
