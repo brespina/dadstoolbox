@@ -70,6 +70,11 @@ export const text = {
     remove: 'Remove',
     // {name} is the file name; for screen readers.
     removeLabel: 'Remove {name}',
+    // Set the order of files that are used together. {name} labels them for screen readers.
+    moveUp: '↑',
+    moveUpLabel: 'Move {name} up',
+    moveDown: '↓',
+    moveDownLabel: 'Move {name} down',
     waitingHeading: 'Ready to start',
     save: 'Save',
     saveLabel: 'Save {name}',
@@ -90,6 +95,17 @@ export const text = {
     failedLine: "Didn't work. {reason}",
     // The reason shown when the Tool gave none of its own.
     failedFallback: 'This file may be damaged or not supported.',
+    // Tools the person types into instead of choosing files (input mode "none").
+    typed: {
+      // The label on the box, unless the Tool gives its own.
+      label: 'Type here',
+      // Read out when a new result is ready to save.
+      ready: 'Ready to save.',
+      // The reason shown when the Tool gave none of its own.
+      failedFallback: "That didn't work. Try changing what you typed.",
+      // The alt text on the result picture. {noun} is the Tool's noun, {typed} what was typed.
+      pictureLabel: '{noun} that says: {typed}',
+    },
   },
   // Shared by the photo Tools.
   photos: {

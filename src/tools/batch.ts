@@ -8,6 +8,7 @@ import {
   type ToolDeclaration,
   type ToolResult,
   type ToolRun,
+  type ToolRunTogether,
 } from './types';
 
 /** A chosen file on the waiting list. */
@@ -81,21 +82,42 @@ function splitName(name: string) {
   return dot > 0 ? { base: name.slice(0, dot), ext: name.slice(dot + 1) } : { base: name, ext: '' };
 }
 
+export type ToolPage<Options extends object> = ReturnType<typeof makeToolPage<Options>>;
+
 /**
  * The state of one Tool page. Every change hands listeners a fresh snapshot, so the
- * page can show it as it is.
+ * page can show it as it is. `run` takes one file, or for "all files together" the
+ * ordered list.
  */
 export function createToolPage<Options extends object>(
   tool: ToolDeclaration<Options>,
   run: ToolRun<Options>,
+): ToolPage<Options>;
+export function createToolPage<Options extends object>(
+  tool: ToolDeclaration<Options>,
+  run: ToolRunTogether<Options>,
+): ToolPage<Options>;
+export function createToolPage<Options extends object>(
+  tool: ToolDeclaration<Options>,
+  run: ToolRun<Options> | ToolRunTogether<Options>,
 ) {
-  if (tool.input !== 'each') throw new Error(`Input mode "${tool.input}" is not built yet`);
+  return makeToolPage(tool, run);
+}
+
+function makeToolPage<Options extends object>(
+  tool: ToolDeclaration<Options>,
+  run: ToolRun<Options> | ToolRunTogether<Options>,
+) {
+  if (tool.input === 'none') throw new Error(`Input mode "${tool.input}" is not built yet`);
 
   let nextId = 1;
-  // Every chosen file stays chosen until the page closes, so changed options can run it
-  // again. `ranWith` holds the options it has been run with, as optionsKey text.
+  // Each file on its own: every chosen file stays chosen until the page closes, so
+  // changed options can run it again. `ranWith` holds the options it has run with, as
+  // optionsKey text. All files together: the list is used up by each press.
   let chosen: { entry: WaitingFile; file: File; ranWith: Set<string> }[] = [];
+  const waiting = () => chosen.filter(({ ranWith }) => ranWith.size === 0);
   const toDo = (options: Options) => {
+    if (tool.input === 'together') return waiting();
     const key = optionsKey(options);
     return chosen.filter(({ ranWith }) => !ranWith.has(key));
   };
@@ -109,7 +131,7 @@ export function createToolPage<Options extends object>(
 
   const state = (): ToolPageState => ({
     // Files never run yet. Files run before are in their Batches.
-    waiting: chosen.filter(({ ranWith }) => ranWith.size === 0).map(({ entry }) => entry),
+    waiting: waiting().map(({ entry }) => entry),
     batches,
     working,
   });
@@ -143,12 +165,13 @@ export function createToolPage<Options extends object>(
     return name;
   }
 
-  async function runOne(item: BatchItem, file: File, options: Options) {
+  /** Runs one row's work and records its named results, or why it didn't work. */
+  async function runRow(item: BatchItem, original: string, work: () => Promise<ToolResult[]>) {
     try {
-      const results = await run(file, options);
+      const results = await work();
       const named = results.map((result) => ({
         id: nextId++,
-        name: nameResult(file.name, result),
+        name: nameResult(original, result),
         size: result.blob.size,
         blob: result.blob,
       }));
@@ -156,9 +179,48 @@ export function createToolPage<Options extends object>(
     } catch (error) {
       let reason: string = text.tool.failedFallback;
       if (error instanceof ToolFailure) reason = error.reason;
-      else console.error(`${tool.name}: ${file.name}`, error);
+      else console.error(`${tool.name}: ${item.name}`, error);
       updateItem(item.id, { status: 'failed', reason });
     }
+  }
+
+  const runOne = (item: BatchItem, file: File, options: Options) =>
+    runRow(item, file.name, () => (run as ToolRun<Options>)(file, options));
+
+  /** Such as "PNG · 3 photos", or "3 photos" when the Tool has no words for its options. */
+  const batchLabel = (total: number, options: Options) => {
+    const count = `${total} ${total === 1 ? tool.noun.one : tool.noun.many}`;
+    const words = wordsFor(tool, options).batchLabel;
+    return words ? fillText(text.tool.batchLabel, { options: words, count }) : count;
+  };
+
+  /** All files together: one row and one run over the waiting list, in its order. */
+  async function startTogether(options: Options) {
+    const files = chosen.map(({ file }) => file);
+    chosen = [];
+    const item: BatchItem = {
+      id: nextId++,
+      name: files.map((f) => f.name).join(', '),
+      size: files.reduce((total, f) => total + f.size, 0),
+      status: 'ready',
+      results: [],
+    };
+    batches = [
+      {
+        id: nextId++,
+        label: batchLabel(files.length, options),
+        items: [item],
+        progress: { current: 1, total: 1 },
+        allDone: wordsFor(tool, options).allDone,
+      },
+      ...batches,
+    ];
+    changed();
+    updateItem(item.id, { status: 'working' });
+    // Results of this mode are named after "combined", as in combined_dtb.pdf.
+    await runRow(item, 'combined', () => (run as ToolRunTogether<Options>)(files, options));
+    working = false;
+    updateNewest((batch) => ({ ...batch, progress: null }));
   }
 
   return {
@@ -191,24 +253,38 @@ export function createToolPage<Options extends object>(
     },
 
     /**
-     * Whether start has anything to do with these options: a file not yet run with them.
-     * A file that didn't work counts as run; choosing it again runs it again.
+     * Moves a file one place up (-1) or down (1). The ends stay put. Used by "all files
+     * together", where every chosen file is on the waiting list.
+     */
+    move(id: number, by: -1 | 1) {
+      const from = chosen.findIndex(({ entry }) => entry.id === id);
+      const to = from + by;
+      if (from < 0 || to < 0 || to >= chosen.length) return;
+      chosen = chosen.slice();
+      [chosen[from], chosen[to]] = [chosen[to]!, chosen[from]!];
+      changed();
+    },
+
+    /**
+     * Whether start has anything to do with these options: for each file on its own, a
+     * file not yet run with them. A file that didn't work counts as run; choosing it
+     * again runs it again.
      */
     hasWork(options: Options): boolean {
       return toDo(options).length > 0;
     },
 
     /**
-     * The start button: makes a new Batch on top from the files not yet run with these
-     * options, and works through it.
+     * The start button: makes a new Batch on top and works through it. Each file on its
+     * own: only the files not yet run with these options.
      */
     async start(options: Options) {
       const todo = toDo(options);
       if (working || todo.length === 0) return;
       working = true;
+      if (tool.input === 'together') return startTogether(options);
       const key = optionsKey(options);
       for (const { ranWith } of todo) ranWith.add(key);
-      const words = wordsFor(tool, options);
       const work = todo.map(({ file }) => {
         const item: BatchItem = {
           id: nextId++,
@@ -220,16 +296,13 @@ export function createToolPage<Options extends object>(
         return { file, item };
       });
       const total = work.length;
-      const count = `${total} ${total === 1 ? tool.noun.one : tool.noun.many}`;
       batches = [
         {
           id: nextId++,
-          label: words.batchLabel
-            ? fillText(text.tool.batchLabel, { options: words.batchLabel, count })
-            : count,
+          label: batchLabel(total, options),
           items: work.map(({ item }) => item),
           progress: { current: 1, total },
-          allDone: words.allDone,
+          allDone: wordsFor(tool, options).allDone,
         },
         ...batches,
       ];

@@ -3,7 +3,8 @@
 //   because plain Node reads it too: the browser lock and the generated page test)
 // - run.ts: exports `run`, the Tool's job, in plain TypeScript
 // - Options.svelte: the Tool's options, bound to an options object
-// - sample.<ext>: the file the generated page test chooses
+// - sample.<ext>: the file the generated page test chooses (sample.txt: the text it
+//   types, for input mode "none")
 // Folders starting with "_" are skipped by discovery.
 
 import { fillText, text } from '../text';
@@ -48,6 +49,8 @@ export interface ToolDeclarationInput<Options extends object> {
   /** File types for the Choose button, such as "application/pdf" or ".pdf". */
   accept: readonly string[];
   input: InputMode;
+  /** The label on the box a person types into (input mode "none"). */
+  typeLabel?: string;
   needs: readonly BrowserFeature[];
   /** Files bigger than this (in bytes) get a note on their Ready row. */
   largeFileLimit: number;
@@ -83,6 +86,7 @@ export function defineTool<Options extends object>(
     privacyLine: fillText(text.tool.privacyLine, { noun: input.noun.many }),
     allDone: text.tool.allDone,
     textFor: () => ({}),
+    typeLabel: text.tool.typed.label,
     reasons: {},
     ...input,
   };
@@ -109,6 +113,7 @@ export function declarationText(tool: ToolDeclaration): string[] {
     tool.privacyLine,
     tool.allDone,
     ...Object.values(tool.textFor(tool.defaultOptions)),
+    tool.typeLabel,
     ...Object.values(tool.reasons),
   ];
 }
@@ -127,9 +132,16 @@ export type ToolRun<Options extends object = object> = (
   options: Options,
 ) => Promise<ToolResult[]>;
 
+/** A Tool's job for all chosen files at once, in the order set (input mode "together"). */
+export type ToolRunTogether<Options extends object = object> = (
+  files: File[],
+  options: Options,
+) => Promise<ToolResult[]>;
+
 /**
  * Thrown by `run` with a plain-language reason the Tool wrote itself, shown on that
- * file's row. Any other error shows the shared fallback.
+ * row only (one row per file, or one for all files together). Any other error shows
+ * the shared fallback.
  */
 export class ToolFailure extends Error {
   constructor(public readonly reason: string) {
@@ -137,3 +149,9 @@ export class ToolFailure extends Error {
     this.name = 'ToolFailure';
   }
 }
+
+/** A Tool's job for what the person typed (input mode "none"). It returns one result. */
+export type ToolTextRun<Options extends object = object> = (
+  typed: string,
+  options: Options,
+) => Promise<ToolResult[]>;

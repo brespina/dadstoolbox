@@ -1,7 +1,7 @@
 <script lang="ts">
   // The interactive part of every Tool page. The shared Batch logic holds the state;
   // this only shows it and passes on what the visitor does.
-  import { onDestroy, onMount, type Component } from 'svelte';
+  import { onDestroy, onMount, tick, type Component } from 'svelte';
   import { fillText as fill, text } from '../text';
   import {
     createToolPage,
@@ -11,7 +11,7 @@
     type ToolPageState,
   } from '../tools/batch';
   import { toolAt } from '../tools/registry';
-  import { wordsFor, type ToolRun } from '../tools/types';
+  import { wordsFor, type ToolResult } from '../tools/types';
   import { saveFiles, type SavableFile } from '../site/save';
   import { formatSize } from '../site/size';
 
@@ -23,7 +23,9 @@
     ['../tools/*/Options.svelte', '!../tools/_*/Options.svelte'],
     { eager: true },
   );
-  const runModules = import.meta.glob<{ run: ToolRun<object> }>([
+  // A Tool's `run` takes one file or the ordered list, as its input mode says.
+  type AnyRun = (input: File | File[], options: object) => Promise<ToolResult[]>;
+  const runModules = import.meta.glob<{ run: AnyRun }>([
     '../tools/*/run.ts',
     '!../tools/_*/run.ts',
   ]);
@@ -34,7 +36,7 @@
   const Options = optionsComponents[`../tools/${tool.address}/Options.svelte`]!.default;
   const loadRun = runModules[`../tools/${tool.address}/run.ts`]!;
 
-  let runPromise: Promise<ToolRun<object>> | undefined;
+  let runPromise: Promise<AnyRun> | undefined;
   const getRun = () =>
     (runPromise ??= loadRun().then(
       (module) => module.run,
@@ -45,7 +47,9 @@
       },
     ));
 
-  const toolPage = createToolPage(tool, async (file, options) => (await getRun())(file, options));
+  const toolPage = createToolPage(tool, async (input: File | File[], options: object) =>
+    (await getRun())(input, options),
+  );
 
   let options = $state(structuredClone(tool.defaultOptions));
   let state: ToolPageState = $state.raw(toolPage.state());
@@ -86,6 +90,19 @@
     input.value = '';
   }
 
+  let waitingList: HTMLElement | undefined = $state();
+
+  /** Moves a file, keeping keyboard focus on its buttons as it goes. */
+  async function move(id: number, by: -1 | 1) {
+    toolPage.move(id, by);
+    await tick();
+    const buttons = [-1, 1].map((d) =>
+      waitingList?.querySelector<HTMLButtonElement>(`[data-move="${id}:${d}"]`),
+    );
+    const [same, other] = by === -1 ? buttons : buttons.reverse();
+    (same?.disabled ? other : same)?.focus();
+  }
+
   const save = (files: SavableFile[]) =>
     saveFiles(files).catch((error: unknown) => console.error('Could not save', error));
 
@@ -124,19 +141,39 @@
   {#if state.waiting.length > 0}
     <section aria-labelledby="waiting-heading">
       <h2 id="waiting-heading">{text.tool.waitingHeading}</h2>
-      <ul class="rows">
-        {#each state.waiting as file (file.id)}
+      <ul class="rows" bind:this={waitingList}>
+        {#each state.waiting as file, index (file.id)}
           <li class="row">
             <div class="row-text">
               <span class="file-name">{file.name}</span>
               <span class="muted">{formatSize(file.size)} · {statusLine(file)}</span>
             </div>
-            <button
-              type="button"
-              class="small-button"
-              aria-label={fill(text.tool.removeLabel, { name: file.name })}
-              onclick={() => toolPage.remove(file.id)}>{text.tool.remove}</button
-            >
+            <div class="row-buttons">
+              {#if tool.input === 'together'}
+                <button
+                  type="button"
+                  class="small-button move"
+                  data-move={`${file.id}:-1`}
+                  aria-label={fill(text.tool.moveUpLabel, { name: file.name })}
+                  disabled={index === 0}
+                  onclick={() => move(file.id, -1)}>{text.tool.moveUp}</button
+                >
+                <button
+                  type="button"
+                  class="small-button move"
+                  data-move={`${file.id}:1`}
+                  aria-label={fill(text.tool.moveDownLabel, { name: file.name })}
+                  disabled={index === state.waiting.length - 1}
+                  onclick={() => move(file.id, 1)}>{text.tool.moveDown}</button
+                >
+              {/if}
+              <button
+                type="button"
+                class="small-button"
+                aria-label={fill(text.tool.removeLabel, { name: file.name })}
+                onclick={() => toolPage.remove(file.id)}>{text.tool.remove}</button
+              >
+            </div>
           </li>
         {/each}
       </ul>
@@ -267,6 +304,21 @@
     font: inherit;
     font-weight: 600;
     cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .small-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .move {
+    padding: 0.25rem;
+  }
+
+  .row-buttons {
+    display: flex;
+    gap: 0.5rem;
     flex-shrink: 0;
   }
 

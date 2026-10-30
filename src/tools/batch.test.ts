@@ -328,3 +328,68 @@ describe('result names', () => {
     ]);
   });
 });
+
+describe('all files together', () => {
+  const together = defineTool({ ...tool, input: 'together' });
+  const names = (page: { state: () => ToolPageState }) => page.state().waiting.map((w) => w.name);
+
+  it('moves a file up or down the waiting list', () => {
+    const page = createToolPage(together, async () => []);
+    page.add([file('a.pdf'), file('b.pdf'), file('c.pdf')]);
+    const [a, , c] = page.state().waiting;
+    page.move(c!.id, -1);
+    expect(names(page)).toEqual(['a.pdf', 'c.pdf', 'b.pdf']);
+    page.move(a!.id, 1);
+    expect(names(page)).toEqual(['c.pdf', 'a.pdf', 'b.pdf']);
+  });
+
+  it('leaves the first file where it is when moved up, and the last when moved down', () => {
+    const page = createToolPage(together, async () => []);
+    page.add([file('a.pdf'), file('b.pdf')]);
+    const [a, b] = page.state().waiting;
+    page.move(a!.id, -1);
+    page.move(b!.id, 1);
+    expect(names(page)).toEqual(['a.pdf', 'b.pdf']);
+  });
+
+  it('runs once over every file in the order set, giving one row named combined_dtb', async () => {
+    const ran: string[][] = [];
+    const page = createToolPage(together, async (files: File[]) => {
+      ran.push(files.map((f) => f.name));
+      return [pdf()];
+    });
+    page.add([file('a.pdf', 100), file('b.pdf', 200)]);
+    page.move(page.state().waiting[1]!.id, -1);
+    await page.start({});
+    expect(ran).toEqual([['b.pdf', 'a.pdf']]);
+    const [batch] = page.state().batches;
+    expect(batch!.label).toBe('2 files');
+    expect(batch!.items).toMatchObject([
+      { name: 'b.pdf, a.pdf', size: 300, status: 'done', results: [{ name: 'combined_dtb.pdf' }] },
+    ]);
+    expect(page.saveAllFiles().map((r) => r.name)).toEqual(['combined_dtb.pdf']);
+  });
+
+  it('names a repeat combined_dtb_2, skipping a name a chosen file already has', async () => {
+    const page = createToolPage(together, async () => [pdf()]);
+    page.add([file('a.pdf')]);
+    await page.start({});
+    page.add([file('combined_dtb_2.pdf')]);
+    await page.start({});
+    expect(page.state().batches.map((b) => b.items[0]!.results[0]!.name)).toEqual([
+      'combined_dtb_3.pdf',
+      'combined_dtb.pdf',
+    ]);
+  });
+
+  it("shows the Tool's own reason on the one row when it fails", async () => {
+    const page = createToolPage(together, async () => {
+      throw new ToolFailure('b.pdf has a password.');
+    });
+    page.add([file('a.pdf'), file('b.pdf')]);
+    await page.start({});
+    expect(page.state().batches[0]!.items).toMatchObject([
+      { status: 'failed', reason: 'b.pdf has a password.', results: [] },
+    ]);
+  });
+});
