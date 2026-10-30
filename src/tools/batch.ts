@@ -10,6 +10,7 @@ import {
   type ToolRun,
   type ToolRunContext,
   type ToolRunTogether,
+  wholePercent,
 } from './types';
 
 /** A chosen file on the waiting list. */
@@ -42,6 +43,8 @@ export interface BatchItem {
   status: ItemStatus;
   /** Why it didn't work: the Tool's own reason, or the shared one. */
   reason?: string;
+  /** How far along this row is while working, as a whole percent, if its Tool says. */
+  percent?: number;
   results: ResultFile[];
 }
 
@@ -176,15 +179,27 @@ function makeToolPage<Options extends object>(
 
   // Counted, so loads that overlap all finish before "Getting ready…" goes.
   let loads = 0;
-  const context: ToolRunContext = {
-    async gettingReady(loading) {
-      if (loads++ === 0) updateNewest((batch) => ({ ...batch, gettingReady: true }));
-      try {
-        return await loading;
-      } finally {
-        if (--loads === 0) updateNewest((batch) => ({ ...batch, gettingReady: false }));
-      }
-    },
+  const gettingReady: ToolRunContext['gettingReady'] = async (loading) => {
+    if (loads++ === 0) updateNewest((batch) => ({ ...batch, gettingReady: true }));
+    try {
+      return await loading;
+    } finally {
+      if (--loads === 0) updateNewest((batch) => ({ ...batch, gettingReady: false }));
+    }
+  };
+
+  /** The context for one row's run: its progress goes on that row. */
+  const contextFor = (item: BatchItem): ToolRunContext => {
+    let shown: number | undefined;
+    return {
+      gettingReady,
+      progress(fraction) {
+        const percent = wholePercent(fraction);
+        if (percent === shown) return;
+        shown = percent;
+        updateItem(item.id, { percent });
+      },
+    };
   };
 
   /** Runs one row's work and records its named results, or why it didn't work. */
@@ -207,7 +222,7 @@ function makeToolPage<Options extends object>(
   }
 
   const runOne = (item: BatchItem, file: File, options: Options) =>
-    runRow(item, file.name, () => (run as ToolRun<Options>)(file, options, context));
+    runRow(item, file.name, () => (run as ToolRun<Options>)(file, options, contextFor(item)));
 
   /** Such as "PNG · 3 photos", or "3 photos" when the Tool has no words for its options. */
   const batchLabel = (total: number, options: Options) => {
@@ -242,7 +257,7 @@ function makeToolPage<Options extends object>(
     updateItem(item.id, { status: 'working' });
     // Results of this mode are named after "combined", as in combined_dtb.pdf.
     await runRow(item, 'combined', () =>
-      (run as ToolRunTogether<Options>)(files, options, context),
+      (run as ToolRunTogether<Options>)(files, options, contextFor(item)),
     );
     working = false;
     updateNewest((batch) => ({ ...batch, progress: null }));

@@ -3,7 +3,13 @@
 // MessageChannel instead of a real worker.
 
 import * as Comlink from 'comlink';
-import { ToolFailure, type Reason, type ToolResult, type ToolRunContext } from './types';
+import {
+  ToolFailure,
+  wholePercent,
+  type Reason,
+  type ToolResult,
+  type ToolRunContext,
+} from './types';
 
 /** A Tool's `run`, taking one file or the ordered list, as its input mode says. */
 export type AnyRun = (
@@ -12,9 +18,12 @@ export type AnyRun = (
   context?: ToolRunContext,
 ) => Promise<ToolResult[]>;
 
-/** Tells the page when the worker starts and stops waiting for something to load. */
-interface Loading {
+/** The worker's line back to the page during one run. */
+interface PageLine {
+  /** The worker starts or stops waiting for something to load. */
   loading(on: boolean): void;
+  /** How far along the file is, as a whole percent. */
+  progress(percent: number): void;
 }
 
 /**
@@ -33,10 +42,18 @@ export function serveRuns(
       address: string,
       input: File | File[],
       options: object,
-      page: Comlink.Remote<Loading>,
+      page: Comlink.Remote<PageLine>,
     ): Promise<Answer> {
       let loads = 0;
+      let sent: number | undefined;
       const context: ToolRunContext = {
+        // Each call is a message to the page, so send only a new whole percent.
+        progress(fraction) {
+          const percent = wholePercent(fraction);
+          if (percent === sent) return;
+          sent = percent;
+          void page.progress(percent);
+        },
         async gettingReady(loading) {
           if (loads++ === 0) page.loading(true);
           try {
@@ -71,14 +88,17 @@ export function runInWorker(
   died: Promise<never> = new Promise<never>(() => {}),
 ): AnyRun {
   const worker = Comlink.wrap<{
-    run(address: string, input: File | File[], options: object, page: Loading): Promise<Answer>;
+    run(address: string, input: File | File[], options: object, page: PageLine): Promise<Answer>;
   }>(endpoint);
   return async (input, options, context) => {
     let loaded: (() => void) | undefined;
-    const page = Comlink.proxy<Loading>({
+    const page = Comlink.proxy<PageLine>({
       loading(on) {
         if (on) void context?.gettingReady(new Promise<void>((resolve) => (loaded = resolve)));
         else loaded?.();
+      },
+      progress(percent) {
+        context?.progress(percent / 100);
       },
     });
     try {
