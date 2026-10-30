@@ -1,15 +1,7 @@
 import { buildTiff, isHeif, jpegWithDetails, readDetails } from '../../photos/exif';
-import { ToolFailure, type ToolRun, type ToolRunContext } from '../types';
+import { shrinkOnCanvas, type Shrink } from '../../photos/shrink';
+import { ToolFailure, type ToolRun } from '../types';
 import { lowerQuality, sizes, tool, type Options } from './declaration';
-import { shrinkOnCanvas } from './canvas';
-
-/** How small to make a photo: its longest side in pixels and the JPG quality (0 to 1). */
-export interface How {
-  longestSide: number;
-  quality: number;
-}
-/** A photo drawn the right way up, no bigger than `how` says, saved as a JPG with no details. */
-export type Shrink = (file: File, how: How, context?: ToolRunContext) => Promise<Blob>;
 
 /** The Tool's job, with the drawing step passed in so tests can stand in for the canvas. */
 export function makeRun(shrink: Shrink): ToolRun<Options> {
