@@ -101,6 +101,9 @@ test.describe('with the video features', () => {
     browserName,
   }) => {
     test.skip(browserName === 'chromium', 'Chromium here cannot make AAC sound');
+    // WebKit on Linux (CI) says it can make AAC, but stays on Working… with Opus sound.
+    // Real phones are tried before release; Safari on an iPhone is the one that matters.
+    test.fixme(browserName === 'webkit', 'WebKit on Linux never finishes remaking Opus sound');
     await make(page, `${folder}opus.mp4`);
     expect(await saveVideo(page, 'opus_dtb.mp4')).toMatchObject({
       picture: { codec: 'avc', width: 320, height: 180 },
