@@ -73,6 +73,7 @@ const extensions: Record<string, string> = {
   'image/png': 'png',
   'image/webp': 'webp',
   'image/gif': 'gif',
+  'audio/mp4': 'm4a',
 };
 
 /** The same text for equal options, whatever order their keys were set in. */
