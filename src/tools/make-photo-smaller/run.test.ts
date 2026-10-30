@@ -86,13 +86,16 @@ describe('Make a photo smaller', () => {
   it('keeps the first try when the lower quality is no smaller either', async () => {
     const tried: number[] = [];
     const original = new File([new Uint8Array(10)], 'tiny.jpg', { type: 'image/jpeg' });
+    const painted = bytes('painted.jpg');
+    // The lower quality comes out even bigger than the first try.
     const shrinkTo = makeRun(async (_file, how) => {
       tried.push(how.quality);
-      return new Blob([bytes('painted.jpg')], { type: 'image/jpeg' });
+      return new Blob([painted, new Uint8Array(how.quality < 0.7 ? 500 : 0)]);
     });
     const [result] = await shrinkTo(original, defaults);
+    const [first] = await makeRun(async () => new Blob([painted]))(original, defaults);
     expect(tried).toEqual([0.82, 0.6]);
-    expect(result!.blob.type).toBe('image/jpeg');
+    expect(result!.blob.size).toBe(first!.blob.size);
   });
 
   it("fails with a plain reason for an iPhone photo (HEIC) the browser can't open", async () => {
