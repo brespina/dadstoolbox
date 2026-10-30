@@ -21,18 +21,25 @@ import {
 } from 'mediabunny';
 import { ToolFailure, type Reason } from '../tools/types';
 import type { VideoReasonKey } from './reasons';
+import { fitLongestSide } from './size';
 
 export interface RemakeSettings {
   /** The calling Tool's own copies of the shared video reasons (`tool.reasons`). */
   reasons: Readonly<Record<VideoReasonKey, Reason>>;
+  /** At most this many pixels on the picture's longest side; never made larger. */
+  longestSide?: number;
 }
 
 /**
- * Remakes a video as an H.264 MP4 with AAC sound, the picture size kept. Sound already in
+ * Remakes a video as an H.264 MP4 with AAC sound, the picture size kept unless a
+ * longest side is given. Sound already in
  * AAC is copied as is. It never drops the picture or the sound: when the browser can't
  * make either, it throws a ToolFailure with a plain reason instead.
  */
-export async function remakeVideo(file: Blob, { reasons }: RemakeSettings): Promise<Blob> {
+export async function remakeVideo(
+  file: Blob,
+  { reasons, longestSide }: RemakeSettings,
+): Promise<Blob> {
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   try {
     // An unknown kind of file throws here.
@@ -40,11 +47,13 @@ export async function remakeVideo(file: Blob, { reasons }: RemakeSettings): Prom
     if (!track) throw new ToolFailure(reasons.notVideo);
 
     // Ask first whether this browser can read this video and make one this size.
-    const width = await track.getDisplayWidth();
-    const height = await track.getDisplayHeight();
+    const fit = fitLongestSide(
+      { width: await track.getDisplayWidth(), height: await track.getDisplayHeight() },
+      longestSide,
+    );
     const canMake =
       (await track.canDecode().catch(() => false)) &&
-      (await canEncodeVideo('avc', { width, height }).catch(() => false));
+      (await canEncodeVideo('avc', fit.size).catch(() => false));
     if (!canMake) throw new ToolFailure(reasons.cantMake);
 
     const output = new Output({
@@ -61,6 +70,7 @@ export async function remakeVideo(file: Blob, { reasons }: RemakeSettings): Prom
         forceTranscode: true,
         // Turned the right way up in the picture itself: old TVs may ignore a "turn" note.
         allowTransformationMetadata: false,
+        ...fit.set,
       },
       audio: { codec: 'aac' },
       showWarnings: false,
