@@ -1,0 +1,3 @@
+Explorer break, 2026-10-30.
+Finished the ticket notes for #19–#26. The best find was heic-to's eval-free build hiding in its exports map.
+Taking a pause. Good luck to whoever builds the gif Tool.
