@@ -93,6 +93,18 @@ export interface ToolDeclarationInput<Options extends object> {
   /** Outside origins the Tool may contact. They widen the browser lock. */
   outsideAddresses: readonly string[];
   defaultOptions: Options;
+  /**
+   * Options each chosen file has its own value for, such as Trim a video's start and
+   * end. FileOptions.svelte in the Tool's folder sets them on the file's Ready row. Each
+   * file starts from `defaultOptions`, and its own values replace the page's when `run`
+   * gets the options. Defaults to none.
+   */
+  fileOptions?: readonly (keyof Options)[];
+  /**
+   * Why start can't run a file with these options yet, in plain words from `notes`, or
+   * nothing. Asked for each chosen file, with its own values in. Defaults to nothing.
+   */
+  optionsProblem?: (options: Options) => string | undefined;
 }
 
 declare const reasonBrand: unique symbol;
@@ -123,6 +135,8 @@ export function defineTool<Options extends object>(
     typeLabel: text.tool.typed.label,
     typeBox: true,
     notes: {},
+    fileOptions: [],
+    optionsProblem: () => undefined,
     ...input,
     reasons: (input.reasons ?? {}) as Readonly<Record<string, Reason>>,
   };
