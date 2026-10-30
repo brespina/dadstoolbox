@@ -61,7 +61,10 @@ for (const { tool, folder } of tools) {
       await expect(page.getByText(sample!)).toBeVisible();
 
       await page.getByRole('button', { name: tool.startButton }).click();
-      await expect(page.getByRole('button', { name: /^Save / }).first()).toBeVisible();
+      // Some Tools take a few seconds, such as one reading video frames.
+      await expect(page.getByRole('button', { name: /^Save / }).first()).toBeVisible({
+        timeout: 20_000,
+      });
       await expect(page.getByText(tool.allDone)).toBeVisible();
     });
   });

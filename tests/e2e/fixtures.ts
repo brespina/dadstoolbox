@@ -7,10 +7,11 @@ import AxeBuilder from '@axe-core/playwright';
 // - axe finds no WCAG 2.2 AA violations, in the light and dark themes
 export const test = base.extend<{ siteChecks: void }>({
   siteChecks: [
-    async ({ page, baseURL }, use) => {
+    async ({ context, page, baseURL }, use) => {
       const siteOrigin = new URL(baseURL!).origin;
       const outside: string[] = [];
-      page.on('request', (request) => {
+      // Watched on the whole context, so requests from workers count too.
+      context.on('request', (request) => {
         const url = new URL(request.url());
         if (url.protocol === 'data:' || url.protocol === 'blob:') return;
         if (url.origin !== siteOrigin) outside.push(request.url());

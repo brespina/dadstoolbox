@@ -16,18 +16,11 @@ be added.
 Some of the machinery this guide describes comes with later Tools. Until those land, a
 new Tool can only use what is built today:
 
-| Part                                                          | Today                           | Built in |
-| ------------------------------------------------------------- | ------------------------------- | -------- |
-| Input mode `together`                                         | The page throws                 | #22      |
-| Input mode `none`                                             | The page throws                 | #23      |
-| `worker: true`                                                | Ignored; `run` runs on the page | #20      |
-| "Getting ready…" while a late library loads                   | Not shown                       | #20      |
-| `needs` checks ("Doesn't work on this browser yet")           | Not checked                     | #24      |
-| The large-file note from `largeFileLimit`                     | Not shown                       | #24      |
-| The credits page for library licences                         | Not there yet                   | #26      |
+| Part                                  | Today         | Built in |
+| ------------------------------------- | ------------- | -------- |
+| The credits page for library licences | Not there yet | #26      |
 
-Fill every declaration field anyway; the fields are already part of the type. When one
-of those tickets lands, it should update this guide.
+When that ticket lands, it should update this guide.
 
 ## The steps
 
@@ -96,11 +89,13 @@ field is required.
 | `input`            | The input mode: `each`, `together` or `none`. See [Input modes](#input-modes).                                                                                                                                                                                                                     |
 | `needs`            | Browser features `run` needs, such as `webcodecs`. They are checked when the page runs. Where one is missing, the home page row and the Tool page say "Doesn't work on this browser yet" and Choose is greyed out. Add a new feature to the `BrowserFeature` type in `types.ts` if it is missing. |
 | `largeFileLimit`   | A size in bytes. A file bigger than this gets a note on its Ready row warning it may be slow or stop partway on a phone. It does not stop the file. Set it from what a phone can really handle.                                                                                                    |
+| `largeFileNote`    | Optional. That note. Defaults to "This {noun} is big for a phone. It may take a few minutes or stop partway." with the Tool's noun (one) swapped in.                                                                                                                                          |
 | `startButton`      | Words on the start button that say what will happen: "Split into pages", "Combine PDFs".                                                                                                                                                                                                          |
 | `privacyLine`      | Optional. Defaults to the Promise line with the noun swapped in: "Your PDFs stay on your device. They are never sent anywhere." A Tool with no file says something like "What you type stays on your device."                                                                                    |
 | `allDone`          | Optional. Shown when a Batch finishes. Defaults to "All done."                                                                                                                                                                                                                                     |
 | `textFor`          | Optional. A function from the options to words that follow them: `startButton` ("Change to PNG"), `batchLabel` (the "PNG" in "PNG · 3 photos") and `allDone`. Each one left out falls back to the field above. With default options it must give the same `startButton`, because the page test presses that. |
 | `reasons`          | Optional. The Tool's own plain-language failure reasons, by key. `run` throws them as `ToolFailure` (see below).                                                                                                                                                                                  |
+| `notes`            | Optional. Other words the Tool shows, by key, such as its option names or the lines its `ready.ts` gives. They are scanned for plain words like every other field.                                                                                                                             |
 | `worker`           | Whether `run` runs in a Web Worker. See [The worker flag](#the-worker-flag).                                                                                                                                                                                                                       |
 | `outsideAddresses` | Outside origins the Tool may contact. Leave it empty. See [Outside addresses](#outside-addresses).                                                                                                                                                                                                 |
 | `defaultOptions`   | The options the page starts with. Their shape is the options type for `run` and `Options.svelte` (`typeof tool.defaultOptions`).                                                                                                                                                                  |
@@ -153,18 +148,30 @@ file; add one if a Tool needs it.
 **Loading.** Import libraries in `run.ts`, never in `declaration.ts`. A small library can
 load with the page. A big one (such as a video library or a fallback photo decoder)
 should load only once a file is chosen, with a dynamic `import()` inside `run`; the page
-will show "Getting ready…" meanwhile (#20). Bundle every library and file from npm or the Site
+shows "Getting ready…" while it loads if `run` wraps the load in
+`context.gettingReady(...)` (see `src/tools/video-to-gif/run.ts`). Bundle every library and file from npm or the Site
 itself. Never load anything from another site.
 
 ## The worker flag
-
-The flag is ignored until #20 builds it; until then `run` always runs on the page.
 
 Set `worker: true` when `run` does heavy work that would freeze the page, such as
 building a gif. Shared code then runs `run` in a Web Worker through Comlink, so the page
 stays responsive. In that case `run` can't use the page: no `document`, `window` or DOM
 elements. `OffscreenCanvas`, `createImageBitmap` and `fetch` to the Site are fine. The
 Tool doesn't make the worker itself; shared code does. Most Tools use `worker: false`.
+Make a gif from a video (`src/tools/video-to-gif/`) is the worked example.
+
+A worker loaded from its own file does not get the page's browser lock tag, so a worker
+Tool must not fetch anything itself. The page tests watch requests from workers too.
+
+## Notes on the Ready row
+
+A Tool may add its own lines to a chosen file's Ready row, before start, such as how big
+the result will be. Export `readyNote` (the `ReadyNote` type in `types.ts`) from
+`ready.ts` in the Tool's folder. It gets the file and the options, and is asked again
+whenever the options change. It runs on the page, so keep it light: no big libraries. A
+line marked `warning` is shown in the problem colour. Put its words in the
+declaration's `notes`.
 
 ## Outside addresses
 

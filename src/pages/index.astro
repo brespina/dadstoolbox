@@ -1,6 +1,7 @@
 ---
 import SiteLayout from '../layouts/SiteLayout.astro';
 import CategoryIcon from '../components/CategoryIcon.astro';
+import ToolBlurb from '../components/ToolBlurb.svelte';
 import { text } from '../text';
 import { toolsByCategory } from '../tools/registry';
 import { sitePath } from '../site/paths';
@@ -21,7 +22,11 @@ const groups = toolsByCategory();
               <CategoryIcon category={tool.category} />
               <span>
                 <span class="tool-name">{tool.name}</span>
-                <span class="tool-blurb">{tool.blurb}</span>
+                {tool.needs.length > 0 ? (
+                  <ToolBlurb client:load blurb={tool.blurb} needs={tool.needs} />
+                ) : (
+                  <span class="tool-blurb">{tool.blurb}</span>
+                )}
               </span>
             </a>
           </li>

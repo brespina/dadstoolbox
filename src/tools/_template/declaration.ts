@@ -16,11 +16,11 @@ export const tool = defineTool({
   position: 99,
   noun: { one: 'text file', many: 'text files' },
   accept: ['text/plain', '.txt'],
-  // 'each' (each file on its own). 'together' and 'none' are not built yet; see the guide.
+  // 'each' (each file on its own), 'together' (all files at once) or 'none' (typed text).
   input: 'each',
   // Browser features `run` needs, such as 'webcodecs'.
   needs: [],
-  // In bytes. Bigger files will get a note on their Ready row (not built yet).
+  // In bytes. Bigger files get a note on their Ready row.
   largeFileLimit: 10_000_000,
   startButton: 'Make copies',
   // Optional: privacyLine and allDone have defaults.
@@ -28,7 +28,7 @@ export const tool = defineTool({
   reasons: {
     empty: 'This file is empty. Choose a file with some text in it.',
   },
-  // true will run `run` in a Web Worker, so it can't touch the page (not built yet).
+  // true runs `run` in a Web Worker, so it can't touch the page.
   worker: false,
   // Outside origins the Tool contacts. Keep this empty; see the guide first.
   outsideAddresses: [],

@@ -76,6 +76,11 @@ export const text = {
     moveDown: '↓',
     moveDownLabel: 'Move {name} down',
     waitingHeading: 'Ready to start',
+    // On the Ready row of a file over the Tool's size limit. {noun} is the Tool's noun,
+    // such as "photo". A Tool may give its own.
+    largeFileNote: 'This {noun} is big for a phone. It may take a few minutes or stop partway.',
+    // Where the browser lacks a feature the Tool needs: on its home page row and its page.
+    unsupported: "Doesn't work on this browser yet",
     save: 'Save',
     saveLabel: 'Save {name}',
     saveAll: 'Save all',

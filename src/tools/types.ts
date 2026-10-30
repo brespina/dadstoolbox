@@ -54,6 +54,8 @@ export interface ToolDeclarationInput<Options extends object> {
   needs: readonly BrowserFeature[];
   /** Files bigger than this (in bytes) get a note on their Ready row. */
   largeFileLimit: number;
+  /** That note. Defaults to the shared one with the Tool's noun swapped in. */
+  largeFileNote?: string;
   /** Words on the start button, saying what will happen. */
   startButton: string;
   /** Defaults to the Promise line with the Tool's noun swapped in. */
@@ -67,6 +69,8 @@ export interface ToolDeclarationInput<Options extends object> {
   textFor?: (options: Options) => OptionsText;
   /** The Tool's own plain-language failure reasons, thrown by `run` as ToolFailure. */
   reasons?: Readonly<Record<string, string>>;
+  /** Other words the Tool shows, such as its note on a Ready row (see ReadyNote). */
+  notes?: Readonly<Record<string, string>>;
   /** Whether `run` runs in a Web Worker. */
   worker: boolean;
   /** Outside origins the Tool may contact. They widen the browser lock. */
@@ -85,9 +89,11 @@ export function defineTool<Options extends object>(
   return {
     privacyLine: fillText(text.tool.privacyLine, { noun: input.noun.many }),
     allDone: text.tool.allDone,
+    largeFileNote: fillText(text.tool.largeFileNote, { noun: input.noun.one }),
     textFor: () => ({}),
     typeLabel: text.tool.typed.label,
     reasons: {},
+    notes: {},
     ...input,
   };
 }
@@ -112,9 +118,11 @@ export function declarationText(tool: ToolDeclaration): string[] {
     tool.startButton,
     tool.privacyLine,
     tool.allDone,
+    tool.largeFileNote,
     ...Object.values(tool.textFor(tool.defaultOptions)),
     tool.typeLabel,
     ...Object.values(tool.reasons),
+    ...Object.values(tool.notes),
   ];
 }
 
@@ -134,6 +142,23 @@ export interface ToolRunContext {
    */
   gettingReady<T>(loading: Promise<T>): Promise<T>;
 }
+
+/** A line on a chosen file's Ready row, such as how big the result may be. */
+export interface ReadyLine {
+  text: string;
+  /** Shown as a warning, such as a result too big to send. */
+  warning?: boolean;
+}
+
+/**
+ * A Tool's own lines for a chosen file's Ready row, from the file and the options. It
+ * runs on the page, before start, so it must stay light: no big libraries. A Tool
+ * that has one exports it as `readyNote` from `ready.ts` in its folder.
+ */
+export type ReadyNote<Options extends object = object> = (
+  file: File,
+  options: Options,
+) => Promise<ReadyLine[]>;
 
 /** A Tool's job for one file (input mode "each"). It may return any number of results. */
 export type ToolRun<Options extends object = object> = (

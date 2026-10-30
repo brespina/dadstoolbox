@@ -11,10 +11,11 @@
     type ToolPageState,
   } from '../tools/batch';
   import { toolAt } from '../tools/registry';
-  import { wordsFor } from '../tools/types';
+  import { wordsFor, type ReadyLine, type ReadyNote } from '../tools/types';
   import { runInWorker, type AnyRun } from '../tools/worker';
   import { saveFiles, type SavableFile } from '../site/save';
   import { formatSize } from '../site/size';
+  import { browserCanRun } from '../site/features';
 
   let { address }: { address: string } = $props();
 
@@ -28,12 +29,18 @@
     '../tools/*/run.ts',
     '!../tools/_*/run.ts',
   ]);
+  // A Tool's own lines for a Ready row, such as an estimated size. Few Tools have one.
+  const readyModules = import.meta.glob<{ readyNote: ReadyNote }>([
+    '../tools/*/ready.ts',
+    '!../tools/_*/ready.ts',
+  ]);
 
   // The address never changes on a page, so reading it once is right.
   // svelte-ignore state_referenced_locally
   const tool = toolAt(address);
   const Options = optionsComponents[`../tools/${tool.address}/Options.svelte`]!.default;
   const loadRun = runModules[`../tools/${tool.address}/run.ts`]!;
+  const loadReady = readyModules[`../tools/${tool.address}/ready.ts`];
 
   // A Tool marked worker runs there, and its `run` loads in the worker, not the page.
   const startWorker = () =>
@@ -62,6 +69,9 @@
   // Each status change is added as its own line, so none is lost when the next comes fast.
   let announcements: { id: number; text: string }[] = $state([]);
   let hydrated = $state(false);
+  // Whether this browser has the features the Tool needs. Checked once the page runs.
+  let supported = $state(true);
+  let canChoose = $derived(hydrated && supported);
 
   /** "Done", or "Didn't work. <reason>". */
   const statusLine = (item: Pick<BatchItem, 'status' | 'reason'>) =>
@@ -71,6 +81,8 @@
 
   onMount(() => {
     hydrated = true;
+    supported = browserCanRun(tool.needs);
+    if (!supported) return;
     // Load the Tool's `run` with the page, so pressing start doesn't wait.
     getRun().catch((error: unknown) => console.error('Could not load the Tool', error));
 
@@ -97,6 +109,26 @@
   }
 
   let waitingList: HTMLElement | undefined = $state();
+
+  // The Tool's own Ready row lines, by file, for the options as they are now.
+  let readyLines: Map<number, ReadyLine[]> = $state.raw(new Map());
+  $effect(() => {
+    if (!loadReady) return;
+    const files = state.waiting;
+    const chosen = $state.snapshot(options);
+    let current = true;
+    loadReady()
+      .then(({ readyNote }) =>
+        Promise.all(files.map(async (f) => [f.id, await readyNote(f.file, chosen)] as const)),
+      )
+      .then((lines) => {
+        if (current) readyLines = new Map(lines);
+      })
+      .catch((error: unknown) => console.error('Could not make the Ready notes', error));
+    return () => {
+      current = false;
+    };
+  });
 
   /** Moves a file, keeping keyboard focus on its buttons as it goes. */
   async function move(id: number, by: -1 | 1) {
@@ -132,13 +164,17 @@
 <div class="tool">
   <Options bind:options />
 
-  <label class="big-button choose" class:disabled={!hydrated}>
+  {#if !supported}
+    <p class="unsupported">{text.tool.unsupported}</p>
+  {/if}
+
+  <label class="big-button choose" class:disabled={!canChoose}>
     <input
       type="file"
       class="visually-hidden"
       multiple
       accept={tool.accept.join(',')}
-      disabled={!hydrated}
+      disabled={!canChoose}
       onchange={onChoose}
     />
     {fill(anyChosen ? text.tool.chooseMore : text.tool.choose, { noun: tool.noun.many })}
@@ -153,6 +189,12 @@
             <div class="row-text">
               <span class="file-name">{file.name}</span>
               <span class="muted">{formatSize(file.size)} · {statusLine(file)}</span>
+              {#each readyLines.get(file.id) ?? [] as line (line.text)}
+                <span class:warning={line.warning}>{line.text}</span>
+              {/each}
+              {#if file.large}
+                <span class="warning">{tool.largeFileNote}</span>
+              {/if}
             </div>
             <div class="row-buttons">
               {#if tool.input === 'together'}
@@ -189,7 +231,7 @@
   <button
     type="button"
     class="big-button start"
-    disabled={!hydrated || !hasWork || state.working}
+    disabled={!canChoose || !hasWork || state.working}
     onclick={() => toolPage.start($state.snapshot(options))}>{words.startButton}</button
   >
 
@@ -380,8 +422,14 @@
     font-weight: 600;
   }
 
-  .failed {
+  .failed,
+  .warning {
     color: var(--problem);
+  }
+
+  .unsupported {
+    margin: 0;
+    font-weight: 600;
   }
 
   .batch-heading {
