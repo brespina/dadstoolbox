@@ -22,7 +22,11 @@ export type Category = (typeof categories)[number];
 export type InputMode = 'each' | 'together' | 'none';
 
 /** Browser features a Tool may need, checked when the page runs. */
-export type BrowserFeature = 'webcodecs';
+/**
+ * - webcodecs: reading video frames
+ * - makeVideo: making video (a video encoder)
+ */
+export type BrowserFeature = 'webcodecs' | 'makeVideo';
 
 /** Words that follow the chosen options. */
 export interface OptionsText {
