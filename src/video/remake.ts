@@ -25,6 +25,12 @@ import type { VideoReasonKey } from './reasons';
 export interface RemakeSettings {
   /** The calling Tool's own copies of the shared video reasons (`tool.reasons`). */
   reasons: Readonly<Record<VideoReasonKey, Reason>>;
+  /**
+   * The part to keep, in seconds from the start of the video. End left out means to the
+   * end. The cut is exact, as the picture is always remade. The caller makes sure start
+   * comes before end.
+   */
+  range?: { start: number; end?: number };
 }
 
 /**
@@ -32,7 +38,10 @@ export interface RemakeSettings {
  * AAC is copied as is. It never drops the picture or the sound: when the browser can't
  * make either, it throws a ToolFailure with a plain reason instead.
  */
-export async function remakeVideo(file: Blob, { reasons }: RemakeSettings): Promise<Blob> {
+export async function remakeVideo(
+  file: Blob,
+  { reasons, range }: RemakeSettings,
+): Promise<Blob> {
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   try {
     // An unknown kind of file throws here.
@@ -63,6 +72,7 @@ export async function remakeVideo(file: Blob, { reasons }: RemakeSettings): Prom
         allowTransformationMetadata: false,
       },
       audio: { codec: 'aac' },
+      ...(range && { trim: range }),
       showWarnings: false,
     });
     // Mediabunny still makes a file when it drops a track, so never trust that alone.
