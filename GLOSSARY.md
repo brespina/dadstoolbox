@@ -19,3 +19,7 @@ _Avoid_: Family, section, module
 **Converter**:
 A Tool that turns a file from one format into another. A description of what a Tool does, not a separate kind of thing.
 _Avoid_: Convertor
+
+**Batch**:
+The results from one press of a Tool's start button. Earlier Batches stay on the page when a person changes the options and runs the Tool again.
+_Avoid_: Run, job, session
