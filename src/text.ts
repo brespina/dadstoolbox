@@ -67,7 +67,8 @@ export const text = {
     // {name} is the library that brings this one in.
     partOf: 'Part of {name}.',
     // {license} is a license name, such as "MIT".
-    license: 'Version {version}. License: {license}',
+    version: 'Version {version}.',
+    license: 'License: {license}',
     // {name} is a library's name. The link text must stay unique on the page.
     codeLink: '{name} code',
     licenseLink: '{name} license',

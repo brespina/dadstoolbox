@@ -24,10 +24,8 @@ const nameOf = (pkg: string) => credits.find((credit) => credit.package === pkg)
           {credit.partOf && ` ${fillText(t.partOf, { name: nameOf(credit.partOf) })}`}
         </p>
         <p>
-          {fillText(t.license, {
-            version: credit.version,
-            license: licenseName(credit.license),
-          })}
+          {credit.version && `${fillText(t.version, { version: credit.version })} `}
+          {fillText(t.license, { license: licenseName(credit.license) })}
         </p>
         <ul class="link-list">
           <li>

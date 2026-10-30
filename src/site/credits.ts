@@ -11,7 +11,8 @@ export interface Credit {
   package?: string;
   /** The npm package that brings it in, when the Site doesn't use it directly. */
   partOf?: string;
-  version: string;
+  /** Left out only when the version can't be known, as for libde265. */
+  version?: string;
   /** The SPDX license name, as in its package.json. */
   license: string;
   /** What it does for the Site, in plain words. */
@@ -109,11 +110,13 @@ export const credits: Credit[] = [
   {
     name: 'libde265',
     partOf: 'heic-to',
-    // The version heic-to's build steps name.
-    version: '1.0.16',
+    // No version: heic-to doesn't record which one its build used (its README says
+    // 1.0.16, libheif's build script defaults to 1.0.15). heic-to's own code link is
+    // the source that matches what ships.
     license: 'LGPL-3.0',
     does: 'Unpacks the picture inside an iPhone photo (HEIC).',
-    ...github('strukturag/libde265', 'v1.0.16', 'COPYING'),
+    codeUrl: 'https://github.com/strukturag/libde265',
+    licenseUrl: 'https://github.com/strukturag/libde265/blob/master/COPYING',
   },
   {
     name: 'Mediabunny',
