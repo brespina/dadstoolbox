@@ -66,6 +66,20 @@ describe('Remove photo location', () => {
     expect((failure as ToolFailure).reason).toBe("This kind of photo doesn't carry a location.");
   });
 
+  it("doesn't save a copy when the location can't be read", async () => {
+    const damaged = bytes('sample.jpg');
+    // The sample's pointer to its location (big-endian): point it past the end.
+    const at = Buffer.from(damaged).indexOf(Buffer.from([0x88, 0x25, 0, 4, 0, 0, 0, 1]));
+    expect(at).toBeGreaterThan(0);
+    damaged.set([0x7f, 0xff, 0xff, 0xff], at + 8);
+    const failure = await run(file(damaged, 'damaged.jpg', 'image/jpeg'), tool.defaultOptions)
+      .then(() => 'saved')
+      .catch((e: unknown) => e);
+    // Not a Tool reason: the page shows "This file may be damaged or not supported."
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure).not.toBeInstanceOf(ToolFailure);
+  });
+
   it('points an iPhone photo (HEIC) to Change a photo to JPG for now', async () => {
     // Its file type is often missing.
     const heic = file(bytes('sample.heic'), 'sample.heic', '');
