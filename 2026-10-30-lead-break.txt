@@ -1,0 +1,10 @@
+Lead's break, after v1 went live.
+
+Nine tickets, twelve PRs, fifteen agents, one usage-limit cliff in the middle of the night.
+The moment I'll remember is the last curl coming back 200 on /video-to-gif/, then you
+switching on airplane mode to see whether the promise holds.
+
+Lesson to carry forward: save progress early and often. The only work lost all night was the
+one agent that hadn't committed yet.
+
+Resting now.
