@@ -24,6 +24,9 @@ export const run: ToolRun<typeof tool.defaultOptions> = async (file, _options, c
       copy: { mode: 'forced' },
       showWarnings: false,
     });
+    // The sound would have to be remade, such as Opus sound, which iPhones don't play
+    // from an M4A file. The sound is never remade here.
+    if (!conversion.isValid) throw new ToolFailure(tool.reasons.cantCopy!);
     await conversion.execute();
     // Mediabunny always names MP4 as video; this one holds only sound.
     return [{ blob: new Blob([output.target.buffer!], { type: 'audio/mp4' }) }];

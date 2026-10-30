@@ -34,4 +34,11 @@ describe('Get the sound from a video', () => {
     expect(failure).toBeInstanceOf(ToolFailure);
     expect((failure as ToolFailure).reason).toBe(tool.reasons.noSound);
   });
+
+  it('says plainly when the sound is a kind that phones do not play from an M4A', async () => {
+    // Opus sound, which can't be copied as it is into an M4A that plays on an iPhone.
+    const failure = await failureOf(video('opus.mp4'));
+    expect(failure).toBeInstanceOf(ToolFailure);
+    expect((failure as ToolFailure).reason).toBe(tool.reasons.cantCopy);
+  });
 });
