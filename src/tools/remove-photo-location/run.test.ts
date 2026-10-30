@@ -53,6 +53,15 @@ describe('Remove photo location', () => {
     });
   });
 
+  it('takes the location out of an extra picture stored after the main one', async () => {
+    // Like an iPhone JPG's second picture: a whole JPEG after the first one ends.
+    const sample = bytes('sample.jpg');
+    const both = new Uint8Array([...sample, ...sample]);
+    const out = await removed(file(both, 'both.jpg', 'image/jpeg'));
+    expect(readDetails(out.subarray(sample.length))?.location).toEqual([]);
+    expect(readDetails(out.subarray(sample.length))?.dates).not.toEqual([]);
+  });
+
   it('still saves a JPG that has no location, unchanged', async () => {
     const original = bytes('painted.jpg');
     const out = await removed(file(original, 'painted.jpg', 'image/jpeg'));
