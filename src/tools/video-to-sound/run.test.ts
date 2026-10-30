@@ -2,12 +2,16 @@
 import { readFileSync } from 'node:fs';
 import { ALL_FORMATS, BufferSource, Input } from 'mediabunny';
 import { describe, expect, it } from 'vitest';
+import { ToolFailure } from '../types';
+import { tool } from './declaration';
 import { run } from './run';
 
 const video = (path: string) =>
   new File([readFileSync(new URL(path, import.meta.url))], path.split('/').pop()!, {
     type: 'video/mp4',
   });
+
+const failureOf = (file: File) => run(file, {}).catch((e: unknown) => e);
 
 describe('Get the sound from a video', () => {
   it("saves the sample video's 2 seconds of sound as an M4A, with no picture", async () => {
@@ -23,5 +27,11 @@ describe('Get the sound from a video', () => {
     expect(tracks.map((t) => t.type)).toEqual(['audio']);
     expect(tracks[0]!.codec).toBe('aac');
     expect(await m4a.computeDuration()).toBeCloseTo(2, 1);
+  });
+
+  it('says plainly when the video has no sound', async () => {
+    const failure = await failureOf(video('../video-to-gif/sample.mp4'));
+    expect(failure).toBeInstanceOf(ToolFailure);
+    expect((failure as ToolFailure).reason).toBe(tool.reasons.noSound);
   });
 });

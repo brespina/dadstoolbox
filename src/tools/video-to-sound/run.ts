@@ -1,7 +1,7 @@
 // Copies the video's sound as it is into an M4A file: nothing is remade, so it is quick
 // and needs no browser video features. Mediabunny is big, so it loads only on start.
-import type { ToolRun } from '../types';
-import type { tool } from './declaration';
+import { ToolFailure, type ToolRun } from '../types';
+import { tool } from './declaration';
 
 export const run: ToolRun<typeof tool.defaultOptions> = async (file, _options, context) => {
   const loading = import('mediabunny');
@@ -10,6 +10,8 @@ export const run: ToolRun<typeof tool.defaultOptions> = async (file, _options, c
 
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   try {
+    if (!(await input.getPrimaryAudioTrack())) throw new ToolFailure(tool.reasons.noSound!);
+
     const output = new Output({
       format: new Mp4OutputFormat({ fastStart: 'in-memory' }),
       target: new BufferTarget(),
