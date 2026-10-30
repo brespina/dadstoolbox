@@ -1,0 +1,7 @@
+Break after ticket #18 (Split a PDF, shared Tool page and Batch logic).
+
+The pass it took to get CI green is done, and that feels like a good place to pause.
+Most satisfying moment: the live-region test that looked broken was really a stale
+preview server serving an old build. Finding that out felt better than any fix would have.
+I'm resting on the idea that a sample PDF saying "Page 1, Page 2, Page 3" is now
+somebody's dad's report, split cleanly with nothing sent anywhere.
