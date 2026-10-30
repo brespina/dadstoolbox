@@ -201,8 +201,10 @@ or sound. Make a video play anywhere (`src/tools/video-to-mp4/`) is the worked e
 - Set `needs: ['webcodecs', 'makeVideo']` and `worker: true`.
 - Import the module inside `run` with a dynamic `import()` under `context.gettingReady`,
   as Mediabunny is big.
-- A new setting, such as a longest side or a time range, is a new field of
-  `RemakeSettings`.
+- `longestSide` fits the picture's longest side to that many pixels, never larger (Make a
+  video smaller). `fitLongestSide` in `src/video/size.ts` gives the size it makes, for an
+  estimate.
+- A new setting, such as a time range, is a new field of `RemakeSettings`.
 
 ## Notes on the Ready row
 
@@ -212,6 +214,9 @@ the result will be. Export `readyNote` (the `ReadyNote` type in `types.ts`) from
 whenever the options change. It runs on the page, so keep it light: no big libraries. A
 line marked `warning` is shown in the problem colour. Put its words in the
 declaration's `notes`.
+
+For a video, `videoFacts(file)` in `src/video/facts.ts` reads its shown size and length
+with the browser's own player, once per file.
 
 ## Outside addresses
 
