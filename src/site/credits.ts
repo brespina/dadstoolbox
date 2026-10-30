@@ -34,7 +34,7 @@ export const credits: Credit[] = [
     package: 'pdf-lib',
     version: '1.17.1',
     license: 'MIT',
-    does: 'Splits and combines PDFs.',
+    does: 'Makes and changes PDFs.',
     ...github('Hopding/pdf-lib', 'v1.17.1', 'LICENSE.md'),
   },
   {

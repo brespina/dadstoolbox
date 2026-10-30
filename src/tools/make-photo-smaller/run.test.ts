@@ -3,7 +3,8 @@ import exifr from 'exifr';
 import { describe, expect, it } from 'vitest';
 import { ToolFailure } from '../types';
 import { tool } from './declaration';
-import { makeRun, type Shrink } from './run';
+import type { Shrink } from '../../photos/shrink';
+import { makeRun } from './run';
 
 const bytes = (path: string) => readFileSync(new URL(path, import.meta.url));
 // A 4032 × 3024 photo marked "turn a quarter turn", with a date taken and a location.

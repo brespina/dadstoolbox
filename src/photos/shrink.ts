@@ -1,15 +1,20 @@
 // The browser's own drawing step: open the photo, draw it smaller on a canvas and save
 // it as a JPG. Pixel work runs only in a browser; the page tests cover it.
+// Shared by Make a photo smaller and Photos to one PDF.
 
-import { openPhoto } from '../../photos/open';
-import type { ToolRunContext } from '../types';
-import type { How } from './run';
+import type { ToolRunContext } from '../tools/types';
+import { openPhoto } from './open';
 
-export async function shrinkOnCanvas(
-  file: File,
-  how: How,
-  context?: ToolRunContext,
-): Promise<Blob> {
+/** How small to make a photo: its longest side in pixels and the JPG quality (0 to 1). */
+export interface How {
+  longestSide: number;
+  quality: number;
+}
+/** A photo drawn the right way up, no bigger than `how` says, saved as a JPG with no details. */
+export type Shrink = (file: File, how: How, context?: ToolRunContext) => Promise<Blob>;
+
+/** The {@link Shrink} step on a real canvas. A photo already small enough keeps its size. */
+export const shrinkOnCanvas: Shrink = async (file, how, context) => {
   // Opening turns the photo the right way up by itself, so its width and height are as seen.
   // Where the browser can't open an iPhone photo (HEIC), the shared fallback does.
   const bitmap = await openPhoto(file, context);
@@ -43,7 +48,7 @@ export async function shrinkOnCanvas(
   } finally {
     bitmap.close();
   }
-}
+};
 
 function draw(from: CanvasImageSource, width: number, height: number) {
   const canvas = document.createElement('canvas');
