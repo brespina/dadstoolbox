@@ -1,0 +1,29 @@
+---
+// A small picture for each Category, so Tool rows are quick to scan.
+import type { Category } from '../tools/types';
+
+interface Props {
+  category: Category;
+}
+
+const paths: Record<Category, string> = {
+  Photos: 'M4 6h3l2-2h6l2 2h3v13H4z M12 9a4 4 0 1 0 0 8a4 4 0 1 0 0-8',
+  PDFs: 'M6 3h8l5 5v13H6z M14 3v5h5 M9 13h7 M9 17h7',
+  Video: 'M3 6h13v12H3z M16 10l5-3v10l-5-3',
+  Other: 'M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z',
+};
+---
+
+<svg
+  class="category-icon"
+  viewBox="0 0 24 24"
+  width="24"
+  height="24"
+  aria-hidden="true"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linejoin="round"
+>
+  <path d={paths[Astro.props.category]}></path>
+</svg>

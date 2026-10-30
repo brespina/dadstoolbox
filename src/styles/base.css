@@ -10,6 +10,9 @@
   --line: #d4d4d4;
   --focus: #b8410e;
   --surface: #f4f4f2;
+  --action: #0b57a4;
+  --action-text: #ffffff;
+  --problem: #a4161a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -21,6 +24,9 @@
     --line: #3a3a3a;
     --focus: #ffb27a;
     --surface: #1f1f1f;
+    --action: #8cc4ff;
+    --action-text: #141414;
+    --problem: #ff9b9b;
   }
 }
 
@@ -93,6 +99,19 @@ a {
 
 .muted {
   color: var(--muted);
+}
+
+/* Read by screen readers, not shown. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .site-footer {

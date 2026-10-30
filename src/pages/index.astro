@@ -1,10 +1,79 @@
 ---
 import SiteLayout from '../layouts/SiteLayout.astro';
+import CategoryIcon from '../components/CategoryIcon.astro';
+import ToolBlurb from '../components/ToolBlurb.svelte';
 import { text } from '../text';
+import { toolsByCategory } from '../tools/registry';
+import { sitePath } from '../site/paths';
+
+const groups = toolsByCategory();
 ---
 
 <SiteLayout title={text.home.title} description={text.home.promiseLine}>
   <h1>{text.siteName}</h1>
   <p>{text.home.promiseLine}</p>
-  <p class="muted">{text.home.noToolsYet}</p>
+  {groups.map(({ category, tools }) => (
+    <section aria-labelledby={`category-${category}`}>
+      <h2 id={`category-${category}`}>{text.categories[category]}</h2>
+      <ul class="tool-rows">
+        {tools.map((tool) => (
+          <li>
+            <a href={sitePath(tool.address)}>
+              <CategoryIcon category={tool.category} />
+              <span>
+                <span class="tool-name">{tool.name}</span>
+                {tool.needs.length > 0 ? (
+                  <ToolBlurb client:load blurb={tool.blurb} needs={tool.needs} />
+                ) : (
+                  <span class="tool-blurb">{tool.blurb}</span>
+                )}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
 </SiteLayout>
+
+<style>
+  .tool-rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .tool-rows a {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    min-height: 2.75rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--line);
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .tool-rows li:last-child a {
+    border-bottom: 1px solid var(--line);
+  }
+
+  :global(.category-icon) {
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+    color: var(--action);
+  }
+
+  .tool-name {
+    display: block;
+    color: var(--link);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  .tool-blurb {
+    display: block;
+    color: var(--muted);
+  }
+</style>
