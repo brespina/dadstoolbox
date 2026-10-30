@@ -65,6 +65,16 @@ describe('Remove photo location', () => {
     expect(failure).toBeInstanceOf(ToolFailure);
     expect((failure as ToolFailure).reason).toBe("This kind of photo doesn't carry a location.");
   });
+
+  it('points an iPhone photo (HEIC) to Change a photo to JPG for now', async () => {
+    // Its file type is often missing.
+    const heic = file(bytes('sample.heic'), 'sample.heic', '');
+    const failure = await run(heic, tool.defaultOptions).catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(ToolFailure);
+    expect((failure as ToolFailure).reason).toBe(
+      "This can't take the location out of an iPhone photo (HEIC) yet. Use Change a photo to JPG with Remove location ticked.",
+    );
+  });
 });
 
 /** Where the first photo details segment (APP1 "Exif") of a JPEG starts and ends. */
