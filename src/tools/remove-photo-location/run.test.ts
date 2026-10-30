@@ -62,6 +62,34 @@ describe('Remove photo location', () => {
     expect(readDetails(out.subarray(sample.length))?.dates).not.toEqual([]);
   });
 
+  it('takes out a location written as text, as photo editing apps do', async () => {
+    const sample = bytes('sample.jpg');
+    const text = new TextEncoder().encode(
+      'http://ns.adobe.com/xap/1.0/\0<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF>' +
+        '<rdf:Description exif:GPSLatitude="30,16.032N" exif:GPSLongitude = \'97,44.586W\'>' +
+        '<exif:GPSAltitude>150/1</exif:GPSAltitude>' +
+        '<exif:GPSAreaInformation rdf:parseType="Resource"><rdf:Alt>' +
+        '<rdf:li xml:lang="x-default">Austin</rdf:li></rdf:Alt></exif:GPSAreaInformation>' +
+        '<xmp:CreateDate>2024-06-01T10:30:00</xmp:CreateDate>' +
+        '</rdf:Description></rdf:RDF></x:xmpmeta>',
+    );
+    const segment = new Uint8Array([0xff, 0xe1, (text.length + 2) >> 8, (text.length + 2) & 0xff]);
+    // After the JFIF mark, before the other details.
+    const edited = new Uint8Array([
+      ...sample.subarray(0, 20),
+      ...segment,
+      ...text,
+      ...sample.subarray(20),
+    ]);
+    const out = await removed(file(edited, 'edited.jpg', 'image/jpeg'));
+    const written = new TextDecoder().decode(out);
+    for (const place of ['30,16.032N', '97,44.586W', '150/1', 'Austin']) {
+      expect(written).not.toContain(place);
+    }
+    expect(written).toContain('<xmp:CreateDate>2024-06-01T10:30:00</xmp:CreateDate>');
+    expect(out.length).toBe(edited.length);
+  });
+
   it('still saves a JPG that has no location, unchanged', async () => {
     const original = bytes('painted.jpg');
     const out = await removed(file(original, 'painted.jpg', 'image/jpeg'));
@@ -102,7 +130,7 @@ describe('Remove photo location', () => {
 
 /** Where the first photo details segment (APP1 "Exif") of a JPEG starts and ends. */
 function detailsSegment(jpeg: Uint8Array): [number, number] {
-  for (let at = 2; jpeg[at] === 0xff && jpeg[at + 1] !== 0xda; ) {
+  for (let at = 2; jpeg[at] === 0xff && jpeg[at + 1] !== 0xda;) {
     const end = at + 2 + ((jpeg[at + 2]! << 8) | jpeg[at + 3]!);
     if (jpeg[at + 1] === 0xe1) return [at, end];
     at = end;

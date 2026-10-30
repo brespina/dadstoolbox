@@ -298,22 +298,54 @@ function blankLocation(tiff: Uint8Array): void {
 
 const isTiff = (bytes: Uint8Array) => ['II*\0', 'MM\0*'].includes(ascii(bytes, 0, 4));
 
+const xmpPrefix = 'http://ns.adobe.com/xap/1.0/\0';
+/** Location fields in XMP text: an attribute's value, or an element's whole content. */
+const xmpLocation = [/\w+:GPS\w*\s*=\s*(["'])[^]*?\1/g, /<(\w+:GPS\w*)[^>]*>[^]*?<\/\1>/g];
+
+/**
+ * Takes the location out of XMP text in place, the details some photo apps write as
+ * text. Each value becomes spaces, so the text keeps its length and stays readable.
+ */
+function blankXmpLocation(xmp: Uint8Array): void {
+  // One character per byte, so places in the text are places in the bytes.
+  let text = '';
+  for (const byte of xmp) text += String.fromCharCode(byte);
+  for (const pattern of xmpLocation) {
+    for (const found of text.matchAll(pattern)) {
+      // Blank the text between tags and inside quotes, keeping the names and marks.
+      const opening = found[0].startsWith('<') ? found[0].indexOf('>') : found[0].search(/["']/);
+      const start = found.index + opening + 1;
+      const end = found.index + found[0].length;
+      for (let at = start, inTag = false; at < end; at++) {
+        const c = text[at];
+        if (c === '<') inTag = true;
+        else if (c === '>') inTag = false;
+        else if (!inTag && !`"'`.includes(c!)) xmp[at] = 0x20;
+      }
+    }
+  }
+}
+
 /**
  * A copy of a JPEG with the location taken out of its photo details, byte for byte
  * the same otherwise: the same length, picture and date taken. Every set of details in
- * the file is cleaned, including those of extra pictures stored after the main one.
+ * the file is cleaned, including those of extra pictures stored after the main one,
+ * and a location some photo apps also write as text (XMP).
  * A JPEG with no location comes back unchanged.
  */
 export function jpegWithoutLocation(jpeg: Uint8Array): Uint8Array {
   const copy = jpeg.slice();
   const view = new DataView(copy.buffer);
   // The picture's own bytes can never hold FF E1, so every match is a details segment.
-  for (let at = 2; at + 18 <= copy.length; at++) {
-    if (copy[at] !== 0xff || copy[at + 1] !== 0xe1 || ascii(copy, at + 4, 6) !== exifPrefix) {
-      continue;
+  for (let at = 2; at + 4 <= copy.length; at++) {
+    if (copy[at] !== 0xff || copy[at + 1] !== 0xe1) continue;
+    const segment = copy.subarray(at + 4, at + 2 + view.getUint16(at + 2));
+    if (ascii(segment, 0, exifPrefix.length) === exifPrefix) {
+      const tiff = segment.subarray(exifPrefix.length);
+      if (isTiff(tiff)) blankLocation(tiff);
+    } else if (ascii(segment, 0, xmpPrefix.length) === xmpPrefix) {
+      blankXmpLocation(segment);
     }
-    const tiff = copy.subarray(at + 10, at + 2 + view.getUint16(at + 2));
-    if (isTiff(tiff)) blankLocation(tiff);
   }
   return copy;
 }

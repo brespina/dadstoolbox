@@ -1,4 +1,4 @@
-import { isHeif, isJpeg,jpegWithoutLocation } from '../../photos/exif';
+import { isHeif, isJpeg, jpegWithoutLocation } from '../../photos/exif';
 import { ToolFailure, type ToolRun } from '../types';
 import { tool } from './declaration';
 
