@@ -119,7 +119,7 @@ describe('Remove photo location', () => {
 
   it('points an iPhone photo (HEIC) to Change a photo to JPG for now', async () => {
     // Its file type is often missing.
-    const heic = file(bytes('sample.heic'), 'sample.heic', '');
+    const heic = file(bytes('iphone.heic'), 'iphone.heic', '');
     const failure = await run(heic, tool.defaultOptions).catch((e: unknown) => e);
     expect(failure).toBeInstanceOf(ToolFailure);
     expect((failure as ToolFailure).reason).toBe(
