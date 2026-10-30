@@ -1,3 +1,8 @@
+/** Fills a text's {placeholders}, as in fillText('Remove {name}', { name: 'a.pdf' }). */
+export function fillText(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key]));
+}
+
 // All shared text a visitor reads. The banned-words test scans everything here,
 // so keep addresses and other non-reading values out (see links.ts).
 

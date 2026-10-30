@@ -5,7 +5,7 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures';
 import { discoverTools } from '../../src/tools/discover';
-import { text } from '../../src/text';
+import { fillText, text } from '../../src/text';
 
 const tools = await discoverTools();
 if (tools.length === 0) throw new Error('No Tools found in src/tools');
@@ -29,7 +29,7 @@ for (const { tool, folder } of tools) {
       await expect(page.getByRole('link', { name: text.tool.backLink })).toBeVisible();
 
       const chooser = page.waitForEvent('filechooser');
-      await page.getByText(text.tool.choose.replace('{noun}', tool.noun.many)).click();
+      await page.getByText(fillText(text.tool.choose, { noun: tool.noun.many })).click();
       await (await chooser).setFiles(join(folder, sample!));
       await expect(page.getByText(sample!)).toBeVisible();
 

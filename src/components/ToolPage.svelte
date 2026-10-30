@@ -2,8 +2,13 @@
   // The interactive part of every Tool page. The shared Batch logic holds the state;
   // this only shows it and passes on what the visitor does.
   import { onMount, type Component } from 'svelte';
-  import { text } from '../text';
-  import { createSession, type ItemStatus, type SessionState } from '../tools/batch';
+  import { fillText as fill, text } from '../text';
+  import {
+    createToolPage,
+    type BatchItem,
+    type ItemStatus,
+    type ToolPageState,
+  } from '../tools/batch';
   import { toolAt } from '../tools/registry';
   import type { ToolRun } from '../tools/types';
   import { saveFiles, type SavableFile } from '../site/save';
@@ -31,16 +36,19 @@
   let runPromise: Promise<ToolRun<object>> | undefined;
   const getRun = () => (runPromise ??= loadRun().then((module) => module.run));
 
-  const session = createSession(tool, async (file, options) => (await getRun())(file, options));
+  const toolPage = createToolPage(tool, async (file, options) => (await getRun())(file, options));
 
   let options = $state(structuredClone(tool.defaultOptions));
-  let state: SessionState = $state.raw(session.state());
-  let announcement = $state('');
+  let state: ToolPageState = $state.raw(toolPage.state());
+  // Each status change is added as its own line, so none is lost when the next comes fast.
+  let announcements: { id: number; text: string }[] = $state([]);
   let hydrated = $state(false);
 
-  const statusText = (status: ItemStatus) => text.tool.status[status];
-  const fill = (template: string, values: Record<string, string | number>) =>
-    template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key]));
+  /** "Done", or "Didn't work. <reason>". */
+  const statusLine = (item: Pick<BatchItem, 'status' | 'reason'>) =>
+    item.status === 'failed'
+      ? `${text.tool.status.failed}. ${item.reason}`
+      : text.tool.status[item.status];
 
   onMount(() => {
     hydrated = true;
@@ -48,25 +56,23 @@
     getRun().catch((error: unknown) => console.error('Could not load the Tool', error));
 
     const lastStatus = new Map<number, ItemStatus>();
-    return session.subscribe((next) => {
+    let nextAnnouncement = 1;
+    return toolPage.subscribe((next) => {
       state = next;
       // One polite announcement per row status change.
       for (const item of next.batches.flatMap((batch) => batch.items)) {
         const before = lastStatus.get(item.id);
         lastStatus.set(item.id, item.status);
         if (before === undefined || before === item.status) continue;
-        const status =
-          item.status === 'failed'
-            ? `${statusText('failed')}. ${item.reason}`
-            : statusText(item.status);
-        announcement = fill(text.tool.announcement, { name: item.name, status });
+        const line = fill(text.tool.announcement, { name: item.name, status: statusLine(item) });
+        announcements = [...announcements, { id: nextAnnouncement++, text: line }];
       }
     });
   });
 
-  function chose(event: Event) {
+  function onChoose(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
-    session.add(input.files ?? []);
+    toolPage.add(input.files ?? []);
     // Clear the picker so choosing the same file again still counts.
     input.value = '';
   }
@@ -75,7 +81,7 @@
     saveFiles(files).catch((error: unknown) => console.error('Could not save', error));
 
   let newest = $derived(state.batches[0]);
-  let saveAllFiles = $derived(newest ? session.saveAllFiles() : []);
+  let saveAllFiles = $derived(newest ? toolPage.saveAllFiles() : []);
 </script>
 
 <div class="tool">
@@ -88,7 +94,7 @@
       multiple
       accept={tool.accept.join(',')}
       disabled={!hydrated}
-      onchange={chose}
+      onchange={onChoose}
     />
     {fill(text.tool.choose, { noun: tool.noun.many })}
   </label>
@@ -101,13 +107,13 @@
           <li class="row">
             <div class="row-text">
               <span class="file-name">{file.name}</span>
-              <span class="muted">{formatSize(file.size)} · {statusText(file.status)}</span>
+              <span class="muted">{formatSize(file.size)} · {statusLine(file)}</span>
             </div>
             <button
               type="button"
               class="small-button"
               aria-label={fill(text.tool.removeLabel, { name: file.name })}
-              onclick={() => session.remove(file.id)}>{text.tool.remove}</button
+              onclick={() => toolPage.remove(file.id)}>{text.tool.remove}</button
             >
           </li>
         {/each}
@@ -119,7 +125,7 @@
     type="button"
     class="big-button start"
     disabled={!hydrated || state.waiting.length === 0 || state.working}
-    onclick={() => session.start($state.snapshot(options))}>{tool.startButton}</button
+    onclick={() => toolPage.start($state.snapshot(options))}>{tool.startButton}</button
   >
 
   {#if newest?.progress}
@@ -129,7 +135,7 @@
       <p class="moving">{fill(text.tool.progress, newest.progress)}</p>
       <p class="still">{text.tool.working}</p>
     </div>
-  {:else if newest}
+  {:else if saveAllFiles.length > 0}
     <p class="all-done">{tool.allDone}</p>
   {/if}
 
@@ -149,7 +155,7 @@
             <div class="row-text">
               <span class="file-name">{item.name}</span>
               <span class:failed={item.status === 'failed'}>
-                {statusText(item.status)}{item.status === 'failed' ? `. ${item.reason}` : ''}
+                {statusLine(item)}
               </span>
             </div>
             {#if item.results.length > 0}
@@ -176,7 +182,11 @@
     </section>
   {/each}
 
-  <div class="visually-hidden" aria-live="polite">{announcement}</div>
+  <div class="visually-hidden" aria-live="polite">
+    {#each announcements as announcement (announcement.id)}
+      <p>{announcement.text}</p>
+    {/each}
+  </div>
 </div>
 
 <style>

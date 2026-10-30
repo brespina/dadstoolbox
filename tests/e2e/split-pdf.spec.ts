@@ -20,7 +20,9 @@ test('a locked PDF says why on its own row, and the other file carries on', asyn
   await page.getByRole('button', { name: 'Split into pages' }).click();
 
   await expect(
-    page.getByText("Didn't work. This PDF has a password. Remove it and try again."),
+    page.getByText("Didn't work. This PDF has a password. Remove it and try again.", {
+      exact: true,
+    }),
   ).toBeVisible();
   for (const name of ['sample_dtb_page1.pdf', 'sample_dtb_page2.pdf', 'sample_dtb_page3.pdf']) {
     await expect(page.getByRole('button', { name: `Save ${name}` })).toBeVisible();
@@ -30,7 +32,12 @@ test('a locked PDF says why on its own row, and the other file carries on', asyn
   const live = page.locator('[aria-live]');
   await expect(live).toHaveCount(1);
   await expect(live).toHaveAttribute('aria-live', 'polite');
-  await expect(live).toHaveText('sample.pdf: Done');
+  await expect(live.getByText('sample.pdf: Done')).toHaveCount(1);
+  await expect(
+    live.getByText(
+      "sample-password.pdf: Didn't work. This PDF has a password. Remove it and try again.",
+    ),
+  ).toHaveCount(1);
 });
 
 test('Remove takes a file off the waiting list', async ({ page }) => {

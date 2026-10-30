@@ -6,7 +6,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { ToolDeclaration } from './types';
 
-export const toolsFolder = fileURLToPath(new URL('.', import.meta.url));
+const toolsFolder = fileURLToPath(new URL('.', import.meta.url));
 
 /** Each Tool's declaration and its folder. */
 export async function discoverTools(): Promise<{ tool: ToolDeclaration; folder: string }[]> {

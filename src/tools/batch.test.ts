@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createSession, type SessionState } from './batch';
+import { createToolPage, type ToolPageState } from './batch';
 import { defineTool, ToolFailure } from './types';
 
 const tool = defineTool({
@@ -23,33 +23,33 @@ const file = (name: string, size = 10) => new File(['x'.repeat(size)], name);
 
 describe('waiting list', () => {
   it('shows chosen files as Ready, in the order chosen', () => {
-    const session = createSession(tool, async () => []);
-    session.add([file('a.txt'), file('b.txt')]);
-    expect(session.state().waiting.map((w) => [w.name, w.status])).toEqual([
+    const page = createToolPage(tool, async () => []);
+    page.add([file('a.txt'), file('b.txt')]);
+    expect(page.state().waiting.map((w) => [w.name, w.status])).toEqual([
       ['a.txt', 'ready'],
       ['b.txt', 'ready'],
     ]);
   });
 
   it('removes a file without touching the others', () => {
-    const session = createSession(tool, async () => []);
-    session.add([file('a.txt'), file('b.txt'), file('c.txt')]);
-    const b = session.state().waiting[1]!;
-    session.remove(b.id);
-    expect(session.state().waiting.map((w) => w.name)).toEqual(['a.txt', 'c.txt']);
+    const page = createToolPage(tool, async () => []);
+    page.add([file('a.txt'), file('b.txt'), file('c.txt')]);
+    const b = page.state().waiting[1]!;
+    page.remove(b.id);
+    expect(page.state().waiting.map((w) => w.name)).toEqual(['a.txt', 'c.txt']);
   });
 
   it('empties once start is pressed, and a removed file is never run', async () => {
     const ran: string[] = [];
-    const session = createSession(tool, async (f) => {
+    const page = createToolPage(tool, async (f) => {
       ran.push(f.name);
       return [];
     });
-    session.add([file('a.txt'), file('b.txt')]);
-    session.remove(session.state().waiting[0]!.id);
-    await session.start({});
+    page.add([file('a.txt'), file('b.txt')]);
+    page.remove(page.state().waiting[0]!.id);
+    await page.start({});
     expect(ran).toEqual(['b.txt']);
-    expect(session.state().waiting).toEqual([]);
+    expect(page.state().waiting).toEqual([]);
   });
 });
 
@@ -60,10 +60,10 @@ const pdf = (detail?: string) => ({
 
 describe('a Batch', () => {
   it('has a row per file that ends Done, with its results named after the original', async () => {
-    const session = createSession(tool, async () => [pdf('page1'), pdf('page2')]);
-    session.add([file('report.pdf', 3800)]);
-    await session.start({});
-    const [batch] = session.state().batches;
+    const page = createToolPage(tool, async () => [pdf('page1'), pdf('page2')]);
+    page.add([file('report.pdf', 3800)]);
+    await page.start({});
+    const [batch] = page.state().batches;
     expect(batch!.items).toMatchObject([
       {
         name: 'report.pdf',
@@ -80,11 +80,11 @@ describe('a Batch', () => {
 
 describe('watching a Batch', () => {
   it('reports each row going Ready → Working… → Done, with progress counts', async () => {
-    const session = createSession(tool, async () => [pdf()]);
-    const seen: SessionState[] = [];
-    session.subscribe((state) => seen.push(state));
-    session.add([file('a.pdf'), file('b.pdf')]);
-    await session.start({});
+    const page = createToolPage(tool, async () => [pdf()]);
+    const seen: ToolPageState[] = [];
+    page.subscribe((state) => seen.push(state));
+    page.add([file('a.pdf'), file('b.pdf')]);
+    await page.start({});
 
     const during = seen.filter((s) => s.batches.length > 0);
     const statusesOf = (index: number) => [
@@ -100,33 +100,33 @@ describe('watching a Batch', () => {
   });
 
   it('labels each Batch with how many files it holds', async () => {
-    const session = createSession(tool, async () => [pdf()]);
-    session.add([file('a.pdf')]);
-    await session.start({});
-    session.add([file('b.pdf'), file('c.pdf')]);
-    await session.start({});
-    expect(session.state().batches.map((b) => b.label)).toEqual(['2 files', '1 file']);
+    const page = createToolPage(tool, async () => [pdf()]);
+    page.add([file('a.pdf')]);
+    await page.start({});
+    page.add([file('b.pdf'), file('c.pdf')]);
+    await page.start({});
+    expect(page.state().batches.map((b) => b.label)).toEqual(['2 files', '1 file']);
   });
 
   it('stops telling a listener once it unsubscribes', () => {
-    const session = createSession(tool, async () => []);
+    const page = createToolPage(tool, async () => []);
     let calls = 0;
-    const stop = session.subscribe(() => calls++);
-    session.add([file('a.pdf')]);
+    const stop = page.subscribe(() => calls++);
+    page.add([file('a.pdf')]);
     stop();
-    session.add([file('b.pdf')]);
+    page.add([file('b.pdf')]);
     expect(calls).toBe(1);
   });
 });
 
 describe('Save all', () => {
   it('covers every result of the newest Batch only', async () => {
-    const session = createSession(tool, async () => [pdf('page1'), pdf('page2')]);
-    session.add([file('old.pdf')]);
-    await session.start({});
-    session.add([file('a.pdf'), file('b.pdf')]);
-    await session.start({});
-    expect(session.saveAllFiles().map((r) => r.name)).toEqual([
+    const page = createToolPage(tool, async () => [pdf('page1'), pdf('page2')]);
+    page.add([file('old.pdf')]);
+    await page.start({});
+    page.add([file('a.pdf'), file('b.pdf')]);
+    await page.start({});
+    expect(page.saveAllFiles().map((r) => r.name)).toEqual([
       'a_dtb_page1.pdf',
       'a_dtb_page2.pdf',
       'b_dtb_page1.pdf',
@@ -135,7 +135,7 @@ describe('Save all', () => {
   });
 
   it('has nothing to save before any Batch', () => {
-    expect(createSession(tool, async () => []).saveAllFiles()).toEqual([]);
+    expect(createToolPage(tool, async () => []).saveAllFiles()).toEqual([]);
   });
 });
 
@@ -146,10 +146,10 @@ describe('a file that fails', () => {
   };
 
   it("shows the Tool's own reason on its row only, and other files carry on", async () => {
-    const session = createSession(tool, runFailing(new ToolFailure('This PDF has a password.')));
-    session.add([file('bad.pdf'), file('good.pdf')]);
-    await session.start({});
-    expect(session.state().batches[0]!.items).toMatchObject([
+    const page = createToolPage(tool, runFailing(new ToolFailure('This PDF has a password.')));
+    page.add([file('bad.pdf'), file('good.pdf')]);
+    await page.start({});
+    expect(page.state().batches[0]!.items).toMatchObject([
       { name: 'bad.pdf', status: 'failed', reason: 'This PDF has a password.', results: [] },
       { name: 'good.pdf', status: 'done', results: [{ name: 'good_dtb.pdf' }] },
     ]);
@@ -157,10 +157,10 @@ describe('a file that fails', () => {
 
   it('shows the shared reason for any other error, with the detail in the console only', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const session = createSession(tool, runFailing(new TypeError('xref table broken')));
-    session.add([file('bad.pdf'), file('good.pdf')]);
-    await session.start({});
-    const [bad, good] = session.state().batches[0]!.items;
+    const page = createToolPage(tool, runFailing(new TypeError('xref table broken')));
+    page.add([file('bad.pdf'), file('good.pdf')]);
+    await page.start({});
+    const [bad, good] = page.state().batches[0]!.items;
     expect(bad).toMatchObject({
       status: 'failed',
       reason: 'This file may be damaged or not supported.',
@@ -173,10 +173,10 @@ describe('a file that fails', () => {
 
 describe('result names', () => {
   const namesFrom = async (names: string[], results: () => ReturnType<typeof pdf>[]) => {
-    const session = createSession(tool, async () => results());
-    session.add(names.map((n) => file(n)));
-    await session.start({});
-    return session.state().batches[0]!.items.flatMap((i) => i.results.map((r) => r.name));
+    const page = createToolPage(tool, async () => results());
+    page.add(names.map((n) => file(n)));
+    await page.start({});
+    return page.state().batches[0]!.items.flatMap((i) => i.results.map((r) => r.name));
   };
 
   it('add _dtb when there is no detail', async () => {
@@ -185,10 +185,10 @@ describe('result names', () => {
 
   it('take the extension from the result, not the original', async () => {
     const jpg = { blob: new Blob(['x'], { type: 'image/jpeg' }) };
-    const session = createSession(tool, async () => [jpg]);
-    session.add([file('IMG_1234.HEIC')]);
-    await session.start({});
-    expect(session.state().batches[0]!.items[0]!.results[0]!.name).toBe('IMG_1234_dtb.jpg');
+    const page = createToolPage(tool, async () => [jpg]);
+    page.add([file('IMG_1234.HEIC')]);
+    await page.start({});
+    expect(page.state().batches[0]!.items[0]!.results[0]!.name).toBe('IMG_1234_dtb.jpg');
   });
 
   it('get _2 and _3 when chosen files share a name', async () => {
@@ -198,12 +198,12 @@ describe('result names', () => {
   });
 
   it('stay different from names in earlier Batches', async () => {
-    const session = createSession(tool, async () => [pdf()]);
-    session.add([file('report.pdf')]);
-    await session.start({});
-    session.add([file('report.pdf')]);
-    await session.start({});
-    const [newest, oldest] = session.state().batches;
+    const page = createToolPage(tool, async () => [pdf()]);
+    page.add([file('report.pdf')]);
+    await page.start({});
+    page.add([file('report.pdf')]);
+    await page.start({});
+    const [newest, oldest] = page.state().batches;
     expect(oldest!.items[0]!.results[0]!.name).toBe('report_dtb.pdf');
     expect(newest!.items[0]!.results[0]!.name).toBe('report_dtb_2.pdf');
   });

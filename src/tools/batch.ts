@@ -43,15 +43,13 @@ export interface Batch {
   progress: { current: number; total: number } | null;
 }
 
-export interface SessionState {
+export interface ToolPageState {
   waiting: WaitingFile[];
   /** Newest first. */
   batches: Batch[];
   /** True while a Batch is being worked on. */
   working: boolean;
 }
-
-export type Session<Options extends object> = ReturnType<typeof createSession<Options>>;
 
 const extensions: Record<string, string> = {
   'application/pdf': 'pdf',
@@ -70,7 +68,7 @@ function splitName(name: string) {
  * The state of one Tool page. Every change hands listeners a fresh snapshot, so the
  * page can show it as it is.
  */
-export function createSession<Options extends object>(
+export function createToolPage<Options extends object>(
   tool: ToolDeclaration<Options>,
   run: ToolRun<Options>,
 ) {
@@ -81,9 +79,9 @@ export function createSession<Options extends object>(
   let batches: Batch[] = [];
   let working = false;
   const takenNames = new Set<string>();
-  const listeners = new Set<(state: SessionState) => void>();
+  const listeners = new Set<(state: ToolPageState) => void>();
 
-  const state = (): SessionState => ({
+  const state = (): ToolPageState => ({
     waiting: waiting.map(({ entry }) => entry),
     batches,
     working,
@@ -140,7 +138,7 @@ export function createSession<Options extends object>(
     state,
 
     /** Calls `listener` with a new snapshot on every change. Returns a stop function. */
-    subscribe(listener: (state: SessionState) => void) {
+    subscribe(listener: (state: ToolPageState) => void) {
       listeners.add(listener);
       return () => void listeners.delete(listener);
     },
@@ -167,7 +165,7 @@ export function createSession<Options extends object>(
     async start(options: Options) {
       if (working || waiting.length === 0) return;
       working = true;
-      const jobs = waiting.map(({ file }) => {
+      const work = waiting.map(({ file }) => {
         const item: BatchItem = {
           id: nextId++,
           name: file.name,
@@ -178,19 +176,19 @@ export function createSession<Options extends object>(
         return { file, item };
       });
       waiting = [];
-      const total = jobs.length;
+      const total = work.length;
       batches = [
         {
           id: nextId++,
           label: `${total} ${total === 1 ? tool.noun.one : tool.noun.many}`,
-          items: jobs.map((job) => job.item),
+          items: work.map(({ item }) => item),
           progress: { current: 1, total },
         },
         ...batches,
       ];
       changed();
 
-      for (const [index, { file, item }] of jobs.entries()) {
+      for (const [index, { file, item }] of work.entries()) {
         updateNewest((batch) => ({ ...batch, progress: { current: index + 1, total } }));
         updateItem(item.id, { status: 'working' });
         await runOne(item, file, options);

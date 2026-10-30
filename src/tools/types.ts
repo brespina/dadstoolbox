@@ -6,7 +6,7 @@
 // - sample.<ext>: the file the generated page test chooses
 // Folders starting with "_" are skipped by discovery.
 
-import { text } from '../text';
+import { fillText, text } from '../text';
 
 /** The fixed, ordered list of Categories. */
 export const categories = ['Photos', 'PDFs', 'Video', 'Other'] as const;
@@ -65,7 +65,7 @@ export function defineTool<Options extends object>(
   input: ToolDeclarationInput<Options>,
 ): ToolDeclaration<Options> {
   return {
-    privacyLine: text.tool.privacyLine.replace('{noun}', input.noun.many),
+    privacyLine: fillText(text.tool.privacyLine, { noun: input.noun.many }),
     allDone: text.tool.allDone,
     reasons: {},
     ...input,
