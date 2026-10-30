@@ -87,11 +87,17 @@
   let supported = $state(true);
   let canChoose = $derived(hydrated && supported);
 
-  /** "Done", or "Didn't work. <reason>". */
-  const statusLine = (item: Pick<BatchItem, 'status' | 'reason'>) =>
-    item.status === 'failed'
-      ? fill(text.tool.failedLine, { reason: item.reason ?? text.tool.failedFallback })
-      : text.tool.status[item.status];
+  /** "Done", "Working… 40%", or "Didn't work. <reason>". */
+  const statusLine = (item: Pick<BatchItem, 'status' | 'reason' | 'percent'>) => {
+    if (item.status === 'failed')
+      return fill(text.tool.failedLine, { reason: item.reason ?? text.tool.failedFallback });
+    if (item.status === 'working' && item.percent !== undefined)
+      return fill(text.tool.workingPercent, { percent: item.percent });
+    return text.tool.status[item.status];
+  };
+
+  // How often a working row's percent is announced: at 25%, 50% and 75%, not every tick.
+  const announceEvery = 25;
 
   onMount(() => {
     hydrated = true;
@@ -101,16 +107,25 @@
     getRun().catch((error: unknown) => console.error('Could not load the Tool', error));
 
     const lastStatus = new Map<number, ItemStatus>();
+    const lastStep = new Map<number, number>();
     let nextAnnouncement = 1;
+    const announce = (item: BatchItem) => {
+      const line = fill(text.tool.announcement, { name: item.name, status: statusLine(item) });
+      announcements = [...announcements, { id: nextAnnouncement++, text: line }];
+    };
     return toolPage.subscribe((next) => {
       state = next;
-      // One polite announcement per row status change.
       for (const item of next.batches.flatMap((batch) => batch.items)) {
+        // One polite announcement per row status change.
         const before = lastStatus.get(item.id);
         lastStatus.set(item.id, item.status);
-        if (before === undefined || before === item.status) continue;
-        const line = fill(text.tool.announcement, { name: item.name, status: statusLine(item) });
-        announcements = [...announcements, { id: nextAnnouncement++, text: line }];
+        if (before !== undefined && before !== item.status) announce(item);
+        // And a few for a working row's percent, below 100 (Done comes next).
+        if (item.status !== 'working' || item.percent === undefined || item.percent >= 100)
+          continue;
+        const step = Math.floor(item.percent / announceEvery);
+        if (step > (lastStep.get(item.id) ?? 0)) announce(item);
+        lastStep.set(item.id, Math.max(step, lastStep.get(item.id) ?? 0));
       }
     });
   });

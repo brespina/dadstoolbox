@@ -3,8 +3,8 @@
 // video calls `remakeVideo` from its `run`, in the worker.
 //
 // It grows one setting at a time (spec #41): Make a video smaller adds a longest side,
-// Trim a video adds a time range, and the progress hook arrives with #48. Each one is a
-// new field of RemakeSettings.
+// Trim a video adds a time range, and `onProgress` reports how far along it is. Each one
+// is a new field of RemakeSettings.
 //
 // Mediabunny is big, so a Tool imports this module with a dynamic import() inside its
 // `run`, under context.gettingReady.
@@ -25,6 +25,8 @@ import type { VideoReasonKey } from './reasons';
 export interface RemakeSettings {
   /** The calling Tool's own copies of the shared video reasons (`tool.reasons`). */
   reasons: Readonly<Record<VideoReasonKey, Reason>>;
+  /** Called as the video is made, with how far along it is from 0 to 1 (`context.progress`). */
+  onProgress?: (fraction: number) => void;
 }
 
 /**
@@ -32,7 +34,10 @@ export interface RemakeSettings {
  * AAC is copied as is. It never drops the picture or the sound: when the browser can't
  * make either, it throws a ToolFailure with a plain reason instead.
  */
-export async function remakeVideo(file: Blob, { reasons }: RemakeSettings): Promise<Blob> {
+export async function remakeVideo(
+  file: Blob,
+  { reasons, onProgress }: RemakeSettings,
+): Promise<Blob> {
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   try {
     // An unknown kind of file throws here.
@@ -71,6 +76,7 @@ export async function remakeVideo(file: Blob, { reasons }: RemakeSettings): Prom
     // Such as Opus sound on a browser that can't make AAC: never save a silent video.
     if (dropped.includes('audio')) throw new ToolFailure(reasons.cantKeepSound);
 
+    if (onProgress) conversion.onProgress = (fraction) => onProgress(fraction);
     await conversion.execute();
     return new Blob([output.target.buffer!], { type: 'video/mp4' });
   } finally {

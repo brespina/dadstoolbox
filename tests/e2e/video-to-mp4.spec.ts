@@ -70,6 +70,31 @@ test.describe('with the video features', () => {
     });
   });
 
+  test('a long video shows a rising percentage, announced only now and then', async ({ page }) => {
+    // Note every percent the page shows, however briefly.
+    await page.evaluate(() => {
+      const seen: number[] = [];
+      (window as unknown as { seen: number[] }).seen = seen;
+      new MutationObserver(() => {
+        for (const match of document.body.textContent!.matchAll(/Working… (\d+)%/g)) {
+          const percent = Number(match[1]);
+          if (!seen.includes(percent)) seen.push(percent);
+        }
+      }).observe(document.body, { subtree: true, childList: true, characterData: true });
+    });
+    // A minute long.
+    await make(page, `${gifFolder}long.mp4`);
+    await expect(page.getByText(tool.allDone)).toBeVisible({ timeout: 60_000 });
+    const seen = await page.evaluate(() => (window as unknown as { seen: number[] }).seen);
+    expect(seen.length).toBeGreaterThan(3);
+    expect(seen).toEqual([...seen].sort((a, b) => a - b));
+    // The live region hears a few percents, not every one.
+    const heard = await page.locator('[aria-live="polite"] p').allTextContents();
+    const percents = heard.filter((line) => /\d+%/.test(line));
+    expect(percents.length).toBeGreaterThan(0);
+    expect(percents.length).toBeLessThanOrEqual(3);
+  });
+
   test('a turned video stays the right way up', async ({ page }) => {
     // Stored 640 × 360 and marked to be shown turned a quarter turn.
     await make(page, `${gifFolder}portrait.mp4`);

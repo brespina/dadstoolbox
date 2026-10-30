@@ -6,5 +6,12 @@ import { tool } from './declaration';
 export const run: ToolRun<typeof tool.defaultOptions> = async (file, _options, context) => {
   const loading = import('../../video/remake');
   const { remakeVideo } = await (context?.gettingReady(loading) ?? loading);
-  return [{ blob: await remakeVideo(file, { reasons: tool.reasons }) }];
+  return [
+    {
+      blob: await remakeVideo(file, {
+        reasons: tool.reasons,
+        onProgress: (fraction) => context?.progress(fraction),
+      }),
+    },
+  ];
 };
