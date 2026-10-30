@@ -1,3 +1,4 @@
+import { text } from '../../text';
 import { defineTool } from '../types';
 
 export const tool = defineTool({
@@ -13,7 +14,7 @@ export const tool = defineTool({
   largeFileLimit: 100_000_000,
   startButton: 'Split into pages',
   reasons: {
-    password: 'This PDF has a password. Remove it and try again.',
+    password: text.pdfs.password,
   },
   worker: false,
   outsideAddresses: [],
