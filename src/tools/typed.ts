@@ -1,6 +1,7 @@
 // Shared logic for Tools the person types into (input mode "none"), in plain TypeScript
 // with no page or framework code. There is no Choose or start button and no Batch: the
-// result is made again each time typing pauses, and only the newest one is kept.
+// result is made again each time typing pauses (or, for a Tool with no type box, each
+// time the options stop changing), and only the newest one is kept.
 
 import { fillText, text } from '../text';
 import { ToolFailure, type ToolDeclaration, type ToolTextRun } from './types';
@@ -22,7 +23,7 @@ export interface TypedToolPageState {
   result: TypedResult | null;
   /** Why there is no result: the Tool's own reason, or the shared one. */
   reason: string | null;
-  /** True from a keypress until its result is ready, so a stale result isn't saved. */
+  /** True from a change until its result is ready, so a stale result isn't saved. */
   updating: boolean;
 }
 
@@ -44,7 +45,7 @@ export function createTypedToolPage<Options extends object>(
   if (tool.input !== 'none') throw new Error(`"${tool.address}" is not a typed Tool`);
 
   let nextId = 1;
-  // Each keypress takes a new number; a result is only kept if its number is the newest.
+  // Each change takes a new number; a result is only kept if its number is the newest.
   let latest = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let current: TypedToolPageState = { result: null, reason: null, updating: false };

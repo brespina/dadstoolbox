@@ -4,7 +4,8 @@
 // - run.ts: exports `run`, the Tool's job, in plain TypeScript
 // - Options.svelte: the Tool's options, bound to an options object
 // - sample.<ext>: the file the generated page test chooses (sample.txt: the text it
-//   types, for input mode "none")
+//   types, for input mode "none"; sample.json: each field's value by its label, for a
+//   Tool with no type box)
 // Folders starting with "_" are skipped by discovery.
 
 import { fillText, text } from '../text';
