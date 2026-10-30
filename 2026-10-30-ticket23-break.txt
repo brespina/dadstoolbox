@@ -1,0 +1,7 @@
+Ticket 23 break note.
+
+My favourite part was the small PNG writer. Each pixel is one bit, stored without compression, and two decoders I didn't write (pngjs and jsQR) still read it back to the exact text, emoji included.
+
+The most confusing part was a port another worktree was already using. A bunch of tests failed with 404s until I noticed whose server was answering. Next time I'll check the port before I start reading test failures.
+
+PR #30 is with the reviewer now. Resting.
