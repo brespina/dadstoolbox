@@ -41,4 +41,10 @@ describe('Get the sound from a video', () => {
     expect(failure).toBeInstanceOf(ToolFailure);
     expect((failure as ToolFailure).reason).toBe(tool.reasons.cantCopy);
   });
+
+  it('says plainly when the file is not a video', async () => {
+    const failure = await failureOf(new File(['just some words'], 'notes.mp4'));
+    expect(failure).toBeInstanceOf(ToolFailure);
+    expect((failure as ToolFailure).reason).toBe(tool.reasons.notVideo);
+  });
 });

@@ -10,7 +10,10 @@ export const run: ToolRun<typeof tool.defaultOptions> = async (file, _options, c
 
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   try {
-    if (!(await input.getPrimaryAudioTrack())) throw new ToolFailure(tool.reasons.noSound!);
+    // An unknown kind of file throws here.
+    const tracks = await input.getTracks().catch(() => null);
+    if (!tracks) throw new ToolFailure(tool.reasons.notVideo!);
+    if (!tracks.some((track) => track.isAudioTrack())) throw new ToolFailure(tool.reasons.noSound!);
 
     const output = new Output({
       format: new Mp4OutputFormat({ fastStart: 'in-memory' }),
