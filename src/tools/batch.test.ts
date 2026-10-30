@@ -40,6 +40,15 @@ describe('waiting list', () => {
     expect(page.state().waiting.map((w) => w.name)).toEqual(['a.txt', 'c.txt']);
   });
 
+  it('flags a file bigger than the declared limit as large', () => {
+    const page = createToolPage(tool, async () => []);
+    page.add([file('small.txt', 1000), file('big.txt', 1001)]);
+    expect(page.state().waiting.map((w) => [w.name, w.large])).toEqual([
+      ['small.txt', false],
+      ['big.txt', true],
+    ]);
+  });
+
   it('empties once start is pressed, and a removed file is never run', async () => {
     const ran: string[] = [];
     const page = createToolPage(tool, async (f) => {

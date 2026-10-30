@@ -16,7 +16,9 @@
     "@astrojs/svelte": "^9.1.2",
     "astro": "^7.4.4",
     "comlink": "4.4.2",
+    "gifenc": "1.0.3",
     "heic-to": "1.6.7",
+    "mediabunny": "1.61.4",
     "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",
     "svelte": "^5.57.3"

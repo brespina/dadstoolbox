@@ -18,6 +18,10 @@ export interface WaitingFile {
   name: string;
   size: number;
   status: 'ready';
+  /** Bigger than the Tool's large-file limit, so its Ready row gets a note. */
+  large: boolean;
+  /** The chosen file itself, for a Tool's note on its Ready row. */
+  file: File;
 }
 
 export type ItemStatus = 'ready' | 'working' | 'done' | 'failed';
@@ -257,7 +261,14 @@ function makeToolPage<Options extends object>(
         // A result must never take a chosen file's name, so saving it can't replace one.
         take(file.name);
         chosen.push({
-          entry: { id: nextId++, name: file.name, size: file.size, status: 'ready' },
+          entry: {
+            id: nextId++,
+            name: file.name,
+            size: file.size,
+            status: 'ready',
+            large: file.size > tool.largeFileLimit,
+            file,
+          },
           file,
           ranWith: new Set(),
         });
