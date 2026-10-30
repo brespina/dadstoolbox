@@ -66,6 +66,11 @@ export const text = {
     remove: 'Remove',
     // {name} is the file name; for screen readers.
     removeLabel: 'Remove {name}',
+    // Set the order of files that are used together. {name} labels them for screen readers.
+    moveUp: '↑',
+    moveUpLabel: 'Move {name} up',
+    moveDown: '↓',
+    moveDownLabel: 'Move {name} down',
     waitingHeading: 'Ready to start',
     save: 'Save',
     saveLabel: 'Save {name}',

@@ -2,7 +2,13 @@
 // framework code. The Svelte Tool page only shows this state and calls its methods.
 
 import { text } from '../text';
-import { ToolFailure, type ToolDeclaration, type ToolResult, type ToolRun } from './types';
+import {
+  ToolFailure,
+  type ToolDeclaration,
+  type ToolResult,
+  type ToolRun,
+  type ToolRunTogether,
+} from './types';
 
 /** A chosen file on the waiting list. */
 export interface WaitingFile {
@@ -64,15 +70,33 @@ function splitName(name: string) {
   return dot > 0 ? { base: name.slice(0, dot), ext: name.slice(dot + 1) } : { base: name, ext: '' };
 }
 
+export type ToolPage<Options extends object> = ReturnType<typeof makeToolPage<Options>>;
+
 /**
  * The state of one Tool page. Every change hands listeners a fresh snapshot, so the
- * page can show it as it is.
+ * page can show it as it is. `run` takes one file, or for "all files together" the
+ * ordered list.
  */
 export function createToolPage<Options extends object>(
   tool: ToolDeclaration<Options>,
   run: ToolRun<Options>,
+): ToolPage<Options>;
+export function createToolPage<Options extends object>(
+  tool: ToolDeclaration<Options>,
+  run: ToolRunTogether<Options>,
+): ToolPage<Options>;
+export function createToolPage<Options extends object>(
+  tool: ToolDeclaration<Options>,
+  run: ToolRun<Options> | ToolRunTogether<Options>,
 ) {
-  if (tool.input !== 'each') throw new Error(`Input mode "${tool.input}" is not built yet`);
+  return makeToolPage(tool, run);
+}
+
+function makeToolPage<Options extends object>(
+  tool: ToolDeclaration<Options>,
+  run: ToolRun<Options> | ToolRunTogether<Options>,
+) {
+  if (tool.input === 'none') throw new Error(`Input mode "${tool.input}" is not built yet`);
 
   let nextId = 1;
   let waiting: { entry: WaitingFile; file: File }[] = [];
@@ -119,12 +143,13 @@ export function createToolPage<Options extends object>(
     return name;
   }
 
-  async function runOne(item: BatchItem, file: File, options: Options) {
+  /** Runs one row's work and records its named results, or why it didn't work. */
+  async function finish(item: BatchItem, original: string, work: () => Promise<ToolResult[]>) {
     try {
-      const results = await run(file, options);
+      const results = await work();
       const named = results.map((result) => ({
         id: nextId++,
-        name: nameResult(file.name, result),
+        name: nameResult(original, result),
         size: result.blob.size,
         blob: result.blob,
       }));
@@ -132,9 +157,42 @@ export function createToolPage<Options extends object>(
     } catch (error) {
       let reason: string = text.tool.failedFallback;
       if (error instanceof ToolFailure) reason = error.reason;
-      else console.error(`${tool.name}: ${file.name}`, error);
+      else console.error(`${tool.name}: ${item.name}`, error);
       updateItem(item.id, { status: 'failed', reason });
     }
+  }
+
+  const runOne = (item: BatchItem, file: File, options: Options) =>
+    finish(item, file.name, () => (run as ToolRun<Options>)(file, options));
+
+  const countLabel = (total: number) => `${total} ${total === 1 ? tool.noun.one : tool.noun.many}`;
+
+  /** All files together: one row and one run over the waiting list, in its order. */
+  async function startTogether(options: Options) {
+    const files = waiting.map(({ file }) => file);
+    waiting = [];
+    const item: BatchItem = {
+      id: nextId++,
+      name: files.map((f) => f.name).join(', '),
+      size: files.reduce((total, f) => total + f.size, 0),
+      status: 'ready',
+      results: [],
+    };
+    batches = [
+      {
+        id: nextId++,
+        label: countLabel(files.length),
+        items: [item],
+        progress: { current: 1, total: 1 },
+      },
+      ...batches,
+    ];
+    changed();
+    updateItem(item.id, { status: 'working' });
+    // Results of this mode are named after "combined", as in combined_dtb.pdf.
+    await finish(item, 'combined', () => (run as ToolRunTogether<Options>)(files, options));
+    working = false;
+    updateNewest((batch) => ({ ...batch, progress: null }));
   }
 
   return {
@@ -164,10 +222,21 @@ export function createToolPage<Options extends object>(
       changed();
     },
 
+    /** Moves a file one place up (-1) or down (1). The ends stay put. */
+    move(id: number, by: -1 | 1) {
+      const from = waiting.findIndex(({ entry }) => entry.id === id);
+      const to = from + by;
+      if (from < 0 || to < 0 || to >= waiting.length) return;
+      waiting = waiting.slice();
+      [waiting[from], waiting[to]] = [waiting[to]!, waiting[from]!];
+      changed();
+    },
+
     /** The start button: makes a new Batch on top from the waiting list and works through it. */
     async start(options: Options) {
       if (working || waiting.length === 0) return;
       working = true;
+      if (tool.input === 'together') return startTogether(options);
       const work = waiting.map(({ file }) => {
         const item: BatchItem = {
           id: nextId++,
@@ -183,7 +252,7 @@ export function createToolPage<Options extends object>(
       batches = [
         {
           id: nextId++,
-          label: `${total} ${total === 1 ? tool.noun.one : tool.noun.many}`,
+          label: countLabel(total),
           items: work.map(({ item }) => item),
           progress: { current: 1, total },
         },

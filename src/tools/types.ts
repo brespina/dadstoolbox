@@ -100,6 +100,12 @@ export type ToolRun<Options extends object = object> = (
   options: Options,
 ) => Promise<ToolResult[]>;
 
+/** A Tool's job for all chosen files at once, in the order set (input mode "together"). */
+export type ToolRunTogether<Options extends object = object> = (
+  files: File[],
+  options: Options,
+) => Promise<ToolResult[]>;
+
 /**
  * Thrown by `run` with a plain-language reason the Tool wrote itself, shown on that
  * file's row. Any other error shows the shared fallback.
