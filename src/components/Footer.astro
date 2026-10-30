@@ -1,9 +1,9 @@
 ---
 import { text } from '../text';
 import { links } from '../links';
+import { sitePath } from '../site/paths';
 
-// BASE_URL may or may not end in a slash, so join and then collapse any double slash.
-const promisePath = `${import.meta.env.BASE_URL}/promise/`.replace(/\/+/g, '/');
+const promisePath = sitePath('promise');
 ---
 
 <footer class="site-footer">

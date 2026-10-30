@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { bannedWordsIn, allStrings } from './wording';
 import { text } from './text';
+import { tools } from './tools/registry';
+import { declarationText } from './tools/types';
 
 describe('bannedWordsIn', () => {
   it.each([
@@ -48,4 +50,17 @@ describe('shared text', () => {
   it.each(allStrings(text))('%j uses only plain words', (line) => {
     expect(bannedWordsIn(line)).toEqual([]);
   });
+});
+
+describe('Tool declarations', () => {
+  it('finds at least one Tool', () => {
+    expect(tools.length).toBeGreaterThan(0);
+  });
+
+  it.each(tools.flatMap((tool) => declarationText(tool).map((line) => [tool.address, line])))(
+    '%s: %j uses only plain words',
+    (_address, line) => {
+      expect(bannedWordsIn(line)).toEqual([]);
+    },
+  );
 });

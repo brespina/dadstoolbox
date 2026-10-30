@@ -1,3 +1,8 @@
+/** Fills a text's {placeholders}, as in fillText('Remove {name}', { name: 'a.pdf' }). */
+export function fillText(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key]));
+}
+
 // All shared text a visitor reads. The banned-words test scans everything here,
 // so keep addresses and other non-reading values out (see links.ts).
 
@@ -10,7 +15,13 @@ export const text = {
     // Shown under the Site name, and used as the page description for search engines.
     promiseLine:
       'Free tools for your files. No sign-up, no ads, and your files stay on your device.',
-    noToolsYet: 'Tools are coming soon.',
+  },
+  // Category headings on the home page, in their fixed order.
+  categories: {
+    Photos: 'Photos',
+    PDFs: 'PDFs',
+    Video: 'Video',
+    Other: 'Other',
   },
   promisePage: {
     title: "Our promise: Dad's Toolbox",
@@ -43,6 +54,38 @@ export const text = {
       host: "The Site is hosted by GitHub. Like any website host, GitHub may keep basic visit records for security. We can't see them and don't use them.",
       hostLink: "Read GitHub's privacy statement",
     },
+  },
+  tool: {
+    // The browser tab title. {name} is the Tool's name, {siteName} the Site's.
+    pageTitle: '{name}: {siteName}',
+    backLink: 'All tools',
+    // {noun} is the Tool's noun, such as "PDFs".
+    privacyLine: 'Your {noun} stay on your device. They are never sent anywhere.',
+    allDone: 'All done.',
+    choose: 'Choose {noun}',
+    remove: 'Remove',
+    // {name} is the file name; for screen readers.
+    removeLabel: 'Remove {name}',
+    waitingHeading: 'Ready to start',
+    save: 'Save',
+    saveLabel: 'Save {name}',
+    saveAll: 'Save all',
+    // {current} and {total} count files in the Batch.
+    progress: 'Working on {current} of {total}…',
+    // Shown instead of the moving progress bar when reduced motion is on.
+    working: 'Working…',
+    status: {
+      ready: 'Ready',
+      working: 'Working…',
+      done: 'Done',
+      failed: "Didn't work",
+    },
+    // {name} is the file name and {status} its new status.
+    announcement: '{name}: {status}',
+    // A row that didn't work. {reason} is the Tool's own reason, or failedFallback.
+    failedLine: "Didn't work. {reason}",
+    // The reason shown when the Tool gave none of its own.
+    failedFallback: 'This file may be damaged or not supported.',
   },
   footer: {
     label: 'More about the Site',
