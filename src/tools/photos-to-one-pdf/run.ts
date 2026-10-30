@@ -1,6 +1,7 @@
 import { PDFDocument, PageSizes } from 'pdf-lib';
+import { isHeif } from '../../photos/exif';
 import { shrinkOnCanvas, type Shrink } from '../../photos/shrink';
-import type { ToolRunTogether } from '../types';
+import { fillReason, ToolFailure, type ToolRunTogether } from '../types';
 import { tool } from './declaration';
 
 /**
@@ -16,7 +17,13 @@ export function makeRun(draw: Shrink): ToolRunTogether<typeof tool.defaultOption
   return async (files, _options, context) => {
     const pdf = await PDFDocument.create();
     for (const file of files) {
-      const drawn = await draw(file, how, context);
+      const drawn = await draw(file, how, context).catch(async (error: unknown) => {
+        // Neither the browser nor the late-loaded decoder could open this iPhone photo.
+        if (isHeif(new Uint8Array(await file.arrayBuffer()))) {
+          throw new ToolFailure(fillReason(tool.reasons.heic!, { name: file.name }));
+        }
+        throw error;
+      });
       // The drawn photo is already the right way up, so its own size says which way it faces.
       const image = await pdf.embedJpg(new Uint8Array(await drawn.arrayBuffer()));
       const [short, long] = PageSizes.Letter;
