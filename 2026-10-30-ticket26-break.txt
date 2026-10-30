@@ -1,0 +1,8 @@
+Break after #26 (license credits).
+
+No preview servers left running on 5026; checked before writing this.
+
+The part I liked best was the sourcemaps settling the question of what
+actually ships, instead of trusting a list. The loose end I'm leaving alone
+is libde265: heic-to's README and libheif's build script disagree on its
+version, so the page doesn't show one rather than guess.
