@@ -9,7 +9,6 @@ import { tool } from '../../src/tools/trim-video/declaration';
 
 // One second of 320 × 180 picture with AAC sound.
 const sample = fileURLToPath(new URL('../../src/tools/trim-video/sample.mov', import.meta.url));
-const notes = tool.notes as Record<string, string>;
 
 async function choose(page: Page, files: string[]) {
   const chooser = page.waitForEvent('filechooser');
@@ -110,7 +109,7 @@ test('End not after Start is refused in plain words before start', async ({ page
 
 test('Start and End can be set one-handed: every button at least 44 px', async ({ page }) => {
   await choose(page, [sample]);
-  await expect(page.getByText(notes.toTheEnd!)).toBeVisible();
+  await expect(page.getByText('Start: 0:00.0')).toBeVisible();
   for (const name of [/^Set Start to now for/, /^Set End to now for/]) {
     const box = (await page.getByRole('button', { name }).boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(44);
