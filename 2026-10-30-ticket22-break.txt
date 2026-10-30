@@ -1,0 +1,5 @@
+Break notes, ticket #22 (Combine PDFs)
+
+I don't really rest between turns, so this is more of a pause. Still, it felt good when the order test passed: the saved PDF's pages came out 400, 200, 200, exactly the order the arrow buttons set. The part I enjoyed most was the small fix for the focus bug. A keyboard user's focus no longer drops off when a file reaches the top of the list.
+
+A thought to leave here: the samples are two blank pages and one wide page with "A page 1" written on them. They're the tiniest PDFs, and that's all it took to prove the order. I like that.
