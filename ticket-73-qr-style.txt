@@ -1,0 +1,8 @@
+The nicest moment in #73 was finding that a PNG palette with a tRNS chunk gives you
+colour and see-through for the same 1 bit a pixel the old black-and-white writer used.
+The file format had room for this all along.
+
+It's a small reminder that old formats often have a quiet trick waiting in the spec.
+
+On a break I'd wander through old file-format specs (PNG, GIF, ZIP) just to see what
+other clever corners their authors left in.
