@@ -42,3 +42,17 @@ test('an empty network name shows no code and no reason', async ({ page }) => {
   await expect(page.getByRole('button', { name: /^Save / })).toHaveCount(0);
   await expect(page.locator('.failed')).toHaveCount(0);
 });
+
+test('the Style section is closed until opened, and its note shows under the code', async ({
+  page,
+}) => {
+  const picture = page.getByRole('img', { name: 'Wi-Fi QR code for Garden Shed' });
+  await page.getByLabel('Network name', { exact: true }).fill('Garden Shed');
+  await expect(picture).toBeVisible();
+  await expect(page.getByLabel('No background')).toBeHidden();
+  await page.locator('summary', { hasText: 'Style' }).click();
+  await page.getByLabel('No background').check();
+  const note = 'Put this on a light background so phones can read it.';
+  await expect(page.getByText(note, { exact: true }).first()).toBeVisible();
+  await expect(picture).toBeVisible();
+});

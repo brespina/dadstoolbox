@@ -1,7 +1,9 @@
 <script lang="ts">
+  import StyleSection from '../../qr/StyleSection.svelte';
   import { tool } from './declaration';
 
-  // The Tool has no type box: these two fields hold everything, and the code follows them.
+  // The Tool has no type box: these fields and the Style hold everything, and the code
+  // follows them.
   let { options = $bindable() }: { options: typeof tool.defaultOptions } = $props();
 </script>
 
@@ -32,6 +34,8 @@
     bind:value={options.password}
   />
 </div>
+
+<StyleSection bind:style={options.style} />
 
 <style>
   .field {

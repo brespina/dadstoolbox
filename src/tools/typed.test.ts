@@ -111,7 +111,9 @@ describe('typing', () => {
     const page = createTypedToolPage(
       tool,
       async (typed) => [
-        typed === 'pale' ? { ...png(typed), warnings: ['These colours may not scan.'] } : png(typed),
+        typed === 'pale'
+          ? { ...png(typed), warnings: ['These colours may not scan.'] }
+          : png(typed),
       ],
       150,
     );

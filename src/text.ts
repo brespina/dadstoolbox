@@ -168,7 +168,7 @@ export const text = {
   // Shared by the QR code Tools: the Style section and its notes under the code.
   qr: {
     style: 'Style',
-    styleHint: 'Colours and background. Leave it closed for black on white.',
+    styleHint: 'Change how your code looks.',
     codeColour: 'Code colour',
     backgroundColour: 'Background colour',
     noBackground: 'No background',
