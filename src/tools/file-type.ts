@@ -8,6 +8,9 @@ const typesByEnding: Record<string, string> = {
   jpeg: 'image/jpeg',
   png: 'image/png',
   webp: 'image/webp',
+  bmp: 'image/bmp',
+  avif: 'image/avif',
+  svg: 'image/svg+xml',
 };
 
 /**
