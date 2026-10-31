@@ -4,7 +4,7 @@
   import { canSaveWebp } from '../../photos/webp';
   import { text } from '../../text';
   import type { OptionsProps } from '../types';
-  import type { Options } from './declaration';
+  import { carriesDetails, type Options } from './declaration';
   import { offeredFormats } from './formats';
 
   let { options = $bindable(), fileTypes = [] }: OptionsProps<Options> = $props();
@@ -43,7 +43,10 @@
   </div>
 </fieldset>
 
-<RemoveLocation bind:options />
+<!-- An ICO holds no photo details, so there is no location to remove. -->
+{#if carriesDetails(options.format)}
+  <RemoveLocation bind:options />
+{/if}
 
 <style>
   .save-as {
