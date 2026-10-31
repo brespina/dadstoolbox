@@ -161,7 +161,10 @@ function makeToolPage<Options extends object>(
       items: batch.items.map((item) => (item.id === id ? { ...item, ...change } : item)),
     }));
 
-  /** The context for one row's run: its progress goes on that row. */
+  /**
+   * The context for one row's run: its progress goes on that row. Loads are counted per
+   * row, which holds because rows run one after another.
+   */
   const contextFor = (item: BatchItem) =>
     runContext({
       progress: (fraction) => updateItem(item.id, { percent: wholePercent(fraction) }),

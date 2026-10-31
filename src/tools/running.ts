@@ -1,6 +1,6 @@
 // Running a Tool's `run` once: naming what it made, or turning its failure into a plain
-// reason (batch.ts and typed.ts), and the context a run reports through (batch.ts and
-// worker.ts).
+// reason, and the context a run reports its progress and loading through. "Run" here is
+// one call to a Tool's `run`, not a Batch.
 
 import { ToolFailure, wholePercent, type ToolResult, type ToolRunContext } from './types';
 
@@ -31,8 +31,11 @@ export function createTakenNames(): TakenNames {
   };
 }
 
-export interface RunNaming {
-  /** The original's name, such as IMG_1234.HEIC. Results are named after it. */
+export interface RunSettings {
+  /**
+   * The original file's name, such as IMG_1234.HEIC, or a typed Tool's address (which
+   * has no dot, so its results get no fallback extension). Results are named after it.
+   */
   original: string;
   /** Names to avoid. A result gets _2, _3 instead, and its name is taken in turn. */
   taken?: TakenNames;
@@ -65,7 +68,7 @@ function splitName(name: string) {
  */
 export async function runOnce(
   work: () => Promise<ToolResult[]>,
-  { original, taken, fallback, logAs }: RunNaming,
+  { original, taken, fallback, logAs }: RunSettings,
 ): Promise<RunOutcome> {
   let results: ToolResult[];
   try {

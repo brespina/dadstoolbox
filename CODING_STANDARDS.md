@@ -17,7 +17,7 @@ Read during review. These are judgement calls: the type check, Prettier, the ban
 
 ## Shared machinery
 
-- One way to do each shared job: open photos with `openPhoto` (`src/photos/open.ts`), keep the Batch's statuses and names in `src/tools/batch.ts`, reuse `src/photos/` for photo options. A Tool-local copy of shared behaviour is a finding.
+- One way to do each shared job: open photos with `openPhoto` (`src/photos/open.ts`), keep the Batch's statuses in `src/tools/batch.ts`, name results and turn failures into reasons with `runOnce` (`src/tools/running.ts`), reuse `src/photos/` for photo options. A Tool-local copy of shared behaviour is a finding.
 - A new input mode adds an overload of `createToolPage`, keeping the existing callers' types.
 - A large library loads only when its Tool needs it (see "Getting ready…" in the guide), and the Tool credits it in `src/site/credits.ts`, including libraries it brings in.
 

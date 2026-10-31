@@ -143,6 +143,18 @@ describe('watching a Batch', () => {
     expect(page.state().batches[0]!.items[0]!.status).toBe('done');
   });
 
+  it('stops Getting ready when loading fails, and the row says it did not work', async () => {
+    const page = createToolPage(tool, async (_file, _options, context) => {
+      await context!.gettingReady(Promise.reject(new Error('offline')));
+      return [pdf()];
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    page.add([file('a.pdf')]);
+    await page.start({});
+    expect(page.state().batches[0]!.gettingReady).toBe(false);
+    expect(page.state().batches[0]!.items[0]!.status).toBe('failed');
+  });
+
   it('labels each Batch with how many files it holds', async () => {
     const page = createToolPage(tool, async () => [pdf()]);
     page.add([file('a.pdf')]);
