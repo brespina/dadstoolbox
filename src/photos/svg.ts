@@ -71,16 +71,17 @@ export function sizeSvg(text: string): SizedSvg {
   const statedWidth = lengthInPixels(valueOf('width'));
   const statedHeight = lengthInPixels(valueOf('height'));
   const shape = viewBoxShape(valueOf('viewBox'));
-  const [width, height] =
-    statedWidth && statedHeight
-      ? [statedWidth, statedHeight]
-      : [
-          unstatedSvgWidth,
-          (unstatedSvgWidth * (shape ?? defaultShape).height) / (shape ?? defaultShape).width,
-        ];
+  const stated = statedWidth !== undefined && statedHeight !== undefined;
+  const [width, height] = stated
+    ? [statedWidth, statedHeight]
+    : [
+        unstatedSvgWidth,
+        (unstatedSvgWidth * (shape ?? defaultShape).height) / (shape ?? defaultShape).width,
+      ];
   const whole = [Math.max(1, Math.round(width)), Math.max(1, Math.round(height))] as const;
 
-  // A viewBox that gives no shape is replaced, so the picture is scaled, not cropped.
+  // A viewBox that gives no shape is replaced when the size is worked out, so the picture
+  // is scaled, not cropped. One that states its size without a viewBox is drawn as it is.
   const kept = attributes.filter(
     (a) => a.name !== 'width' && a.name !== 'height' && (shape || a.name !== 'viewBox'),
   );
@@ -88,7 +89,7 @@ export function sizeSvg(text: string): SizedSvg {
     ...kept.map((a) => `${a.name}="${a.value.replaceAll('"', '&quot;')}"`),
     `width="${whole[0]}"`,
     `height="${whole[1]}"`,
-    ...(shape ? [] : [`viewBox="0 0 ${defaultShape.width} ${defaultShape.height}"`]),
+    ...(shape || stated ? [] : [`viewBox="0 0 ${defaultShape.width} ${defaultShape.height}"`]),
   ];
   const tag = `<svg ${written.join(' ')}${selfClosing ? '/' : ''}>`;
   return {

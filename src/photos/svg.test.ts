@@ -58,6 +58,12 @@ describe('sizeSvg', () => {
     expect(sizeSvg(`<svg ${ns}/>`).markup).toContain('viewBox="0 0 300 150"');
   });
 
+  it('adds no viewBox to a picture that states its size without one', () => {
+    const { markup } = sizeSvg(`<svg ${ns} width="40" height="30"><rect/></svg>`);
+    expect(markup).not.toContain('viewBox');
+    expect(markup).toContain('width="40"');
+  });
+
   it('keeps an empty root element empty', () => {
     expect(sizeSvg(`<svg ${ns} viewBox="0 0 4 3"/>`).markup).toMatch(/\/>$/);
   });
