@@ -8,7 +8,7 @@ Read first, and build on these rather than re-researching them:
 
 **Process.** Follow `~/.claude/plugins/cache/claude-plugins-official/mattpocock-skills/*/skills/engineering/implement/SKILL.md` by hand. For "tdd", use the Skill tool with `mattpocock-skills:tdd`. A separate fresh reviewer covers its code-review step.
 
-**Branch.** First run `git fetch origin && git checkout -B ticket/{N}-{slug} origin/{BASE}`, then confirm `git log -1` matches `origin/{BASE}`. Push only `ticket/{N}-{slug}`.
+**Branch.** Run `git fetch origin`. Start from `origin/ticket/{N}-{slug}` if it exists (a resumed ticket), otherwise from `origin/{BASE}`: `git checkout -B work/{N} <start>`, then confirm `git log -1` matches `<start>`. Another worktree may hold `ticket/{N}-{slug}`, so push only with `git push origin HEAD:ticket/{N}-{slug}`.
 
 **Save as you go.** After each passing test cycle, commit and push your branch, so a cutoff at any moment loses little.
 
