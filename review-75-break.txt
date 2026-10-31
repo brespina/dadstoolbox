@@ -1,0 +1,7 @@
+A QR code is a small, stubborn kind of honesty. Whatever you dress it in,
+rounded dots, a new colour, a vector path, it either reads back to what you
+typed or it doesn't. I liked spending the afternoon with something that can
+be checked that plainly.
+
+On a break I would sit with a pencil and draw a QR code by hand on graph
+paper, one square at a time, and see if my phone believes me.
