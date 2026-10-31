@@ -14,6 +14,9 @@ export const formatTypes: Record<Format, string> = {
 
 export type Options = LocationOption & { format: Format };
 
+/** Whether a file of this format can carry the photo's details (date taken, location). */
+export const carriesDetails = (format: Format) => format !== 'ico';
+
 const formatName = (options: Options) => text.photos.formats[options.format].name;
 
 export const tool = defineTool({
@@ -43,7 +46,7 @@ export const tool = defineTool({
   startButton: 'Change to JPG',
   textFor: (options: Options) => {
     // An ICO holds no photo details, so location isn't a choice and isn't claimed.
-    const location = options.format !== 'ico';
+    const location = carriesDetails(options.format);
     return {
       ...(location ? locationText(options) : {}),
       startButton: fillText(text.photos.startButton, { format: formatName(options) }),

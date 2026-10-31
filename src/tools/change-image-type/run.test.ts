@@ -150,6 +150,20 @@ describe('Change image file type', () => {
     );
   });
 
+  it("fails with the same plain reason for a HEIC that won't open when saving as ICO", async () => {
+    const cantOpen = makeRun(paint, async () => {
+      throw new DOMException('The source image could not be decoded.', 'InvalidStateError');
+    });
+    const unnamed = new File([bytes('sample.heic')], 'IMG_1234.HEIC');
+    const failure = await cantOpen(unnamed, { ...defaults, format: 'ico' }).catch(
+      (e: unknown) => e,
+    );
+    expect(failure).toBeInstanceOf(ToolFailure);
+    expect((failure as ToolFailure).reason).toBe(
+      "This iPhone photo (HEIC) wouldn't open. Choose it again, or try another photo.",
+    );
+  });
+
   it("throws an ordinary error for another file it can't open", async () => {
     const cantOpen = makeRun(async () => {
       throw new DOMException('The source image could not be decoded.', 'InvalidStateError');

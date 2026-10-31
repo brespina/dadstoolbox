@@ -301,11 +301,15 @@ test('ICO is saved with 16, 32, 48 and 256 px pictures and no location choice', 
   for (const icon of icons) {
     expect([icon.picture.width, icon.picture.height]).toEqual([icon.width, icon.height]);
     const size = icon.width;
-    // The wide image fills the middle half, not stretched: see-through above and below.
-    expect(alphaAt(icon, size >> 1, 0)).toBe(0);
-    expect(alphaAt(icon, size >> 1, size - 1)).toBe(0);
-    // Its solid left half is solid, and its see-through right half stays see-through.
-    expect(alphaAt(icon, Math.round(size * 0.25), size >> 1)).toBe(255);
+    // The wide image fills exactly the middle half of the rows, not stretched.
+    const left = Math.round(size * 0.25);
+    const top = size / 4;
+    const bottom = (size * 3) / 4;
+    expect(alphaAt(icon, left, top - 1)).toBe(0);
+    expect(alphaAt(icon, left, top)).toBe(255);
+    expect(alphaAt(icon, left, bottom - 1)).toBe(255);
+    expect(alphaAt(icon, left, bottom)).toBe(0);
+    // Its see-through right half stays see-through.
     expect(alphaAt(icon, Math.round(size * 0.75), size >> 1)).toBe(0);
   }
 });
@@ -318,12 +322,17 @@ test('a tall photo sits in the middle of the ICO square, not stretched', async (
   const saved = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Save rotated_dtb.ico' }).click();
   const icons = readIco(readFileSync((await (await saved).path())!));
-  const big = icons[3]!;
-  // 32 × 48 fits 171 wide at most 256 tall: about 85 px of see-through at each side.
-  expect(alphaAt(big, 5, 128)).toBe(0);
-  expect(alphaAt(big, 250, 128)).toBe(0);
-  expect(alphaAt(big, 128, 128)).toBe(255);
-  expect(alphaAt(big, 128, 0)).toBe(255);
+  expect(icons).toHaveLength(4);
+  for (const icon of icons) {
+    const size = icon.width;
+    // 32 × 48 is two thirds as wide as tall, so it fills the height and leaves
+    // see-through at each side (at least a pixel even at 16 px).
+    expect(alphaAt(icon, 0, size >> 1)).toBe(0);
+    expect(alphaAt(icon, size - 1, size >> 1)).toBe(0);
+    expect(alphaAt(icon, size >> 1, size >> 1)).toBe(255);
+    expect(alphaAt(icon, size >> 1, 0)).toBe(255);
+    expect(alphaAt(icon, size >> 1, size - 1)).toBe(255);
+  }
 });
 
 test('the browser can show a saved ICO', async ({ page }) => {
