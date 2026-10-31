@@ -154,6 +154,7 @@ export const text = {
       jpg: { name: 'JPG', hint: 'Opens and sends anywhere.' },
       png: { name: 'PNG', hint: 'Sharpest, but a bigger file.' },
       webp: { name: 'WebP', hint: "Small file. Some apps can't open it." },
+      ico: { name: 'ICO', hint: 'The small icon a website shows in its browser tab.' },
     },
     // Make a photo smaller: how small to make it.
     howSmall: 'How small',

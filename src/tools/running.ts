@@ -51,6 +51,7 @@ const extensions: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
+  'image/x-icon': 'ico',
   'image/gif': 'gif',
   'image/svg+xml': 'svg',
   'video/mp4': 'mp4',
