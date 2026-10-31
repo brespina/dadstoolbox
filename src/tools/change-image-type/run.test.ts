@@ -35,6 +35,55 @@ const details = async (blob: Blob) =>
   })) as Record<string, unknown> | undefined;
 
 describe('Change image file type', () => {
+  it('takes BMP, AVIF and SVG pictures but not GIF at the Choose button', () => {
+    for (const accepted of [
+      'image/bmp',
+      'image/x-ms-bmp',
+      'image/avif',
+      'image/svg+xml',
+      '.bmp',
+      '.avif',
+      '.svg',
+    ]) {
+      expect(tool.accept).toContain(accepted);
+    }
+    expect(tool.accept.filter((a) => /gif/i.test(a))).toEqual([]);
+  });
+
+  describe.each([
+    ['a BMP', 'sample.bmp', 'image/bmp'],
+    ['an AVIF', 'sample.avif', 'image/avif'],
+    ['an SVG', 'sized.svg', 'image/svg+xml'],
+  ])('given %s', (_name, file, fileType) => {
+    it.each([
+      ['jpg', 'image/jpeg'],
+      ['png', 'image/png'],
+      ['webp', 'image/webp'],
+    ] as const)('changes it to %s, with no photo details added', async (format, type) => {
+      const [result, ...rest] = await run(sample(file, fileType), {
+        ...defaults,
+        format,
+        removeLocation: false,
+      });
+      expect(rest).toEqual([]);
+      expect(result!.blob.type).toBe(type);
+      // exifr refuses a file with no details at all, which is fine here.
+      const found = (await details(result!.blob).catch(() => undefined)) ?? {};
+      expect(found).not.toHaveProperty('DateTimeOriginal');
+      expect(found).not.toHaveProperty('latitude');
+    });
+
+    it('gives the ordinary failure for a damaged one', async () => {
+      const cantOpen = makeRun(async () => {
+        throw new DOMException('The source image could not be decoded.', 'InvalidStateError');
+      });
+      const damaged = new File([new Uint8Array([1, 2, 3, 4])], file, { type: fileType });
+      const failure = await cantOpen(damaged, defaults).catch((e: unknown) => e);
+      expect(failure).toBeInstanceOf(Error);
+      expect(failure).not.toBeInstanceOf(ToolFailure);
+    });
+  });
+
   it('changes an iPhone photo (HEIC) to a JPG with no location, keeping the date taken', async () => {
     const [result, ...rest] = await run(heic(), defaults);
     expect(rest).toEqual([]);
