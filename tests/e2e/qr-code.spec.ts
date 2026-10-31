@@ -5,6 +5,7 @@ import jsQR from 'jsqr';
 import { PNG } from 'pngjs';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
+import { readSvgCode, savedText } from './qr-svg';
 
 const box = (page: Page) => page.getByLabel('Text or web address');
 const picture = (page: Page, typed: string) =>
@@ -132,4 +133,61 @@ test('dot and corner shapes are chosen apart, start on square, and are in the sa
     const rgba = new Uint8ClampedArray(png.data.buffer, png.data.byteOffset, png.data.length);
     expect(jsQR(rgba, png.width, png.height)?.data).toBe('https://example.com/menu');
   }).toPass();
+});
+
+test('Save as offers PNG first, and an SVG is saved that reads back and shows on the page', async ({
+  page,
+}) => {
+  await box(page).fill('https://example.com/menu');
+  await expect(picture(page, 'https://example.com/menu')).toBeVisible();
+  await styleSection(page).click();
+
+  const saveAs = page.getByRole('group', { name: 'Save as' });
+  await expect(saveAs.locator('label')).toHaveText(['PNG', 'SVG']);
+  await expect(saveAs.getByLabel('PNG')).toBeChecked();
+
+  // Colours and shapes come out in the SVG too.
+  await page.getByLabel('Code colour').fill('#1a237e');
+  await page.getByRole('group', { name: 'Dot shape' }).getByText('Round', { exact: true }).click();
+  await saveAs.getByText('SVG', { exact: true }).click();
+
+  const saveButton = page.getByRole('button', { name: 'Save qr-code_dtb.svg' });
+  await expect(saveButton).toBeVisible();
+  const shown = picture(page, 'https://example.com/menu');
+  await expect(shown).toBeVisible();
+  // The picture is the SVG: a blob of that type that the browser has drawn.
+  await expect
+    .poll(() =>
+      shown.evaluate(async (img: HTMLImageElement) => ({
+        type: (await (await fetch(img.src)).blob()).type,
+        drawn: img.complete && img.naturalWidth > 0,
+      })),
+    )
+    .toEqual({ type: 'image/svg+xml', drawn: true });
+
+  const saved = page.waitForEvent('download');
+  await saveButton.click();
+  const download = await saved;
+  expect(download.suggestedFilename()).toBe('qr-code_dtb.svg');
+  const svg = await savedText(download);
+  expect(svg).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+  expect(svg).toContain('fill="#1a237e"');
+  expect(svg).toContain('fill="#ffffff"');
+  expect(await readSvgCode(page, svg)).toBe('https://example.com/menu');
+
+  // Back to PNG: the name follows.
+  await saveAs.getByText('PNG', { exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Save qr-code_dtb.png' })).toBeVisible();
+});
+
+test('an SVG with no background has none, and still reads back on white', async ({ page }) => {
+  await box(page).fill('hello');
+  await styleSection(page).click();
+  await page.getByLabel('No background').check();
+  await page.getByRole('group', { name: 'Save as' }).getByText('SVG', { exact: true }).click();
+  const saved = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save qr-code_dtb.svg' }).click();
+  const svg = await savedText(await saved);
+  expect(svg).not.toContain('<rect');
+  expect(await readSvgCode(page, svg)).toBe('hello');
 });

@@ -1,9 +1,9 @@
 <script lang="ts">
   // The shared Style section for the QR code Tools, closed until opened. Its defaults
   // draw today's black-on-white code, so a section never opened changes nothing.
-  // Save as (#75) and a logo (#76) join it here.
+  // A logo (#76) joins it here.
   import { text } from '../text';
-  import { shapeNames, type QrStyle } from './style';
+  import { saveTypes, shapeNames, type QrStyle } from './style';
 
   let { style = $bindable() }: { style: QrStyle } = $props();
 
@@ -57,6 +57,27 @@
         </div>
       </fieldset>
     {/each}
+
+    <fieldset class="shapes">
+      <legend class="label">{text.qr.saveAs}</legend>
+      <div class="options">
+        {#each saveTypes as type (type)}
+          <label class="choice">
+            <input
+              type="radio"
+              class="visually-hidden"
+              name="save-as"
+              value={type}
+              bind:group={style.saveAs}
+            />
+            <span class="face">{text.qr.saveTypes[type]}</span>
+          </label>
+        {/each}
+      </div>
+      {#if style.saveAs === 'svg'}
+        <p class="muted hint">{text.qr.svgHint}</p>
+      {/if}
+    </fieldset>
   </div>
 </details>
 
@@ -198,6 +219,10 @@
   input:focus-visible + .face {
     outline: 3px solid var(--focus);
     outline-offset: 2px;
+  }
+
+  .hint {
+    margin: 0.5rem 0 0;
   }
 
   .check > span {
