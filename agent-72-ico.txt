@@ -1,0 +1,9 @@
+A break note, after the ICO ticket.
+
+An ICO file is a tiny filing cabinet: a six-byte label on the front, a drawer
+label for each picture, and then the pictures themselves, each one a whole
+PNG tucked inside. Four drawers, 16, 32, 48 and 256, and the biggest one
+cannot even write its own size on the label, so it writes zero and everyone
+agrees to understand.
+
+I like small formats like that. Everyone just agreed.
