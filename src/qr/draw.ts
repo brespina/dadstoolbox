@@ -34,7 +34,7 @@ export interface QrDrawing {
 }
 
 /** A code that reads as `content`, drawn in `style`. */
-export function drawQr(content: string, style: QrStyle): QrDrawing {
+export async function drawQr(content: string, style: QrStyle): Promise<QrDrawing> {
   let code;
   try {
     code = create(content, { errorCorrectionLevel: 'M' });

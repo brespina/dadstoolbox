@@ -44,7 +44,7 @@ const style = (changes: Partial<QrStyle>): QrStyle => ({ ...plainStyle, ...chang
 
 describe('the shared QR drawing', () => {
   it('draws the plain Style black on white, square and big enough to print', async () => {
-    const { blob, warnings } = drawQr('hello', plainStyle);
+    const { blob, warnings } = await drawQr('hello', plainStyle);
     expect(blob.type).toBe('image/png');
     expect(warnings).toEqual([]);
     expect(await colours(blob)).toEqual(new Set(['0,0,0,255', '255,255,255,255']));
@@ -55,7 +55,7 @@ describe('the shared QR drawing', () => {
   });
 
   it('draws the chosen code and background colours, and reads back', async () => {
-    const { blob, warnings } = drawQr(
+    const { blob, warnings } = await drawQr(
       'https://example.com/menu',
       style({ code: '#1a237e', background: '#fff59d' }),
     );
@@ -68,13 +68,13 @@ describe('the shared QR drawing', () => {
   });
 
   it('keeps a two-colour code small, at 1 bit a pixel', async () => {
-    const { blob } = drawQr('hello', style({ code: '#1a237e', noBackground: true }));
+    const { blob } = await drawQr('hello', style({ code: '#1a237e', noBackground: true }));
     const { png } = await pixels(blob);
     expect(blob.size).toBeLessThan((png.width * png.height) / 8 + 2000);
   });
 
   it('leaves the background see-through with no background, and reads back on white', async () => {
-    const { blob } = drawQr('Café crème ☕', style({ code: '#004d40', noBackground: true }));
+    const { blob } = await drawQr('Café crème ☕', style({ code: '#004d40', noBackground: true }));
     const found = await colours(blob);
     expect(found.has('0,77,64,255')).toBe(true);
     expect([...found].filter((c) => c.endsWith(',0'))).toHaveLength(1);
@@ -83,8 +83,8 @@ describe('the shared QR drawing', () => {
     expect(await readCode(blob)).toBe('Café crème ☕');
   });
 
-  it('notes that a code with no background needs a light one behind it', () => {
-    expect(drawQr('hello', style({ noBackground: true })).warnings).toEqual([
+  it('notes that a code with no background needs a light one behind it', async () => {
+    expect((await drawQr('hello', style({ noBackground: true }))).warnings).toEqual([
       'Put this on a light background so phones can read it.',
     ]);
   });
@@ -94,13 +94,15 @@ describe('the shared QR drawing', () => {
     ['the code lighter than its background', '#ffffff', '#000000'],
     ['a light code on a slightly darker background', '#fff59d', '#ffeb3b'],
   ])('warns, but still draws, when the colours are %s', async (_case, code, background) => {
-    const { blob, warnings } = drawQr('hello', style({ code, background }));
+    const { blob, warnings } = await drawQr('hello', style({ code, background }));
     expect(warnings).toEqual(['These colours may not scan.']);
     expect(blob.size).toBeGreaterThan(0);
   });
 
-  it('checks a code with no background against white, where it is meant to go', () => {
-    expect(drawQr('hello', style({ code: '#eeeeee', noBackground: true })).warnings).toEqual([
+  it('checks a code with no background against white, where it is meant to go', async () => {
+    expect(
+      (await drawQr('hello', style({ code: '#eeeeee', noBackground: true }))).warnings,
+    ).toEqual([
       'These colours may not scan.',
       'Put this on a light background so phones can read it.',
     ]);
@@ -110,8 +112,8 @@ describe('the shared QR drawing', () => {
     ['dark grey on white', '#555555', '#ffffff'],
     ['navy on pale yellow', '#1a237e', '#fff59d'],
     ['black on mid grey', '#000000', '#9e9e9e'],
-  ])('gives no warning for %s', (_case, code, background) => {
-    expect(drawQr('hello', style({ code, background })).warnings).toEqual([]);
+  ])('gives no warning for %s', async (_case, code, background) => {
+    expect((await drawQr('hello', style({ code, background }))).warnings).toEqual([]);
   });
 
   describe('dot and corner shapes', () => {
@@ -122,14 +124,14 @@ describe('the shared QR drawing', () => {
     it.each(combos)('reads back with %s dots and %s corners', async (dotShape, cornerShape) => {
       const shaped = style({ dotShape, cornerShape });
       for (const typed of ['hello', 'https://example.com/menu?table=4', 'Café crème ☕ for Zoë']) {
-        expect(await readCode(drawQr(typed, shaped).blob)).toBe(typed);
+        expect(await readCode((await drawQr(typed, shaped)).blob)).toBe(typed);
       }
     });
 
     it('reads back at a long text too, with the biggest dots to place', async () => {
       const typed = 'Wi-Fi password: garden shed 42. '.repeat(12);
       const shaped = style({ dotShape: 'round', cornerShape: 'round' });
-      expect(await readCode(drawQr(typed, shaped).blob)).toBe(typed);
+      expect(await readCode((await drawQr(typed, shaped)).blob)).toBe(typed);
     });
 
     it('reads back with colours', async () => {
@@ -139,12 +141,12 @@ describe('the shared QR drawing', () => {
         code: '#1a237e',
         background: '#fff59d',
       });
-      expect(await readCode(drawQr('hello', shaped).blob)).toBe('hello');
+      expect(await readCode((await drawQr('hello', shaped)).blob)).toBe('hello');
     });
 
     it('reads back with no background, and keeps the background see-through around the edges', async () => {
       const shaped = style({ dotShape: 'round', cornerShape: 'round', noBackground: true });
-      const { blob } = drawQr('hello', shaped);
+      const { blob } = await drawQr('hello', shaped);
       expect(await readCode(blob)).toBe('hello');
       const { png, at } = await pixels(blob);
       expect(at(0, 0)).toEqual([255, 255, 255, 0]);
@@ -162,12 +164,12 @@ describe('the shared QR drawing', () => {
     });
 
     it('blends the edges between code and background colours, so they look smooth', async () => {
-      const { blob } = drawQr('hello', style({ dotShape: 'round', cornerShape: 'round' }));
+      const { blob } = await drawQr('hello', style({ dotShape: 'round', cornerShape: 'round' }));
       expect((await colours(blob)).size).toBeGreaterThanOrEqual(8);
     });
 
     it('draws the square shapes exactly as before, in two colours', async () => {
-      const { blob } = drawQr('hello', style({ dotShape: 'square', cornerShape: 'square' }));
+      const { blob } = await drawQr('hello', style({ dotShape: 'square', cornerShape: 'square' }));
       expect((await colours(blob)).size).toBe(2);
     });
 
@@ -180,8 +182,8 @@ describe('the shared QR drawing', () => {
       const scale = 25;
       const x = (8 + 4) * scale;
       const y = (13 + 4) * scale;
-      const dark = await pixels(drawQr('hello', square).blob);
-      const dot = await pixels(drawQr('hello', round).blob);
+      const dark = await pixels((await drawQr('hello', square)).blob);
+      const dot = await pixels((await drawQr('hello', round)).blob);
       expect(dark.at(x, y)).toEqual([0, 0, 0, 255]);
       expect(dot.at(x, y)).toEqual([255, 255, 255, 255]);
       expect(dot.at(x + 12, y + 12)).toEqual([0, 0, 0, 255]);
@@ -190,14 +192,17 @@ describe('the shared QR drawing', () => {
     it('rounds the outer corner of the big corner squares, and only for rounded and round', async () => {
       // The pixel just inside the top left corner of the first big corner square.
       const at = async (cornerShape: 'square' | 'rounded' | 'round') =>
-        (await pixels(drawQr('hello', style({ cornerShape })).blob)).at(4 * 25 + 1, 4 * 25 + 1);
+        (await pixels((await drawQr('hello', style({ cornerShape }))).blob)).at(
+          4 * 25 + 1,
+          4 * 25 + 1,
+        );
       expect(await at('square')).toEqual([0, 0, 0, 255]);
       expect(await at('rounded')).toEqual([255, 255, 255, 255]);
       expect(await at('round')).toEqual([255, 255, 255, 255]);
     });
 
     it('draws a round corner with the finder rings still one module thick on the middle row', async () => {
-      const { blob } = drawQr('hello', style({ cornerShape: 'round' }));
+      const { blob } = await drawQr('hello', style({ cornerShape: 'round' }));
       const { at } = await pixels(blob);
       const scale = 25;
       const row = (4 + 3.5) * scale;
@@ -209,16 +214,16 @@ describe('the shared QR drawing', () => {
 
   describe('saving as SVG', () => {
     const svgStyle = (changes: Partial<QrStyle> = {}) => style({ saveAs: 'svg', ...changes });
-    const svgText = (changes: Partial<QrStyle> = {}, typed = 'hello') =>
-      drawQr(typed, svgStyle(changes)).blob.text();
+    const svgText = async (changes: Partial<QrStyle> = {}, typed = 'hello') =>
+      (await drawQr(typed, svgStyle(changes))).blob.text();
 
-    it('saves as PNG unless SVG is chosen', () => {
+    it('saves as PNG unless SVG is chosen', async () => {
       expect(plainStyle.saveAs).toBe('png');
-      expect(drawQr('hello', plainStyle).blob.type).toBe('image/png');
+      expect((await drawQr('hello', plainStyle)).blob.type).toBe('image/png');
     });
 
     it('draws a standalone SVG file, with a size so a picture of it has one', async () => {
-      const { blob, warnings } = drawQr('hello', svgStyle());
+      const { blob, warnings } = await drawQr('hello', svgStyle());
       expect(blob.type).toBe('image/svg+xml');
       expect(warnings).toEqual([]);
       const svg = await blob.text();
@@ -245,11 +250,11 @@ describe('the shared QR drawing', () => {
       expect(none).toMatch(/<path [^>]*fill="#004d40"/);
     });
 
-    it('gives the same warnings as the PNG', () => {
-      expect(drawQr('hello', svgStyle({ noBackground: true })).warnings).toEqual([
+    it('gives the same warnings as the PNG', async () => {
+      expect((await drawQr('hello', svgStyle({ noBackground: true }))).warnings).toEqual([
         'Put this on a light background so phones can read it.',
       ]);
-      expect(drawQr('hello', svgStyle({ code: '#ffeb3b' })).warnings).toEqual([
+      expect((await drawQr('hello', svgStyle({ code: '#ffeb3b' }))).warnings).toEqual([
         'These colours may not scan.',
       ]);
     });
@@ -273,12 +278,12 @@ describe('the shared QR drawing', () => {
       expect(long).toContain('viewBox="0 0 37 37"');
     });
 
-    it('still throws TooLongForCode', () => {
-      expect(() => drawQr('a'.repeat(5000), svgStyle())).toThrow(TooLongForCode);
+    it('still throws TooLongForCode', async () => {
+      await expect(drawQr('a'.repeat(5000), svgStyle())).rejects.toThrow(TooLongForCode);
     });
   });
 
-  it('throws TooLongForCode when the text is too long for one code', () => {
-    expect(() => drawQr('a'.repeat(5000), plainStyle)).toThrow(TooLongForCode);
+  it('throws TooLongForCode when the text is too long for one code', async () => {
+    await expect(drawQr('a'.repeat(5000), plainStyle)).rejects.toThrow(TooLongForCode);
   });
 });
