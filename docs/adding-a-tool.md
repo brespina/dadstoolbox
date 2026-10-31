@@ -135,8 +135,9 @@ and the options. It returns a list of results:
 ```
 
 - **`blob`** is the result's bytes. Its type, such as `application/pdf`, sets the file
-  extension. Shared code knows the types in `extensions` in `src/tools/batch.ts`; any
-  other type keeps the original file's extension.
+  extension. Shared code knows the types in `extensions` in `src/tools/running.ts`; any
+  other type keeps the original file's extension, or gets none for a typed Tool, which
+  has no original file.
 - **`detail`** is added to the name, as in `report_dtb_page3.pdf`. Shared code builds
   every name as `<original>_dtb[_<detail>].<ext>` and adds `_2`, `_3` for repeats, so a
   result never overwrites an original. Don't build names in `run`.

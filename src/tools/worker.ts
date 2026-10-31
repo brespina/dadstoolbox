@@ -3,13 +3,8 @@
 // MessageChannel instead of a real worker.
 
 import * as Comlink from 'comlink';
-import {
-  ToolFailure,
-  wholePercent,
-  type Reason,
-  type ToolResult,
-  type ToolRunContext,
-} from './types';
+import { runContext } from './running';
+import { ToolFailure, type Reason, type ToolResult, type ToolRunContext } from './types';
 
 /** A Tool's `run`, taking one file or the ordered list, as its input mode says. */
 export type AnyRun = (
@@ -44,25 +39,11 @@ export function serveRuns(
       options: object,
       page: Comlink.Remote<PageLine>,
     ): Promise<Answer> {
-      let loads = 0;
-      let sent: number | undefined;
-      const context: ToolRunContext = {
-        // Each call is a message to the page, so send only a new whole percent.
-        progress(fraction) {
-          const percent = wholePercent(fraction);
-          if (percent === sent) return;
-          sent = percent;
-          void page.progress(fraction);
-        },
-        async gettingReady(loading) {
-          if (loads++ === 0) page.loading(true);
-          try {
-            return await loading;
-          } finally {
-            if (--loads === 0) page.loading(false);
-          }
-        },
-      };
+      // Each report is a message to the page, so only a new whole percent is sent.
+      const context = runContext({
+        progress: (fraction) => void page.progress(fraction),
+        loading: (on) => void page.loading(on),
+      });
       try {
         return { results: await (await loadRun(address))(input, options, context) };
       } catch (error) {

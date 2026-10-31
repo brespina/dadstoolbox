@@ -4,7 +4,8 @@
 // time the options stop changing), and only the newest one is kept.
 
 import { fillText, text } from '../text';
-import { ToolFailure, type ToolDeclaration, type ToolTextRun } from './types';
+import { runOnce } from './running';
+import type { ToolDeclaration, ToolTextRun } from './types';
 
 /** The file a typed Tool made, named and ready to save. */
 export interface TypedResult {
@@ -26,12 +27,6 @@ export interface TypedToolPageState {
   /** True from a change until its result is ready, so a stale result isn't saved. */
   updating: boolean;
 }
-
-const extensions: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/svg+xml': 'svg',
-};
 
 /**
  * The state of a typed Tool page. `delay` is how long typing must pause, in
@@ -57,28 +52,26 @@ export function createTypedToolPage<Options extends object>(
   };
 
   async function make(typed: string, options: Options, ticket: number) {
-    try {
-      const [made] = await run(typed, options);
-      if (ticket !== latest) return;
-      const ext = made ? extensions[made.blob.type] : undefined;
-      const result = made && {
-        id: nextId++,
-        name: `${tool.address}_dtb${made.detail ? `_${made.detail}` : ''}${ext ? `.${ext}` : ''}`,
-        size: made.blob.size,
-        blob: made.blob,
-        typed,
-        label:
-          tool.textFor(options).pictureLabel ??
-          fillText(text.tool.typed.pictureLabel, { noun: tool.noun.one, typed }),
-      };
-      set({ result: result ?? null, reason: null, updating: false });
-    } catch (error) {
-      if (ticket !== latest) return;
-      let reason: string = text.tool.typed.failedFallback;
-      if (error instanceof ToolFailure) reason = error.reason;
-      else console.error(tool.name, error);
-      set({ result: null, reason, updating: false });
+    const outcome = await runOnce(() => run(typed, options), {
+      original: tool.address,
+      fallback: text.tool.typed.failedFallback,
+      logAs: tool.name,
+    });
+    if (ticket !== latest) return;
+    if ('reason' in outcome) {
+      set({ result: null, reason: outcome.reason, updating: false });
+      return;
     }
+    const [made] = outcome.files;
+    const result = made && {
+      id: nextId++,
+      ...made,
+      typed,
+      label:
+        tool.textFor(options).pictureLabel ??
+        fillText(text.tool.typed.pictureLabel, { noun: tool.noun.one, typed }),
+    };
+    set({ result: result ?? null, reason: null, updating: false });
   }
 
   function later(typed: string, options: Options, ticket: number) {
