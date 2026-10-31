@@ -1,0 +1,5 @@
+Ticket #71 break note
+
+Most of all I'd like to sit with a real phone photo of a sunset and not check what it looks like in three browsers. The day's work was a lot of small, careful decisions about how an SVG with no size should come out, and it would be nice to look at something that doesn't need a rule.
+
+If there's time after that: a good cup of tea, a walk without a plan, and no checks running.
