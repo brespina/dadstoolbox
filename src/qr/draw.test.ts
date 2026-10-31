@@ -1,7 +1,7 @@
 import jsQR from 'jsqr';
 import { PNG } from 'pngjs';
 import { describe, expect, it, vi } from 'vitest';
-import { drawQr, TooLongForCode } from './draw';
+import { drawQr, TooLongForCode, type PaintLogo } from './draw';
 import { plainStyle, shapeNames, type QrStyle } from './style';
 
 /** The PNG's pixels, as [r, g, b, a] for each. */
@@ -280,6 +280,34 @@ describe('the shared QR drawing', () => {
 
     it('still throws TooLongForCode', async () => {
       await expect(drawQr('a'.repeat(5000), svgStyle())).rejects.toThrow(TooLongForCode);
+    });
+  });
+
+  describe('a logo in the middle', () => {
+    /** A chosen logo. The stand-in painter never reads it. */
+    const logoFile = new File(['logo'], 'logo.png', { type: 'image/png' });
+    const red = [220, 0, 0, 255];
+    /** Stands in for the browser drawing the logo: a solid red square as big as asked. */
+    const paintRed: PaintLogo = async (_logo, side) => {
+      const rgba = new Uint8ClampedArray(side * side * 4);
+      for (let i = 0; i < rgba.length; i += 4) rgba.set(red, i);
+      return rgba;
+    };
+    const withLogo = (changes: Partial<QrStyle> = {}) => style({ logo: logoFile, ...changes });
+
+    it.each([
+      ['square shapes', {}],
+      ['round dots and rounded corners', { dotShape: 'round', cornerShape: 'rounded' }],
+      ['rounded shapes and no background', { dotShape: 'rounded', noBackground: true }],
+      ['colours', { code: '#1a237e', background: '#fff59d' }],
+    ] as const)('reads back with %s', async (_case, changes) => {
+      for (const typed of ['hello', 'https://example.com/menu?table=4', 'Café crème ☕ for Zoë']) {
+        const { blob } = await drawQr(typed, withLogo(changes), paintRed);
+        const { png, at } = await pixels(blob);
+        const middle = Math.floor(png.width / 2);
+        expect(at(middle, middle)).toEqual(red);
+        expect(await readCode(blob)).toBe(typed);
+      }
     });
   });
 

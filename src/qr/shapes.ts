@@ -1,6 +1,6 @@
 // The geometry of a QR code's shapes, in squares ("modules"), shared by every way of drawing
-// a code: the PNG, the SVG and a logo's gap (#76) later. Nothing here knows
-// about pixels or colours, so every drawing gets the same shapes.
+// a code: the PNG, the SVG and the patch a logo sits on. Nothing here knows about pixels
+// or colours, so every drawing gets the same shapes.
 import type { ShapeName } from './style';
 
 /** A square with rounded corners; a radius of half its size is a circle. */
@@ -83,4 +83,41 @@ export function codeParts(
     }
   }
   return parts;
+}
+
+/** A plain square, in squares from the code's top left. */
+export interface Square {
+  x: number;
+  y: number;
+  size: number;
+}
+
+/** Where a logo goes in a code: the patch with no dots, and the logo inside it. */
+export interface LogoPlace {
+  /** Whole squares, centred, with no dots on them. */
+  patch: Square;
+  /** The logo's box: the patch less half a square all round, so the logo never touches a dot. */
+  logo: Square;
+  /** True when the square at this row and column is on the patch. */
+  covers(row: number, col: number): boolean;
+}
+
+/**
+ * Where a logo goes in a code `size` squares wide. The patch is the widest odd number of
+ * whole squares that is at most a fifth of the code (codes are an odd number of squares
+ * wide, so an odd patch is exactly centred), so the logo inside it is less than a fifth.
+ * That hides at most 4% of the code, well within what the strongest error correction
+ * (about 30%) recovers, and keeps clear of the big corner squares and the lines between
+ * them.
+ */
+export function logoPlace(size: number): LogoPlace {
+  const fifth = Math.floor(size / 5);
+  const side = Math.max(1, fifth % 2 === 1 ? fifth : fifth - 1);
+  const start = (size - side) / 2;
+  const end = start + side;
+  return {
+    patch: { x: start, y: start, size: side },
+    logo: { x: start + 0.5, y: start + 0.5, size: side - 1 },
+    covers: (row, col) => row >= start && row < end && col >= start && col < end,
+  };
 }

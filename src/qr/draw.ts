@@ -1,7 +1,8 @@
 // Draws a QR code in a Style, shared by the QR code Tools: the one place a code is drawn.
 import { create } from 'qrcode';
-import { palettePng, type PaletteColour } from './png';
-import { codeParts, type Part, type RoundedSquare } from './shapes';
+import { paintLogoOnCanvas } from './paint-logo';
+import { palettePng, rgbaPng, type PaletteColour } from './png';
+import { codeParts, logoPlace, type LogoPlace, type Part, type RoundedSquare } from './shapes';
 import { rgb, styleWarnings, type QrStyle } from './style';
 import { svgBlob } from './svg';
 
@@ -33,33 +34,71 @@ export interface QrDrawing {
   warnings: string[];
 }
 
-/** A code that reads as `content`, drawn in `style`. */
-export async function drawQr(content: string, style: QrStyle): Promise<QrDrawing> {
-  let code;
+/** Thrown when the logo is not a picture the browser can open. Each Tool turns it into its own reason. */
+export class LogoNotOpened extends Error {
+  constructor(cause: unknown) {
+    super('The logo could not be opened', { cause });
+    this.name = 'LogoNotOpened';
+  }
+}
+
+/**
+ * Draws the logo's pixels on a see-through square `side` wide, fitted whole and centred:
+ * red, green, blue and alpha for each pixel, row by row. The browser's canvas does it;
+ * tests pass a stand-in.
+ */
+export type PaintLogo = (logo: File, side: number) => Promise<Uint8ClampedArray>;
+
+/**
+ * A code with a logo is at least version 2 (25 squares wide), so the logo is at least 4
+ * squares wide. Version 1 would leave room for only 2.
+ */
+const leastLogoVersion = 2;
+
+/**
+ * The code's squares for `content`. A logo hides some of them, so a code with one uses
+ * the strongest error correction (H), which holds less text; without one it keeps M.
+ */
+function makeCode(content: string, hasLogo: boolean) {
+  const errorCorrectionLevel = hasLogo ? 'H' : 'M';
   try {
-    code = create(content, { errorCorrectionLevel: 'M' });
+    const code = create(content, { errorCorrectionLevel });
+    return hasLogo && code.version < leastLogoVersion
+      ? create(content, { errorCorrectionLevel, version: leastLogoVersion })
+      : code;
   } catch (error) {
     if (error instanceof Error && /too big/.test(error.message)) throw new TooLongForCode();
     throw error;
   }
+}
 
-  const { size, data } = code.modules;
+/** A code that reads as `content`, drawn in `style`. `paintLogo` draws the logo, if any. */
+export async function drawQr(
+  content: string,
+  style: QrStyle,
+  paintLogo: PaintLogo = paintLogoOnCanvas,
+): Promise<QrDrawing> {
+  const { size, data } = makeCode(content, style.logo !== null).modules;
   const total = size + margin * 2;
   const scale = Math.ceil(minimumWidth / total);
   const pixels = total * scale;
+  const place = style.logo ? logoPlace(size) : undefined;
+  // No dots under the logo's patch.
   const parts = codeParts(
     size,
-    (row, col) => data[row * size + col] === 1,
+    (row, col) => data[row * size + col] === 1 && !place?.covers(row, col),
     style.dotShape,
     style.cornerShape,
   );
+  const warnings = styleWarnings(style);
   if (style.saveAs === 'svg') {
-    return {
-      blob: svgBlob({ parts, border: margin, total, pixels, style }),
-      warnings: styleWarnings(style),
-    };
+    return { blob: svgBlob({ parts, border: margin, total, pixels, style }), warnings };
   }
   const levels = paintParts(parts, pixels, scale);
+  if (style.logo && place) {
+    const logo = await logoPixels(paintLogo, style.logo, Math.round(place.logo.size * scale));
+    return { blob: pngWithLogo(levels, pixels, scale, style, place, logo), warnings };
+  }
   // Only the shades that appear get a palette colour: a code of square shapes has just
   // background and code, so it stays a 2-colour, 1-bit PNG.
   const used = [...new Set(levels)].sort((a, b) => a - b);
@@ -67,7 +106,67 @@ export async function drawQr(content: string, style: QrStyle): Promise<QrDrawing
   const blob = palettePng(pixels, shadePalette(style, used), (x, y) =>
     indexOf.get(levels[y * pixels + x]!)!,
   );
-  return { blob, warnings: styleWarnings(style) };
+  return { blob, warnings };
+}
+
+/** The logo drawn `side` pixels wide, or LogoNotOpened. */
+async function logoPixels(paintLogo: PaintLogo, logo: File, side: number) {
+  try {
+    return await paintLogo(logo, side);
+  } catch (error) {
+    throw new LogoNotOpened(error);
+  }
+}
+
+/**
+ * The patch under a logo: the background colour, or white when there is none, so the
+ * logo and the code around it still read on any surface.
+ */
+function patchColour(style: QrStyle) {
+  return rgb(style.noBackground ? '#ffffff' : style.background);
+}
+
+/**
+ * The code in full colour, with the logo on its patch in the middle. The logo's own
+ * see-through parts show the patch.
+ */
+function pngWithLogo(
+  levels: Uint8Array,
+  pixels: number,
+  scale: number,
+  style: QrStyle,
+  place: LogoPlace,
+  logo: Uint8ClampedArray,
+) {
+  const palette = shadePalette(
+    style,
+    Array.from({ length: edgeShades }, (_, shade) => shade),
+  );
+  const rgba = new Uint8ClampedArray(pixels * pixels * 4);
+  levels.forEach((shade, i) => rgba.set(palette[shade]!, i * 4));
+
+  const toPixel = (squares: number) => Math.round((squares + margin) * scale);
+  const patch = [...patchColour(style), 255];
+  const patchStart = toPixel(place.patch.x);
+  const patchEnd = toPixel(place.patch.x + place.patch.size);
+  for (let y = patchStart; y < patchEnd; y++) {
+    for (let x = patchStart; x < patchEnd; x++) rgba.set(patch, (y * pixels + x) * 4);
+  }
+
+  // The logo over the solid patch: each pixel blends by the logo's alpha.
+  const side = Math.round(place.logo.size * scale);
+  const logoStart = toPixel(place.logo.x);
+  for (let y = 0; y < side; y++) {
+    for (let x = 0; x < side; x++) {
+      const from = (y * side + x) * 4;
+      const to = ((logoStart + y) * pixels + logoStart + x) * 4;
+      const alpha = logo[from + 3]! / 255;
+      for (let c = 0; c < 3; c++) {
+        rgba[to + c] = logo[from + c]! * alpha + rgba[to + c]! * (1 - alpha);
+      }
+    }
+  }
+  return rgbaPng(pixels, rgba);
 }
 
 /** The palette colours of a Style for these shades: 0 is all background, `edgeShades - 1` all code. */
