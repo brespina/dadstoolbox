@@ -160,9 +160,8 @@ page, so those Tools set `worker: false`.
 `context.progress(fraction)` with how far along that file is, from 0 to 1; its row then
 shows "Working… 40%", and the live region hears it at 25%, 50% and 75% only. Call it as
 often as you like, in the page or in a worker: only a new whole percent is sent or shown.
-A Tool that never calls it shows plain "Working…". The shared video module takes it as
-`onProgress` (`remakeVideo(file, { reasons, onProgress: (f) => context?.progress(f) })`,
-see `src/tools/video-to-mp4/run.ts`).
+A Tool that never calls it shows plain "Working…". Every Tool that calls `remakeVideo`
+passes it on (see [Remaking a video](#remaking-a-video)).
 
 **Loading.** Import libraries in `run.ts`, never in `declaration.ts`. A small library can
 load with the page. A big one (such as a video library or a fallback photo decoder)
@@ -209,7 +208,11 @@ or sound. Make a video play anywhere (`src/tools/video-to-mp4/`) is the worked e
   video smaller). `fitLongestSide` in `src/video/size.ts` gives the size it makes, for an
   estimate.
 - `range` keeps only the part from `start` to `end` (seconds), cut exactly (Trim a
-  video).
+  video). Its values come from the file's own options (see
+  [Options for each file](#options-for-each-file)).
+- `onProgress` is called with how far along the video is, from 0 to 1. Pass
+  `onProgress: (f) => context?.progress(f)` so the file's row shows "Working… 40%" (see
+  **Progress** above). Every video Tool passes it.
 - A new setting is a new field of `RemakeSettings`.
 
 ## Notes on the Ready row
