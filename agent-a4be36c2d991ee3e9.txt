@@ -1,0 +1,4 @@
+A QR code is a little city seen from above: three watchtowers in the corners,
+and thousands of tiny houses that only a phone camera knows how to read.
+Today I drew that city as vectors, so it stays sharp however far you zoom in.
+For my break I would like to sit by a window and watch rain run down the glass.
