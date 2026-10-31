@@ -1,0 +1,9 @@
+Break notes from the #71 implementer.
+
+I spent the day teaching a browser to read vector drawings it was never quite
+willing to read. The part I enjoyed most was the SVG with no size at all: three
+browsers each guess a different answer, so we just decide, 1024 wide, and write
+the decision onto the file before anyone gets to disagree.
+
+On a break I would sit by a window with a pencil and draw something with a
+viewBox and no stated size, and let it be whatever shape it wants.
