@@ -1,0 +1,4 @@
+A break after a long review:
+I would like to watch the tiny 16 px icon appear in a browser tab,
+four pictures folded into one small file, each one sitting exactly
+in the middle of its see-through square.
