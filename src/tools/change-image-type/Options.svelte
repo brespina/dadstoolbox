@@ -3,16 +3,23 @@
   import RemoveLocation from '../../photos/RemoveLocation.svelte';
   import { canSaveWebp } from '../../photos/webp';
   import { text } from '../../text';
-  import type { Format, Options } from './declaration';
+  import type { OptionsProps } from '../types';
+  import type { Options } from './declaration';
+  import { offeredFormats } from './formats';
 
-  let { options = $bindable() }: { options: Options } = $props();
+  let { options = $bindable(), fileTypes = [] }: OptionsProps<Options> = $props();
 
   // WebP is offered only where the browser can save it, so it is checked on the page.
   let webp = $state(false);
   onMount(() => {
     canSaveWebp().then((yes) => (webp = yes));
   });
-  let formats: Format[] = $derived(webp ? ['jpg', 'png', 'webp'] : ['jpg', 'png']);
+  // A type the chosen images already are is left out, so no choice does nothing.
+  let formats = $derived(offeredFormats(fileTypes, webp));
+  // If the chosen type was left out, the first type still offered takes its place.
+  $effect(() => {
+    if (!formats.includes(options.format)) options.format = formats[0]!;
+  });
 </script>
 
 <fieldset class="save-as">

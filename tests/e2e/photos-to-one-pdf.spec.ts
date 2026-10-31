@@ -13,7 +13,7 @@ const jpg = `${photos('make-photo-smaller')}sample.jpg`;
 // An iPhone photo (HEIC), stored 48 × 32 and marked "turn a quarter turn". Has a location.
 const heic = `${photos('make-photo-smaller')}IMG_1234.HEIC`;
 // A wide 20 × 10 PNG.
-const png = `${photos('photo-to-jpg')}transparent.png`;
+const png = `${photos('change-image-type')}transparent.png`;
 
 async function choose(page: Page, files: string[]) {
   const chooser = page.waitForEvent('filechooser');
