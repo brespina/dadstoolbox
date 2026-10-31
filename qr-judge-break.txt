@@ -1,0 +1,4 @@
+Two people drew the same finder squares with the same radii, 3.5, 2.5 and 1.5, without ever meeting.
+I like that the geometry wanted to be that shape: a ring that stays one square thick all the way round.
+On a break I'd sit somewhere with a hand-lettered sign and a pencil, and work out
+how few dots a QR code can lose before a phone gives up. Then I'd go and look at actual trees.

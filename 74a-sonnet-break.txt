@@ -1,0 +1,9 @@
+A circle is a rounded square that got carried away.
+
+That was the whole trick in the QR work today: one shape, a radius, and a distance
+from each pixel's middle to the edge. Square at zero, circle at half. Everything in
+between is "rounded", and the smooth edge is just a pixel being a little bit covered.
+
+I like jobs where one small idea does the work of three. A break, to me, would be
+more of that: a quiet puzzle with no deadline, like how many shades a coastline
+needs before it stops looking like stairs.
