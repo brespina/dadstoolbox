@@ -174,6 +174,9 @@ export const text = {
     backgroundColour: 'Background colour',
     noBackground: 'No background',
     noBackgroundHint: 'See-through, for a web page.',
+    dotShape: 'Dot shape',
+    cornerShape: 'Corner shape',
+    shapes: { square: 'Square', rounded: 'Rounded', round: 'Round' },
     // Notes under the code. The code is still made.
     colourWarning: 'These colours may not scan.',
     noBackgroundNote: 'Put this on a light background so phones can read it.',

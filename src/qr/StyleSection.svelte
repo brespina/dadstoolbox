@@ -1,9 +1,9 @@
 <script lang="ts">
   // The shared Style section for the QR code Tools, closed until opened. Its defaults
   // draw today's black-on-white code, so a section never opened changes nothing.
-  // Dot and corner shapes (#74), Save as (#75) and a logo (#76) join it here.
+  // Save as (#75) and a logo (#76) join it here.
   import { text } from '../text';
-  import type { QrStyle } from './style';
+  import { shapeNames, type QrStyle } from './style';
 
   let { style = $bindable() }: { style: QrStyle } = $props();
 </script>
@@ -32,6 +32,42 @@
         <span class="muted">{text.qr.noBackgroundHint}</span>
       </span>
     </label>
+
+    <fieldset class="shapes">
+      <legend class="label">{text.qr.dotShape}</legend>
+      <div class="options">
+        {#each shapeNames as shape (shape)}
+          <label class="choice">
+            <input
+              type="radio"
+              class="visually-hidden"
+              name="dot-shape"
+              value={shape}
+              bind:group={style.dotShape}
+            />
+            <span class="face">{text.qr.shapes[shape]}</span>
+          </label>
+        {/each}
+      </div>
+    </fieldset>
+
+    <fieldset class="shapes">
+      <legend class="label">{text.qr.cornerShape}</legend>
+      <div class="options">
+        {#each shapeNames as shape (shape)}
+          <label class="choice">
+            <input
+              type="radio"
+              class="visually-hidden"
+              name="corner-shape"
+              value={shape}
+              bind:group={style.cornerShape}
+            />
+            <span class="face">{text.qr.shapes[shape]}</span>
+          </label>
+        {/each}
+      </div>
+    </fieldset>
   </div>
 </details>
 
@@ -125,6 +161,54 @@
     margin: 0.1rem 0.625rem 0;
     flex-shrink: 0;
     accent-color: var(--action);
+  }
+
+  .shapes {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  legend {
+    padding: 0;
+    margin-bottom: 0.5rem;
+  }
+
+  .options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
+    gap: 0.5rem;
+  }
+
+  /* Each choice is a big button; the chosen one is filled in. */
+  .choice {
+    display: flex;
+    cursor: pointer;
+  }
+
+  .face {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 2.75rem;
+    box-sizing: border-box;
+    padding: 0.5rem 0.75rem;
+    border: 2px solid var(--action);
+    border-radius: 0.5rem;
+    background: var(--bg);
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  input:checked + .face {
+    background: var(--action);
+    color: var(--action-text);
+  }
+
+  input:focus-visible + .face {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
   }
 
   .check > span {
