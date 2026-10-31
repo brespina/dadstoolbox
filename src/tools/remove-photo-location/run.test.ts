@@ -100,7 +100,7 @@ describe('Remove photo location', () => {
     const png = file(bytes('transparent.png'), 'transparent.png', 'image/png');
     const failure = await run(png, tool.defaultOptions).catch((e: unknown) => e);
     expect(failure).toBeInstanceOf(ToolFailure);
-    expect((failure as ToolFailure).reason).toBe("This kind of photo doesn't carry a location.");
+    expect((failure as ToolFailure).reason).toBe(tool.reasons.notCarried);
   });
 
   it("doesn't save a copy when the location can't be read", async () => {

@@ -85,8 +85,8 @@ test('Start and End set through the preview give a clip that long, with its soun
   expect(clip).toMatchObject({ width: 320, sound: 'aac' });
 });
 
-test('a long clip shows a rising percentage', async ({ page }) => {
-  // Note every percent the page shows, however briefly.
+/** Notes every percent the page shows, however briefly; `seenPercents` reads them back. */
+async function watchPercents(page: Page) {
   await page.evaluate(() => {
     const seen: number[] = [];
     (window as unknown as { seen: number[] }).seen = seen;
@@ -97,13 +97,36 @@ test('a long clip shows a rising percentage', async ({ page }) => {
       }
     }).observe(document.body, { subtree: true, childList: true, characterData: true });
   });
+}
+
+const seenPercents = (page: Page) =>
+  page.evaluate(() => (window as unknown as { seen: number[] }).seen);
+
+test('a long clip shows a rising percentage', async ({ page }) => {
+  await watchPercents(page);
   // Start and End left as they are: the whole minute.
   await choose(page, [long]);
   await page.getByRole('button', { name: tool.startButton }).click();
   await expect(page.getByText(tool.allDone)).toBeVisible({ timeout: 60_000 });
-  const seen = await page.evaluate(() => (window as unknown as { seen: number[] }).seen);
+  const seen = await seenPercents(page);
   expect(seen.length).toBeGreaterThan(3);
   expect(seen).toEqual([...seen].sort((a, b) => a - b));
+});
+
+test('the percentage counts only the part kept, from near 0 to near 100', async ({ page }) => {
+  await watchPercents(page);
+  await choose(page, [long]);
+  // The middle third: counted against the whole minute, it would run from 33 to 66.
+  await setAt(page, 0, 'Start', 20);
+  await setAt(page, 0, 'End', 40);
+  await expect(page.getByText('The clip will be 0:20.0 long.')).toBeVisible();
+  await page.getByRole('button', { name: tool.startButton }).click();
+  await expect(page.getByText(tool.allDone)).toBeVisible({ timeout: 60_000 });
+  const seen = await seenPercents(page);
+  expect(seen.length).toBeGreaterThan(3);
+  expect(seen).toEqual([...seen].sort((a, b) => a - b));
+  expect(seen[0]).toBeLessThan(20);
+  expect(seen.at(-1)).toBeGreaterThan(80);
 });
 
 test('two videos keep their own Start and End', async ({ page }) => {

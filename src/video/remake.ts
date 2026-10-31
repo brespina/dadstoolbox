@@ -11,6 +11,7 @@
 
 import {
   ALL_FORMATS,
+  AudioSampleSink,
   BlobSource,
   BufferTarget,
   canEncodeVideo,
@@ -18,6 +19,7 @@ import {
   Input,
   Mp4OutputFormat,
   Output,
+  type InputAudioTrack,
 } from 'mediabunny';
 import { ToolFailure, type Reason } from '../tools/types';
 import type { VideoReasonKey } from './reasons';
@@ -40,9 +42,9 @@ export interface RemakeSettings {
 
 /**
  * Remakes a video as an H.264 MP4 with AAC sound, the picture size kept unless a
- * longest side is given. Sound already in
- * AAC is copied as is. It never drops the picture or the sound: when the browser can't
- * make either, it throws a ToolFailure with a plain reason instead.
+ * longest side is given. Sound already in AAC is copied as is; other sound is remade.
+ * It never drops the picture or the sound: when the browser can't make either, it
+ * throws a ToolFailure with a plain reason instead.
  */
 export async function remakeVideo(
   file: Blob,
@@ -89,11 +91,43 @@ export async function remakeVideo(
     if (!conversion.isValid || dropped.includes('video')) throw new ToolFailure(reasons.cantMake);
     // Such as Opus sound on a browser that can't make AAC: never save a silent video.
     if (dropped.includes('audio')) throw new ToolFailure(reasons.cantKeepSound);
+    // Sound that isn't AAC is remade, so the browser must read it. WebKit on Linux says it
+    // reads Opus but never gives back any sound, which would leave the row on Working…
+    for (const track of conversion.utilizedTracks) {
+      if (!track.isAudioTrack() || (await track.getCodec()) === 'aac') continue;
+      if (!(await readsSound(track, range?.start ?? 0))) {
+        throw new ToolFailure(reasons.cantKeepSound);
+      }
+    }
 
     if (onProgress) conversion.onProgress = (fraction) => onProgress(fraction);
     await conversion.execute();
     return new Blob([output.target.buffer!], { type: 'video/mp4' });
   } finally {
     input.dispose();
+  }
+}
+
+/** How long to wait for the first bit of sound before deciding the browser can't read it. */
+const soundWait = 10_000;
+
+/** Whether the browser gives back the first bit of this sound in good time. */
+async function readsSound(track: InputAudioTrack, from: number): Promise<boolean> {
+  const samples = new AudioSampleSink(track).samples(from);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<'late'>(
+    (resolve) => (timer = setTimeout(() => resolve('late'), soundWait)),
+  );
+  try {
+    const first = await Promise.race([samples.next(), late]);
+    if (first === 'late') return false;
+    first.value?.close();
+    // Not awaited: a stuck reader never finishes, and the caller disposes of the input.
+    void samples.return().catch(() => {});
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
   }
 }

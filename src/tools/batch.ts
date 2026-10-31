@@ -128,14 +128,14 @@ function makeToolPage<Options extends object>(
   // Each file on its own: every chosen file stays chosen until the page closes, so
   // changed options can run it again. `ranWith` holds the options it has run with, as
   // optionsKey text. All files together: the list is used up by each press.
-  // `fileOptions` holds the file's own values for the Tool's `fileOptions`, which
+  // `entry.fileOptions` holds the file's own values for the Tool's `fileOptions`, which
   // replace the page's options for that file.
-  type Chosen = { entry: WaitingFile; file: File; ranWith: Set<string>; fileOptions: object };
+  type Chosen = { entry: WaitingFile; file: File; ranWith: Set<string> };
   let chosen: Chosen[] = [];
   const waiting = () => chosen.filter(({ ranWith }) => ranWith.size === 0);
-  const forFile = (options: Options, { fileOptions }: Chosen): Options => ({
+  const forFile = (options: Options, { entry }: Chosen): Options => ({
     ...options,
-    ...fileOptions,
+    ...entry.fileOptions,
   });
   const toDo = (options: Options) => {
     if (tool.input === 'together') return waiting();
@@ -158,7 +158,7 @@ function makeToolPage<Options extends object>(
 
   const state = (): ToolPageState => ({
     // Files never run yet. Files run before are in their Batches.
-    waiting: waiting().map(({ entry, fileOptions }) => ({ ...entry, fileOptions })),
+    waiting: waiting().map(({ entry }) => entry),
     batches,
     working,
   });
@@ -300,11 +300,10 @@ function makeToolPage<Options extends object>(
             status: 'ready',
             large: file.size > tool.largeFileLimit,
             file,
-            fileOptions: {},
+            fileOptions: startingFileOptions(),
           },
           file,
           ranWith: new Set(),
-          fileOptions: startingFileOptions(),
         });
       }
       changed();
@@ -316,7 +315,9 @@ function makeToolPage<Options extends object>(
      */
     setFileOptions(id: number, values: Partial<Options>) {
       chosen = chosen.map((c) =>
-        c.entry.id === id ? { ...c, fileOptions: { ...c.fileOptions, ...values } } : c,
+        c.entry.id === id
+          ? { ...c, entry: { ...c.entry, fileOptions: { ...c.entry.fileOptions, ...values } } }
+          : c,
       );
       changed();
     },
