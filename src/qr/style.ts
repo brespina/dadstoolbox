@@ -1,12 +1,16 @@
 // How a QR code looks (its Style, see GLOSSARY.md), shared by the QR code Tools. Plain
 // data, so the Tools' declarations can use the plain Style as their default.
-// Saving as SVG (#75) and a logo (#76) join it later.
+// A logo in the middle (#76) joins it later.
 
 import { text } from '../text';
 
 /** How the dots, or the three big corner squares, are drawn. Square comes first. */
 export const shapeNames = ['square', 'rounded', 'round'] as const;
 export type ShapeName = (typeof shapeNames)[number];
+
+/** What a code is saved as. PNG comes first. */
+export const saveTypes = ['png', 'svg'] as const;
+export type SaveType = (typeof saveTypes)[number];
 
 export interface QrStyle {
   /** The code's colour, as "#rrggbb". */
@@ -19,6 +23,8 @@ export interface QrStyle {
   dotShape: ShapeName;
   /** The shape of the three big corner squares. */
   cornerShape: ShapeName;
+  /** The kind of file the code is saved as. */
+  saveAs: SaveType;
 }
 
 /** Today's code: black on white. A closed Style section gives it. */
@@ -28,6 +34,7 @@ export const plainStyle: QrStyle = {
   noBackground: false,
   dotShape: 'square',
   cornerShape: 'square',
+  saveAs: 'png',
 };
 
 /** What a code with no background is meant to sit on. */

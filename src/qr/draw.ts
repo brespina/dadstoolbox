@@ -3,6 +3,7 @@ import { create } from 'qrcode';
 import { palettePng, type PaletteColour } from './png';
 import { codeParts, type Part, type RoundedSquare } from './shapes';
 import { rgb, styleWarnings, type QrStyle } from './style';
+import { svgBlob } from './svg';
 
 /** The border around the code, in squares. Scanners need at least 4. */
 const margin = 4;
@@ -26,7 +27,7 @@ export class TooLongForCode extends Error {
 
 /** A drawn code, and the notes to show under it. */
 export interface QrDrawing {
-  /** A PNG of the code. */
+  /** The code, as a PNG or an SVG, as the Style says. */
   blob: Blob;
   /** Notes under the code, such as colours that may not scan. They never stop it. */
   warnings: string[];
@@ -52,6 +53,12 @@ export function drawQr(content: string, style: QrStyle): QrDrawing {
     style.dotShape,
     style.cornerShape,
   );
+  if (style.saveAs === 'svg') {
+    return {
+      blob: svgBlob({ parts, border: margin, total, pixels, style }),
+      warnings: styleWarnings(style),
+    };
+  }
   const levels = paintParts(parts, pixels, scale);
   // Only the shades that appear get a palette colour: a code of square shapes has just
   // background and code, so it stays a 2-colour, 1-bit PNG.

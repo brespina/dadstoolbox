@@ -207,6 +207,77 @@ describe('the shared QR drawing', () => {
     });
   });
 
+  describe('saving as SVG', () => {
+    const svgStyle = (changes: Partial<QrStyle> = {}) => style({ saveAs: 'svg', ...changes });
+    const svgText = (changes: Partial<QrStyle> = {}, typed = 'hello') =>
+      drawQr(typed, svgStyle(changes)).blob.text();
+
+    it('saves as PNG unless SVG is chosen', () => {
+      expect(plainStyle.saveAs).toBe('png');
+      expect(drawQr('hello', plainStyle).blob.type).toBe('image/png');
+    });
+
+    it('draws a standalone SVG file, with a size so a picture of it has one', async () => {
+      const { blob, warnings } = drawQr('hello', svgStyle());
+      expect(blob.type).toBe('image/svg+xml');
+      expect(warnings).toEqual([]);
+      const svg = await blob.text();
+      expect(svg).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" /);
+      // Version 1 is 21 squares, and the border adds 4 on each side: 29 squares.
+      expect(svg).toContain('viewBox="0 0 29 29"');
+      const width = Number(/ width="(\d+)"/.exec(svg)![1]);
+      expect(width).toBeGreaterThanOrEqual(720);
+      expect(svg).toContain(` height="${width}"`);
+      // Nothing it needs from outside the file.
+      expect(svg).not.toMatch(/<script|<image|href=|<style|@import|<\?xml-stylesheet/);
+      expect(svg.trim().endsWith('</svg>')).toBe(true);
+    });
+
+    it('draws the code and background colours, and leaves out the background when none', async () => {
+      const coloured = await svgText({ code: '#1a237e', background: '#fff59d' });
+      expect(coloured).toMatch(/<rect [^>]*width="29" height="29" fill="#fff59d"/);
+      expect(coloured).toMatch(/<path [^>]*fill="#1a237e"/);
+      expect(coloured).not.toContain('#000000');
+
+      const none = await svgText({ code: '#004d40', noBackground: true, background: '#fff59d' });
+      expect(none).not.toContain('<rect');
+      expect(none).not.toContain('#fff59d');
+      expect(none).toMatch(/<path [^>]*fill="#004d40"/);
+    });
+
+    it('gives the same warnings as the PNG', () => {
+      expect(drawQr('hello', svgStyle({ noBackground: true })).warnings).toEqual([
+        'Put this on a light background so phones can read it.',
+      ]);
+      expect(drawQr('hello', svgStyle({ code: '#ffeb3b' })).warnings).toEqual([
+        'These colours may not scan.',
+      ]);
+    });
+
+    it('draws the shapes as curves, and square shapes as straight lines only', async () => {
+      const square = await svgText();
+      expect(square).not.toMatch(/ d="[^"]*a/);
+      expect(square).toContain('crispEdges');
+      for (const changes of [{ dotShape: 'round' }, { cornerShape: 'rounded' }] as const) {
+        const shaped = await svgText(changes);
+        expect(shaped).toMatch(/ d="[^"]*a/);
+        expect(shaped).not.toContain('crispEdges');
+      }
+    });
+
+    it('grows with the text, and cuts rings out by the even-odd rule', async () => {
+      const short = await svgText({}, 'hi');
+      const long = await svgText({}, 'https://example.com/menu?table=4');
+      expect(short).toContain('fill-rule="evenodd"');
+      expect(long.length).toBeGreaterThan(short.length);
+      expect(long).toContain('viewBox="0 0 37 37"');
+    });
+
+    it('still throws TooLongForCode', () => {
+      expect(() => drawQr('a'.repeat(5000), svgStyle())).toThrow(TooLongForCode);
+    });
+  });
+
   it('throws TooLongForCode when the text is too long for one code', () => {
     expect(() => drawQr('a'.repeat(5000), plainStyle)).toThrow(TooLongForCode);
   });
