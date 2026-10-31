@@ -20,6 +20,9 @@ export const plainStyle: QrStyle = {
   noBackground: false,
 };
 
+/** What a code with no background is meant to sit on. */
+const paper = '#ffffff';
+
 /** Below this contrast between code and background, many phone cameras struggle. */
 const leastContrast = 3;
 
@@ -29,8 +32,8 @@ export function rgb(colour: string): [number, number, number] {
   return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
 }
 
-/** How light a colour looks, from 0 (black) to 1 (white), as WCAG measures it. */
-function lightness(colour: string) {
+/** A colour's relative luminance, from 0 (black) to 1 (white), as WCAG measures it. */
+function luminance(colour: string) {
   const [r, g, b] = rgb(colour).map((part) => {
     const c = part / 255;
     return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
@@ -44,8 +47,8 @@ function lightness(colour: string) {
  * is checked against white, where the note says to put it.
  */
 export function styleWarnings(style: QrStyle): string[] {
-  const code = lightness(style.code);
-  const background = lightness(style.noBackground ? plainStyle.background : style.background);
+  const code = luminance(style.code);
+  const background = luminance(style.noBackground ? paper : style.background);
   // Below 1 when the code is lighter than its background.
   const contrast = (background + 0.05) / (code + 0.05);
   return [

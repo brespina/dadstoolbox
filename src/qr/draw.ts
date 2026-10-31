@@ -47,10 +47,8 @@ export function drawQr(content: string, style: QrStyle): QrDrawing {
     const c = col - margin;
     return r >= 0 && c >= 0 && r < size && c < size && data[r * size + c] === 1;
   };
-  const background: PaletteColour = style.noBackground
-    ? seeThrough
-    : [...rgb(style.background), 255];
-  const palette = [background, [...rgb(style.code), 255] as const];
+  const solid = (colour: string): PaletteColour => [...rgb(colour), 255];
+  const palette = [style.noBackground ? seeThrough : solid(style.background), solid(style.code)];
   const blob = palettePng(total * scale, palette, (x, y) =>
     isDark(Math.floor(y / scale), Math.floor(x / scale)) ? 1 : 0,
   );

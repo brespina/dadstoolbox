@@ -119,7 +119,7 @@
         >
       </figcaption>
     </figure>
-    {#each state.result.warnings as warning (warning)}
+    {#each state.result.warnings as warning, index (index)}
       <p class="warning">{warning}</p>
     {/each}
   {/if}
