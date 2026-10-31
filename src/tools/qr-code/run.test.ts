@@ -28,7 +28,7 @@ describe('QR code maker', () => {
   });
 
   it('makes a styled code that reads back, with its warnings', async () => {
-    const style = { code: '#1a237e', background: '#fff59d', noBackground: false };
+    const style = { ...plainStyle, code: '#1a237e', background: '#fff59d', noBackground: false };
     const [result] = await run('https://example.com/menu', { style });
     expect((await readCode(result!.blob)).text).toBe('https://example.com/menu');
     expect(result!.warnings).toEqual([]);

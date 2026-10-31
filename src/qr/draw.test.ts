@@ -111,6 +111,91 @@ describe('the shared QR drawing', () => {
     expect(drawQr('hello', style({ code, background })).warnings).toEqual([]);
   });
 
+  describe('dot and corner shapes', () => {
+    const shapes = ['square', 'rounded', 'round'] as const;
+    const combos = shapes.flatMap((dotShape) =>
+      shapes.map((cornerShape) => [dotShape, cornerShape]),
+    );
+
+    it.each(combos)('reads back with %s dots and %s corners', async (dotShape, cornerShape) => {
+      const shaped = style({ dotShape, cornerShape } as Partial<QrStyle>);
+      for (const typed of ['hello', 'https://example.com/menu?table=4', 'Café crème ☕ for Zoë']) {
+        expect(await readCode(drawQr(typed, shaped).blob)).toBe(typed);
+      }
+    });
+
+    it('reads back at a long text too, with the biggest dots to place', async () => {
+      const typed = 'Wi-Fi password: garden shed 42. '.repeat(12);
+      const shaped = style({ dotShape: 'round', cornerShape: 'round' });
+      expect(await readCode(drawQr(typed, shaped).blob)).toBe(typed);
+    });
+
+    it('reads back with colours', async () => {
+      const shaped = style({
+        dotShape: 'round',
+        cornerShape: 'rounded',
+        code: '#1a237e',
+        background: '#fff59d',
+      });
+      expect(await readCode(drawQr('hello', shaped).blob)).toBe('hello');
+    });
+
+    it('reads back with no background, and keeps the background see-through around the edges', async () => {
+      const shaped = style({ dotShape: 'round', cornerShape: 'round', noBackground: true });
+      const { blob } = drawQr('hello', shaped);
+      expect(await readCode(blob)).toBe('hello');
+      const { png, at } = await pixels(blob);
+      expect(at(0, 0)).toEqual([255, 255, 255, 0]);
+      // Edges are partly see-through code colour, not white or black pixels.
+      const partial = new Set<number>();
+      for (let i = 3; i < png.data.length; i += 4) {
+        const a = png.data[i]!;
+        if (a > 0 && a < 255) {
+          partial.add(a);
+          // A see-through edge keeps the code's colour.
+          expect([...png.data.subarray(i - 3, i)]).toEqual([0, 0, 0]);
+        }
+      }
+      expect(partial.size).toBeGreaterThanOrEqual(8);
+    });
+
+    it('blends the edges between code and background colours, so they look smooth', async () => {
+      const { blob } = drawQr('hello', style({ dotShape: 'round', cornerShape: 'round' }));
+      expect((await colours(blob)).size).toBeGreaterThanOrEqual(8);
+    });
+
+    it('draws the square shapes exactly as before, in two colours', async () => {
+      const { blob } = drawQr('hello', style({ dotShape: 'square', cornerShape: 'square' }));
+      expect((await colours(blob)).size).toBe(2);
+    });
+
+    it('draws a round dot as a circle, with its corners left as background', async () => {
+      // A lone dark module's corner is background when round, code when square.
+      const round = style({ dotShape: 'round', cornerShape: 'square' });
+      const square = style({ dotShape: 'square', cornerShape: 'square' });
+      // The 8x8 finder area aside, the format-information dark module sits at row 4v+9.
+      // v1 (21 modules): row 13, column 8; margin 4; scale = ceil(720 / 29) = 25.
+      const scale = 25;
+      const x = (8 + 4) * scale;
+      const y = (13 + 4) * scale;
+      const dark = await pixels(drawQr('hello', square).blob);
+      const dot = await pixels(drawQr('hello', round).blob);
+      expect(dark.at(x, y)).toEqual([0, 0, 0, 255]);
+      expect(dot.at(x, y)).toEqual([255, 255, 255, 255]);
+      expect(dot.at(x + 12, y + 12)).toEqual([0, 0, 0, 255]);
+    });
+
+    it('draws a round corner with the finder rings still one module thick on the middle row', async () => {
+      const { blob } = drawQr('hello', style({ cornerShape: 'round' }));
+      const { at } = await pixels(blob);
+      const scale = 25;
+      const row = (4 + 3.5) * scale;
+      // dark ring, light ring, dark centre, light ring, dark ring across the finder.
+      const runs = [0, 1, 2, 3, 4, 5, 6].map((m) => at((4 + m) * scale + 12, Math.floor(row))[0]);
+      expect(runs).toEqual([0, 255, 0, 0, 0, 255, 0]);
+    });
+  });
+
   it('throws TooLongForCode when the text is too long for one code', () => {
     expect(() => drawQr('a'.repeat(5000), plainStyle)).toThrow(TooLongForCode);
   });
