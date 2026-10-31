@@ -6,16 +6,16 @@ Which model and effort each subagent gets, and the evidence behind each choice. 
 
 Pass the Model and Effort below as the Agent tool's `model` and `effort`.
 
-| Role | Model | Effort | Evidence |
-|---|---|---|---|
-| Implementer, **pattern** ticket | sonnet | high | Starting guess |
-| Implementer, **foundation** ticket | opus | high | Starting guess |
-| Implementer, **hand-drawn** ticket | opus | high | Starting guess |
-| Exploration (notes folder) | sonnet | medium | Starting guess |
-| Quick lookup (find a file or fact) | haiku | low | Starting guess |
-| Reviewer, one PR | sonnet | high | Starting guess |
-| Reviewer, whole branch | opus | high | Starting guess |
-| Duel judge | opus | high | Fixed: the judge is the measuring stick, so it never duels |
+| Role                               | Model  | Effort | Evidence                                                   |
+| ---------------------------------- | ------ | ------ | ---------------------------------------------------------- |
+| Implementer, **pattern** ticket    | sonnet | high   | Starting guess                                             |
+| Implementer, **foundation** ticket | opus   | high   | Starting guess                                             |
+| Implementer, **hand-drawn** ticket | opus   | high   | Starting guess                                             |
+| Exploration (notes folder)         | sonnet | medium | Starting guess                                             |
+| Quick lookup (find a file or fact) | haiku  | low    | Starting guess                                             |
+| Reviewer, one PR                   | sonnet | high   | Starting guess                                             |
+| Reviewer, whole branch             | opus   | high   | Starting guess                                             |
+| Duel judge                         | opus   | high   | Fixed: the judge is the measuring stick, so it never duels |
 
 The lead is the user's session. Suggest Opus at medium effort, and high for grilling and spec writing.
 
@@ -56,5 +56,5 @@ A tie goes to the cheaper arm: the question is whether the cheaper model is enou
 
 One row per duel or rescue. Tokens, tool calls and minutes come from each subagent's task notification. Judge scores are out of 20.
 
-| Date | Spec | Ticket | Kind | A | B | Checks green on first push (A / B) | Judge (A / B) | Tokens (A / B) | Minutes (A / B) | Winner | Note |
-|---|---|---|---|---|---|---|---|---|---|---|---|
+| Date | Spec | Ticket | Kind | A   | B   | Checks green on first push (A / B) | Judge (A / B) | Tokens (A / B) | Minutes (A / B) | Winner | Note |
+| ---- | ---- | ------ | ---- | --- | --- | ---------------------------------- | ------------- | -------------- | --------------- | ------ | ---- |
