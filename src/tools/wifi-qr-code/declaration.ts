@@ -20,6 +20,7 @@ export const tool = defineTool({
   textFor: (options) => ({ pictureLabel: `Wi-Fi QR code for ${options.name}` }),
   reasons: {
     tooLong: 'This is too long for one code. Try a shorter name or password.',
+    logo: "This logo didn't open. Choose a PNG, JPG, WebP or SVG.",
   },
   notes: {
     name: 'Network name',

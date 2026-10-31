@@ -1,10 +1,12 @@
 // Draws a QR code in a Style, shared by the QR code Tools: the one place a code is drawn.
 import { create } from 'qrcode';
+import { sizeSvg } from '../photos/svg';
+import { fileTypeOf } from '../tools/file-type';
 import { paintLogoOnCanvas } from './paint-logo';
 import { palettePng, rgbaPng, type PaletteColour } from './png';
 import { codeParts, logoPlace, type LogoPlace, type Part, type RoundedSquare } from './shapes';
 import { rgb, styleWarnings, type QrStyle } from './style';
-import { svgBlob } from './svg';
+import { svgBlob, type SvgLogo } from './svg';
 
 /** The border around the code, in squares. Scanners need at least 4. */
 const margin = 4;
@@ -92,7 +94,11 @@ export async function drawQr(
   );
   const warnings = styleWarnings(style);
   if (style.saveAs === 'svg') {
-    return { blob: svgBlob({ parts, border: margin, total, pixels, style }), warnings };
+    const logo =
+      style.logo && place
+        ? await svgLogo(paintLogo, style, style.logo, place, pixels / total)
+        : undefined;
+    return { blob: svgBlob({ parts, border: margin, total, pixels, style, logo }), warnings };
   }
   const levels = paintParts(parts, pixels, scale);
   if (style.logo && place) {
@@ -119,11 +125,47 @@ async function logoPixels(paintLogo: PaintLogo, logo: File, side: number) {
 }
 
 /**
- * The patch under a logo: the background colour, or white when there is none, so the
- * logo and the code around it still read on any surface.
+ * The patch under a logo, as "#rrggbb": the background colour, or white when there is
+ * none, so the logo and the code around it still read on any surface.
  */
 function patchColour(style: QrStyle) {
-  return rgb(style.noBackground ? '#ffffff' : style.background);
+  return style.noBackground ? '#ffffff' : style.background;
+}
+
+/** A raster logo in an SVG has twice the pixels the file's stated size needs, so it stays sharp zoomed in. */
+const svgLogoDetail = 2;
+
+/**
+ * The logo for an SVG code, held inside the file. An SVG logo is kept as it is, so it
+ * stays sharp at any size; any other is drawn and held as a PNG, so a big photo doesn't
+ * make a big file.
+ */
+async function svgLogo(
+  paintLogo: PaintLogo,
+  style: QrStyle,
+  logo: File,
+  place: LogoPlace,
+  pixelsPerSquare: number,
+): Promise<SvgLogo> {
+  const side = Math.ceil(place.logo.size * pixelsPerSquare * svgLogoDetail);
+  // Drawn even for an SVG logo, so one that won't open fails here as it does in a PNG.
+  const drawn = await logoPixels(paintLogo, logo, side);
+  const href =
+    fileTypeOf(logo) === 'image/svg+xml'
+      ? // Sized, so a logo that states no size still fills its box.
+        dataAddress('image/svg+xml', new TextEncoder().encode(sizeSvg(await logo.text()).markup))
+      : dataAddress('image/png', new Uint8Array(await rgbaPng(side, drawn).arrayBuffer()));
+  return { patch: place.patch, patchColour: patchColour(style), box: place.logo, href };
+}
+
+/** Bytes as a data address ("data:<type>;base64,..."), which holds them inside a file. */
+function dataAddress(type: string, bytes: Uint8Array) {
+  let binary = '';
+  // In parts, as one call with millions of arguments would overflow the stack.
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return `data:${type};base64,${btoa(binary)}`;
 }
 
 /**
@@ -146,7 +188,7 @@ function pngWithLogo(
   levels.forEach((shade, i) => rgba.set(palette[shade]!, i * 4));
 
   const toPixel = (squares: number) => Math.round((squares + margin) * scale);
-  const patch = [...patchColour(style), 255];
+  const patch = [...rgb(patchColour(style)), 255];
   const patchStart = toPixel(place.patch.x);
   const patchEnd = toPixel(place.patch.x + place.patch.size);
   for (let y = patchStart; y < patchEnd; y++) {

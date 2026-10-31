@@ -1,4 +1,4 @@
-import { drawQr, TooLongForCode } from '../../qr/draw';
+import { drawQr, LogoNotOpened, TooLongForCode } from '../../qr/draw';
 import { ToolFailure, type ToolTextRun } from '../types';
 import { tool } from './declaration';
 
@@ -21,6 +21,7 @@ export const run: ToolTextRun<typeof tool.defaultOptions> = async (_typed, optio
     return [await drawQr(wifiText(options), options.style)];
   } catch (error) {
     if (error instanceof TooLongForCode) throw new ToolFailure(tool.reasons.tooLong!);
+    if (error instanceof LogoNotOpened) throw new ToolFailure(tool.reasons.logo!);
     throw error;
   }
 };
