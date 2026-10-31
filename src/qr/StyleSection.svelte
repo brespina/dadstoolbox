@@ -1,15 +1,35 @@
 <script lang="ts">
   // The shared Style section for the QR code Tools, closed until opened. Its defaults
   // draw today's black-on-white code, so a section never opened changes nothing.
-  // Save as (#75) and a logo (#76) join it here.
+  // A logo (#76) joins it here.
   import { text } from '../text';
-  import { shapeNames, type QrStyle } from './style';
+  import { saveTypes, shapeNames, type QrStyle } from './style';
 
   let { style = $bindable() }: { style: QrStyle } = $props();
 
-  const shapeChoices = [
-    { field: 'dotShape', legend: text.qr.dotShape, name: 'dot-shape' },
-    { field: 'cornerShape', legend: text.qr.cornerShape, name: 'corner-shape' },
+  // Each is a row of big buttons that sets one field of the Style.
+  const groups = [
+    {
+      field: 'dotShape',
+      legend: text.qr.dotShape,
+      name: 'dot-shape',
+      values: shapeNames,
+      words: text.qr.shapes,
+    },
+    {
+      field: 'cornerShape',
+      legend: text.qr.cornerShape,
+      name: 'corner-shape',
+      values: shapeNames,
+      words: text.qr.shapes,
+    },
+    {
+      field: 'saveAs',
+      legend: text.qr.saveAs,
+      name: 'save-as',
+      values: saveTypes,
+      words: text.qr.saveTypes,
+    },
   ] as const;
 </script>
 
@@ -38,23 +58,26 @@
       </span>
     </label>
 
-    {#each shapeChoices as { field, legend, name } (field)}
-      <fieldset class="shapes">
+    {#each groups as { field, legend, name, values, words } (field)}
+      <fieldset class="group">
         <legend class="label">{legend}</legend>
         <div class="options">
-          {#each shapeNames as shape (shape)}
+          {#each values as value (value)}
             <label class="choice">
               <input
                 type="radio"
                 class="visually-hidden"
                 {name}
-                value={shape}
+                {value}
                 bind:group={style[field]}
               />
-              <span class="face">{text.qr.shapes[shape]}</span>
+              <span class="face">{words[value as keyof typeof words]}</span>
             </label>
           {/each}
         </div>
+        {#if field === 'saveAs'}
+          <p class="muted hint">{text.qr.saveAsHint}</p>
+        {/if}
       </fieldset>
     {/each}
   </div>
@@ -152,7 +175,7 @@
     accent-color: var(--action);
   }
 
-  .shapes {
+  .group {
     margin: 0;
     padding: 0;
     border: 0;
@@ -198,6 +221,10 @@
   input:focus-visible + .face {
     outline: 3px solid var(--focus);
     outline-offset: 2px;
+  }
+
+  .hint {
+    margin: 0.5rem 0 0;
   }
 
   .check > span {

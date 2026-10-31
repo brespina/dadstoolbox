@@ -125,14 +125,15 @@ QR code maker are the worked examples for `together` and `none`, and Make a Wi-F
 for `none` with no type box.
 
 The QR code Tools share their drawing and their Style (see the glossary). `drawQr` in
-`src/qr/draw.ts` takes the text and a `QrStyle` (`src/qr/style.ts`) and gives the PNG
-and its warnings, ready to return from `run`. Each Tool keeps its Style in
+`src/qr/draw.ts` takes the text and a `QrStyle` (`src/qr/style.ts`) and gives the PNG (or the SVG,
+when `saveAs` is `svg`) and its warnings, ready to return from `run`. Each Tool keeps its Style in
 `options.style`, starting from `plainStyle` (black on white), and shows the shared
 `StyleSection.svelte` from `src/qr/` in its options. A new Style choice is a new field
 of `QrStyle`, drawn in `drawQr` and offered in `StyleSection.svelte`, so both Tools get
 it at once. The shapes themselves are plain geometry in `src/qr/shapes.ts` (`codeParts` gives
 rounded squares and rings in module units, with no pixels or colours), so the PNG and the
-SVG (#75) draw the same shapes. `drawQr` rasterises them with smooth edges.
+SVG draw the same shapes. `drawQr` rasterises them with smooth edges; `src/qr/svg.ts` writes
+them as one vector path.
 
 ## The `run` contract
 

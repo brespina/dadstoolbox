@@ -32,6 +32,13 @@ describe('Wi-Fi QR code maker', () => {
     expect(result!.warnings).toEqual(['Put this on a light background so phones can read it.']);
   });
 
+  it('makes an SVG instead when the Style says to save as one', async () => {
+    const style = { ...plainStyle, saveAs: 'svg' } as const;
+    const [result] = await run('', { name: 'Garden Shed', password: 'tomatoes42', style });
+    expect(result!.blob.type).toBe('image/svg+xml');
+    expect(await result!.blob.text()).toContain('<svg ');
+  });
+
   it('makes an open-network code when the password is empty', async () => {
     const [result] = await run('', { name: 'Cafe Guest', password: '', style: plainStyle });
     expect(await readCode(result!.blob)).toBe('WIFI:T:nopass;S:Cafe Guest;;');

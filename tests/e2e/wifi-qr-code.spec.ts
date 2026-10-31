@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import jsQR from 'jsqr';
 import { PNG } from 'pngjs';
 import { test, expect } from './fixtures';
+import { readSvgCode, savedText } from './qr-svg';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -55,4 +56,24 @@ test('the Style section is closed until opened, and its note shows under the cod
   const note = 'Put this on a light background so phones can read it.';
   await expect(page.getByText(note, { exact: true }).first()).toBeVisible();
   await expect(picture).toBeVisible();
+});
+
+test('the code can be saved as an SVG that joins the network', async ({ page }) => {
+  await page.getByLabel('Network name', { exact: true }).fill('Garden Shed');
+  await page.getByLabel('Password', { exact: true }).fill('tomatoes42');
+  const picture = page.getByRole('img', { name: 'Wi-Fi QR code for Garden Shed' });
+  await expect(picture).toBeVisible();
+  await page.locator('summary', { hasText: 'Style' }).click();
+  await page.getByRole('group', { name: 'Save as' }).getByText('SVG', { exact: true }).click();
+
+  const saveButton = page.getByRole('button', { name: 'Save wifi-qr-code_dtb.svg' });
+  await expect(saveButton).toBeVisible();
+  await expect(picture).toBeVisible();
+  const saved = page.waitForEvent('download');
+  await saveButton.click();
+  const download = await saved;
+  expect(download.suggestedFilename()).toBe('wifi-qr-code_dtb.svg');
+  expect(await readSvgCode(page, await savedText(download))).toBe(
+    'WIFI:T:WPA;S:Garden Shed;P:tomatoes42;;',
+  );
 });

@@ -36,6 +36,12 @@ describe('QR code maker', () => {
     expect(pale!.warnings).toEqual(['These colours may not scan.']);
   });
 
+  it('makes an SVG instead when the Style says to save as one', async () => {
+    const [result] = await run('hello', { style: { ...plainStyle, saveAs: 'svg' } });
+    expect(result!.blob.type).toBe('image/svg+xml');
+    expect(await result!.blob.text()).toContain('<svg ');
+  });
+
   it('is square and big enough to print', async () => {
     const code = await readCode((await run('hello', plain))[0]!.blob);
     expect(code.width).toBe(code.height);

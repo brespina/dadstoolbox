@@ -1,5 +1,5 @@
 // The geometry of a QR code's shapes, in squares ("modules"), shared by every way of drawing
-// a code: the PNG today, the SVG (#75) and a logo's gap (#76) later. Nothing here knows
+// a code: the PNG, the SVG and a logo's gap (#76) later. Nothing here knows
 // about pixels or colours, so every drawing gets the same shapes.
 import type { ShapeName } from './style';
 
