@@ -26,7 +26,7 @@ describe('Wi-Fi QR code maker', () => {
   });
 
   it('makes a styled code that reads back, with its warnings', async () => {
-    const style = { code: '#004d40', background: '#ffffff', noBackground: true };
+    const style = { ...plainStyle, code: '#004d40', background: '#ffffff', noBackground: true };
     const [result] = await run('', { name: 'Garden Shed', password: 'tomatoes42', style });
     expect(await readCode(result!.blob)).toBe('WIFI:T:WPA;S:Garden Shed;P:tomatoes42;;');
     expect(result!.warnings).toEqual(['Put this on a light background so phones can read it.']);

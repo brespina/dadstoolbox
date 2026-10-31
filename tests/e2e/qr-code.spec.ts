@@ -98,3 +98,38 @@ test('close colours and no background warn, but the code is still made', async (
   await expect(picture(page, 'hello')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save qr-code_dtb.png' })).toBeEnabled();
 });
+
+test('dot and corner shapes are chosen apart, start on square, and are in the saved picture', async ({
+  page,
+}) => {
+  await box(page).fill('https://example.com/menu');
+  await expect(picture(page, 'https://example.com/menu')).toBeVisible();
+  await styleSection(page).click();
+
+  const dots = page.getByRole('group', { name: 'Dot shape' });
+  const corners = page.getByRole('group', { name: 'Corner shape' });
+  await expect(dots.getByRole('radio')).toHaveCount(3);
+  await expect(dots.locator('label').first()).toHaveText('Square');
+  await expect(corners.locator('label').first()).toHaveText('Square');
+  await expect(dots.getByRole('radio').first()).toBeChecked();
+  await expect(corners.getByRole('radio').first()).toBeChecked();
+
+  // The choices are separate: picking round dots leaves the corners alone.
+  await dots.getByText('Round', { exact: true }).click();
+  await expect(corners.getByRole('radio').first()).toBeChecked();
+  await corners.getByText('Rounded', { exact: true }).click();
+  await expect(dots.getByLabel('Round', { exact: true })).toBeChecked();
+
+  const saveButton = page.getByRole('button', { name: 'Save qr-code_dtb.png' });
+  await expect(async () => {
+    const saved = page.waitForEvent('download');
+    await saveButton.click();
+    const png = PNG.sync.read(await readFile((await (await saved).path())!));
+    // Rounded edges are blended: more than code and background colours.
+    const colours = new Set<number>();
+    for (let i = 0; i < png.data.length; i += 4) colours.add(png.data.readUInt32LE(i));
+    expect(colours.size).toBeGreaterThan(2);
+    const rgba = new Uint8ClampedArray(png.data.buffer, png.data.byteOffset, png.data.length);
+    expect(jsQR(rgba, png.width, png.height)?.data).toBe('https://example.com/menu');
+  }).toPass();
+});
