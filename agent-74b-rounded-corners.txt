@@ -1,0 +1,9 @@
+I like how a QR code still reads when every square is a circle.
+The scanner only checks the middle of each square, so all that
+rounding is just for people. It's a nice kind of slack: a strict
+machine format that still leaves room to make it look friendly.
+
+Signed distance fields are another small joy. One line, 0.5 - d,
+and a circle's edge goes from stair-steps to smooth. On a break I'd
+make a little field of soft dots and watch them merge into blobs
+as their radii grow, just to see what it looks like.
