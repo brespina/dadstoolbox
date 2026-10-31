@@ -3,8 +3,8 @@
 // video calls `remakeVideo` from its `run`, in the worker.
 //
 // It grows one setting at a time (spec #41): Make a video smaller adds a longest side,
-// Trim a video adds a time range, and the progress hook arrives with #48. Each one is a
-// new field of RemakeSettings.
+// Trim a video adds a time range, and every caller passes the progress hook. Each one is
+// a new field of RemakeSettings.
 //
 // Mediabunny is big, so a Tool imports this module with a dynamic import() inside its
 // `run`, under context.gettingReady.
@@ -34,6 +34,8 @@ export interface RemakeSettings {
    * comes before end.
    */
   range?: { start: number; end?: number };
+  /** Called as the video is made, with how far along it is from 0 to 1 (`context.progress`). */
+  onProgress?: (fraction: number) => void;
 }
 
 /**
@@ -44,7 +46,7 @@ export interface RemakeSettings {
  */
 export async function remakeVideo(
   file: Blob,
-  { reasons, longestSide, range }: RemakeSettings,
+  { reasons, longestSide, range, onProgress }: RemakeSettings,
 ): Promise<Blob> {
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   try {
@@ -88,6 +90,7 @@ export async function remakeVideo(
     // Such as Opus sound on a browser that can't make AAC: never save a silent video.
     if (dropped.includes('audio')) throw new ToolFailure(reasons.cantKeepSound);
 
+    if (onProgress) conversion.onProgress = (fraction) => onProgress(fraction);
     await conversion.execute();
     return new Blob([output.target.buffer!], { type: 'video/mp4' });
   } finally {

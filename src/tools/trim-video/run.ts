@@ -10,5 +10,13 @@ export const run: ToolRun<Options> = async (file, options, context) => {
   const loading = import('../../video/remake');
   const { remakeVideo } = await (context?.gettingReady(loading) ?? loading);
   const range = { start: options.start, ...(options.end !== null && { end: options.end }) };
-  return [{ blob: await remakeVideo(file, { reasons: tool.reasons, range }) }];
+  return [
+    {
+      blob: await remakeVideo(file, {
+        reasons: tool.reasons,
+        range,
+        onProgress: (fraction) => context?.progress(fraction),
+      }),
+    },
+  ];
 };

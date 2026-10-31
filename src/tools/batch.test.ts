@@ -109,6 +109,25 @@ describe('watching a Batch', () => {
     ]);
   });
 
+  it('shows how far along the working row is, as a whole percent', async () => {
+    const percents: (number | undefined)[][] = [];
+    const page = createToolPage(tool, async (_f, _options, context) => {
+      for (const fraction of [0, 0.401, 0.404, 0.75, 1]) context!.progress(fraction);
+      return [pdf()];
+    });
+    page.subscribe(
+      (state) => state.batches[0] && percents.push(state.batches[0].items.map((i) => i.percent)),
+    );
+    page.add([file('a.pdf'), file('b.pdf')]);
+    await page.start({});
+    const first = [...new Set(percents.map(([a]) => a))];
+    const second = [...new Set(percents.map(([, b]) => b))];
+    expect(first).toEqual([undefined, 0, 40, 75, 100]);
+    expect(second).toEqual([undefined, 0, 40, 75, 100]);
+    // 40.1% and 40.4% are both 40%: no new snapshot for the same whole percent.
+    expect(percents.filter(([a]) => a === 40)).toHaveLength(1);
+  });
+
   it('shows Getting ready while a Tool waits for something to load, then carries on', async () => {
     let loaded!: () => void;
     const loading = new Promise<void>((resolve) => (loaded = resolve));
@@ -496,6 +515,19 @@ describe('a Tool whose run is marked worker', () => {
       { status: 'failed', reason: 'This file may be damaged or not supported.' },
       { status: 'done' },
     ]);
+  });
+
+  it('shows how far along the file in the worker is', async () => {
+    const page = inWorker(async (_f, _options, context) => {
+      for (const fraction of [0.1, 0.105, 0.29, 0.5]) context!.progress(fraction);
+      return [pdf()];
+    });
+    const seen: (number | undefined)[] = [];
+    page.subscribe((state) => state.batches[0] && seen.push(state.batches[0].items[0]!.percent));
+    page.add([file('a.pdf')]);
+    await page.start({});
+    // Progress comes on its own line, so it may arrive just after the result.
+    await vi.waitFor(() => expect([...new Set(seen)]).toEqual([undefined, 10, 29, 50]));
   });
 
   it('shows Getting ready while the worker loads something', async () => {

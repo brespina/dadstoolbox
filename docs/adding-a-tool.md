@@ -156,8 +156,12 @@ with no photo details, no bigger than a longest side, use `shrinkOnCanvas`
 page, so those Tools set `worker: false`.
 
 **Progress.** Shared code shows "Working on 2 of 5…" as it works through the files, so
-`run` reports nothing itself. `types.ts` has no way yet to report progress within one
-file; add one if a Tool needs it.
+`run` needs to report nothing. For a file that takes a while, `run` may also call
+`context.progress(fraction)` with how far along that file is, from 0 to 1; its row then
+shows "Working… 40%", and the live region hears it at 25%, 50% and 75% only. Call it as
+often as you like, in the page or in a worker: only a new whole percent is sent or shown.
+A Tool that never calls it shows plain "Working…". Every Tool that calls `remakeVideo`
+passes it on (see [Remaking a video](#remaking-a-video)).
 
 **Loading.** Import libraries in `run.ts`, never in `declaration.ts`. A small library can
 load with the page. A big one (such as a video library or a fallback photo decoder)
@@ -204,7 +208,11 @@ or sound. Make a video play anywhere (`src/tools/video-to-mp4/`) is the worked e
   video smaller). `fitLongestSide` in `src/video/size.ts` gives the size it makes, for an
   estimate.
 - `range` keeps only the part from `start` to `end` (seconds), cut exactly (Trim a
-  video).
+  video). Its values come from the file's own options (see
+  [Options for each file](#options-for-each-file)).
+- `onProgress` is called with how far along the video is, from 0 to 1. Pass
+  `onProgress: (f) => context?.progress(f)` so the file's row shows "Working… 40%" (see
+  **Progress** above). Every video Tool passes it.
 - A new setting is a new field of `RemakeSettings`.
 
 ## Notes on the Ready row

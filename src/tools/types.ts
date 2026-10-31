@@ -185,6 +185,22 @@ export interface ToolRunContext {
    * something big that loads only once a file is chosen, such as a library.
    */
   gettingReady<T>(loading: Promise<T>): Promise<T>;
+  /**
+   * Tells the page how far along the current file is, from 0 to 1, shown on its row
+   * as "Working… 40%". Call it as often as you like: the page changes only when the
+   * whole percent does. A Tool that never calls it shows plain "Working…".
+   */
+  progress(fraction: number): void;
+}
+
+/**
+ * A `progress` fraction as a whole percent from 0 to 100, rounded down so 100 means
+ * finished. Anything that isn't a number counts as 0.
+ */
+export function wholePercent(fraction: number): number {
+  if (!Number.isFinite(fraction)) return 0;
+  // The small nudge keeps 0.29 at 29: 0.29 * 100 is 28.999… in floating point.
+  return Math.min(100, Math.max(0, Math.floor(fraction * 100 + 1e-9)));
 }
 
 /** A line on a chosen file's Ready row, such as how big the result may be. */

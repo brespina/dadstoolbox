@@ -7,5 +7,13 @@ export const run: ToolRun<Options> = async (file, options, context) => {
   const loading = import('../../video/remake');
   const { remakeVideo } = await (context?.gettingReady(loading) ?? loading);
   const longestSide = sizes[options.size];
-  return [{ blob: await remakeVideo(file, { reasons: tool.reasons, longestSide }) }];
+  return [
+    {
+      blob: await remakeVideo(file, {
+        reasons: tool.reasons,
+        longestSide,
+        onProgress: (fraction) => context?.progress(fraction),
+      }),
+    },
+  ];
 };

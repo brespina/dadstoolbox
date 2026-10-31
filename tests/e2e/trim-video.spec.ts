@@ -9,6 +9,8 @@ import { tool } from '../../src/tools/trim-video/declaration';
 
 // One second of 320 × 180 picture with AAC sound.
 const sample = fileURLToPath(new URL('../../src/tools/trim-video/sample.mov', import.meta.url));
+// A minute long, so the clip takes long enough to show progress.
+const long = fileURLToPath(new URL('../../src/tools/video-to-gif/long.mp4', import.meta.url));
 
 async function choose(page: Page, files: string[]) {
   const chooser = page.waitForEvent('filechooser');
@@ -81,6 +83,27 @@ test('Start and End set through the preview give a clip that long, with its soun
   expect(clip.seconds).toBeGreaterThan(0.4 - 0.07);
   expect(clip.seconds).toBeLessThan(0.4 + 0.07);
   expect(clip).toMatchObject({ width: 320, sound: 'aac' });
+});
+
+test('a long clip shows a rising percentage', async ({ page }) => {
+  // Note every percent the page shows, however briefly.
+  await page.evaluate(() => {
+    const seen: number[] = [];
+    (window as unknown as { seen: number[] }).seen = seen;
+    new MutationObserver(() => {
+      for (const match of document.body.textContent!.matchAll(/Working… (\d+)%/g)) {
+        const percent = Number(match[1]);
+        if (!seen.includes(percent)) seen.push(percent);
+      }
+    }).observe(document.body, { subtree: true, childList: true, characterData: true });
+  });
+  // Start and End left as they are: the whole minute.
+  await choose(page, [long]);
+  await page.getByRole('button', { name: tool.startButton }).click();
+  await expect(page.getByText(tool.allDone)).toBeVisible({ timeout: 60_000 });
+  const seen = await page.evaluate(() => (window as unknown as { seen: number[] }).seen);
+  expect(seen.length).toBeGreaterThan(3);
+  expect(seen).toEqual([...seen].sort((a, b) => a - b));
 });
 
 test('two videos keep their own Start and End', async ({ page }) => {
