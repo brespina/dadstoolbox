@@ -1,8 +1,9 @@
 // Change image file type end to end, in a real browser: the canvas, the browser's own
 // photo opening, and Batches across presses of the start button.
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import exifr from 'exifr';
+import { PNG } from 'pngjs';
 import type { FileChooser, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 
@@ -189,7 +190,9 @@ test('a BMP and an AVIF change to PNG, the AVIF staying see-through', async ({ p
 test('a BMP, an AVIF and an SVG all change to JPG', async ({ page }) => {
   await choose(page, [bmp, avif, sizedSvg]);
   await page.getByRole('button', { name: 'Change to JPG' }).click();
-  await expect(page.getByRole('button', { name: /^Save / })).toHaveCount(3);
+  for (const name of ['sample_dtb.jpg', 'sample_dtb_2.jpg', 'sized_dtb.jpg']) {
+    await expect(page.getByRole('button', { name: `Save ${name}` })).toBeVisible();
+  }
 });
 
 test('a damaged file of a new type gets the plain failure reason', async ({ page }) => {
@@ -371,4 +374,128 @@ test('the old address forwards to the new page', async ({ page }) => {
 test('the old address has a link for people without scripts', async ({ page }) => {
   const response = await page.request.get('photo-to-jpg/');
   expect(await response.text()).toMatch(/<a href="[^"]*\/change-image-type\/">/);
+});
+
+/** The pictures inside a saved ICO, read by hand (not by the Site's own code). */
+function readIco(bytes: Buffer) {
+  expect([bytes.readUInt16LE(0), bytes.readUInt16LE(2)]).toEqual([0, 1]);
+  return Array.from({ length: bytes.readUInt16LE(4) }, (_, i) => {
+    const at = 6 + i * 16;
+    const start = bytes.readUInt32LE(at + 12);
+    const picture = PNG.sync.read(bytes.subarray(start, start + bytes.readUInt32LE(at + 8)));
+    return { width: bytes[at]! || 256, height: bytes[at + 1]! || 256, picture };
+  });
+}
+
+const alphaAt = ({ picture }: ReturnType<typeof readIco>[number], x: number, y: number) =>
+  picture.data[(y * picture.width + x) * 4 + 3]!;
+
+test('ICO is saved with 16, 32, 48 and 256 px pictures and no location choice', async ({
+  page,
+}, testInfo) => {
+  // 40 × 20: the left half solid red, the right half see-through.
+  const wide = new PNG({ width: 40, height: 20 });
+  for (let y = 0; y < 20; y++)
+    for (let x = 0; x < 20; x++) wide.data.set([255, 0, 0, 255], (y * 40 + x) * 4);
+  const wideFile = testInfo.outputPath('wide.png');
+  writeFileSync(wideFile, PNG.sync.write(wide));
+
+  await page.getByText('ICO', { exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: /Remove location/ })).toHaveCount(0);
+  await choose(page, [wideFile]);
+  await page.getByRole('button', { name: 'Change to ICO' }).click();
+  await expect(page.getByText('All done.', { exact: true })).toBeVisible();
+
+  const saved = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save wide_dtb.ico' }).click();
+  const download = await saved;
+  expect(download.suggestedFilename()).toBe('wide_dtb.ico');
+  const icons = readIco(readFileSync((await download.path())!));
+
+  expect(icons.map((i) => [i.width, i.height])).toEqual([
+    [16, 16],
+    [32, 32],
+    [48, 48],
+    [256, 256],
+  ]);
+  for (const icon of icons) {
+    expect([icon.picture.width, icon.picture.height]).toEqual([icon.width, icon.height]);
+    const size = icon.width;
+    // The wide image fills exactly the middle half of the rows, not stretched.
+    const left = Math.round(size * 0.25);
+    const top = size / 4;
+    const bottom = (size * 3) / 4;
+    expect(alphaAt(icon, left, top - 1)).toBe(0);
+    expect(alphaAt(icon, left, top)).toBe(255);
+    expect(alphaAt(icon, left, bottom - 1)).toBe(255);
+    expect(alphaAt(icon, left, bottom)).toBe(0);
+    // Its see-through right half stays see-through.
+    expect(alphaAt(icon, Math.round(size * 0.75), size >> 1)).toBe(0);
+  }
+});
+
+test('a tall photo sits in the middle of the ICO square, not stretched', async ({ page }) => {
+  // Stored 48 × 32 and turned upright, so 32 × 48.
+  await page.getByText('ICO', { exact: true }).click();
+  await choose(page, [sample]);
+  await page.getByRole('button', { name: 'Change to ICO' }).click();
+  const saved = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save rotated_dtb.ico' }).click();
+  const icons = readIco(readFileSync((await (await saved).path())!));
+  expect(icons).toHaveLength(4);
+  for (const icon of icons) {
+    const size = icon.width;
+    // 32 × 48 is two thirds as wide as tall, so it fills the height and leaves
+    // see-through at each side (at least a pixel even at 16 px).
+    expect(alphaAt(icon, 0, size >> 1)).toBe(0);
+    expect(alphaAt(icon, size - 1, size >> 1)).toBe(0);
+    expect(alphaAt(icon, size >> 1, size >> 1)).toBe(255);
+    expect(alphaAt(icon, size >> 1, 0)).toBe(255);
+    expect(alphaAt(icon, size >> 1, size - 1)).toBe(255);
+  }
+});
+
+test('the browser can show a saved ICO', async ({ page }) => {
+  await page.getByText('ICO', { exact: true }).click();
+  await choose(page, [seeThrough]);
+  await page.getByRole('button', { name: 'Change to ICO' }).click();
+  await expect(page.getByRole('button', { name: 'Save transparent_dtb.ico' })).toBeVisible();
+  const size = await thumbnailSize(page, 'transparent_dtb.ico');
+  expect(size[0]).toBeGreaterThan(0);
+  expect(size[0]).toBe(size[1]);
+});
+
+test('an SVG saved as ICO is drawn sharp at each size, its see-through half staying so', async ({
+  page,
+}) => {
+  await page.getByText('ICO', { exact: true }).click();
+  await choose(page, [sizedSvg]);
+  await page.getByRole('button', { name: 'Change to ICO' }).click();
+  const saved = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save sized_dtb.ico' }).click();
+  const icons = readIco(readFileSync((await (await saved).path())!));
+  expect(icons.map((i) => i.width)).toEqual([16, 32, 48, 256]);
+  for (const icon of icons) {
+    const size = icon.width;
+    // 40 × 30 fills the width and the middle three quarters of the rows.
+    const row = size >> 1;
+    const left = Math.round(size * 0.25);
+    expect(alphaAt(icon, left, row)).toBe(255);
+    expect(icon.picture.data[(row * size + left) * 4]!).toBeGreaterThan(150);
+    expect(alphaAt(icon, Math.round(size * 0.75), row)).toBe(0);
+    expect(alphaAt(icon, left, 0)).toBe(0);
+    expect(alphaAt(icon, left, size - 1)).toBe(0);
+  }
+});
+
+test('a BMP and an AVIF save as ICO too', async ({ page }) => {
+  await page.getByText('ICO', { exact: true }).click();
+  await choose(page, [bmp, avif]);
+  await page.getByRole('button', { name: 'Change to ICO' }).click();
+  for (const name of ['sample_dtb.ico', 'sample_dtb_2.ico']) {
+    await expect(page.getByRole('button', { name: `Save ${name}` })).toBeVisible();
+    const size = await thumbnailSize(page, name);
+    expect(size[0]).toBeGreaterThan(0);
+    expect(size[0]).toBe(size[1]);
+  }
 });

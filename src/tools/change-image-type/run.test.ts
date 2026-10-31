@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import exifr from 'exifr';
+import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import { ToolFailure } from '../types';
 import { tool } from './declaration';
-import { makeRun, type Paint } from './run';
+import { makeRun, type Paint, type PaintSquares } from './run';
 
 const bytes = (name: string) => readFileSync(new URL(name, import.meta.url));
 const sample = (name: string, type: string) => new File([bytes(name)], name, { type });
@@ -22,7 +23,20 @@ const paint: Paint = async (_file, type) => ({
   width: 32,
   height: 48,
 });
-const run = makeRun(paint);
+// Likewise for the squares of an ICO: each is a real PNG, the asked-for size, in solid
+// red, so the test can check the file's layout and what it holds.
+const paintSquares: PaintSquares = async (_file, sizes) =>
+  sizes.map((size) => {
+    const square = new PNG({ width: size, height: size });
+    for (let at = 0; at < square.data.length; at += 4) square.data.set([255, 0, 0, 255], at);
+    const data = PNG.sync.write(square);
+    return {
+      blob: new Blob([new Uint8Array(data)], { type: 'image/png' }),
+      width: size,
+      height: size,
+    };
+  });
+const run = makeRun(paint, paintSquares);
 
 const defaults = tool.defaultOptions;
 const details = async (blob: Blob) =>
@@ -154,6 +168,24 @@ describe('Change image file type', () => {
     expect(found?.Orientation ?? 1).toBe(1);
   });
 
+  it('saves as an ICO that holds 16, 32, 48 and 256 px pictures', async () => {
+    const [result, ...rest] = await run(jpg(), { ...defaults, format: 'ico' });
+    expect(rest).toEqual([]);
+    expect(result!.blob.type).toBe('image/x-icon');
+    const entries = icoEntries(new Uint8Array(await result!.blob.arrayBuffer()));
+    expect(entries.map((e) => [e.width, e.height])).toEqual([
+      [16, 16],
+      [32, 32],
+      [48, 48],
+      [256, 256],
+    ]);
+    // Each picture is a whole PNG that opens as the size the directory says.
+    for (const entry of entries) {
+      const picture = PNG.sync.read(Buffer.from(entry.png));
+      expect([picture.width, picture.height]).toEqual([entry.width, entry.height]);
+    }
+  });
+
   it("fails with a plain reason for an iPhone photo (HEIC) that won't open", async () => {
     const cantOpen = makeRun(async () => {
       throw new DOMException('The source image could not be decoded.', 'InvalidStateError');
@@ -161,6 +193,20 @@ describe('Change image file type', () => {
     // The picker may give no file type, so the photo itself is checked.
     const unnamed = new File([bytes('sample.heic')], 'IMG_1234.HEIC');
     const failure = await cantOpen(unnamed, defaults).catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(ToolFailure);
+    expect((failure as ToolFailure).reason).toBe(
+      "This iPhone photo (HEIC) wouldn't open. Choose it again, or try another photo.",
+    );
+  });
+
+  it("fails with the same plain reason for a HEIC that won't open when saving as ICO", async () => {
+    const cantOpen = makeRun(paint, async () => {
+      throw new DOMException('The source image could not be decoded.', 'InvalidStateError');
+    });
+    const unnamed = new File([bytes('sample.heic')], 'IMG_1234.HEIC');
+    const failure = await cantOpen(unnamed, { ...defaults, format: 'ico' }).catch(
+      (e: unknown) => e,
+    );
     expect(failure).toBeInstanceOf(ToolFailure);
     expect((failure as ToolFailure).reason).toBe(
       "This iPhone photo (HEIC) wouldn't open. Choose it again, or try another photo.",
@@ -188,4 +234,22 @@ function webpChunks(file: Uint8Array) {
     at += 8 + length + (length % 2);
   }
   return chunks;
+}
+
+/** The pictures in an ICO file, read straight from its bytes. */
+function icoEntries(file: Uint8Array) {
+  const view = new DataView(file.buffer, file.byteOffset, file.byteLength);
+  // Reserved, then 1 for an icon, then how many pictures.
+  expect([view.getUint16(0, true), view.getUint16(2, true)]).toEqual([0, 1]);
+  return Array.from({ length: view.getUint16(4, true) }, (_, i) => {
+    const at = 6 + i * 16;
+    const length = view.getUint32(at + 8, true);
+    const offset = view.getUint32(at + 12, true);
+    return {
+      // A 0 in the file means 256.
+      width: view.getUint8(at) || 256,
+      height: view.getUint8(at + 1) || 256,
+      png: file.subarray(offset, offset + length),
+    };
+  });
 }

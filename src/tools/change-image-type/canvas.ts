@@ -5,6 +5,7 @@ import { openPhoto } from '../../photos/open';
 import { sizeSvg } from '../../photos/svg';
 import { fileTypeOf } from '../file-type';
 import type { ToolRunContext } from '../types';
+import { fitInSquare } from './ico';
 import type { Painted } from './run';
 
 /** Most pixels a canvas may hold on an iPhone; bigger ones are tried only where they work. */
@@ -84,4 +85,36 @@ async function draw(source: Source, type: string, scale: number) {
   // Free the canvas's memory now; phones have little to spare.
   canvas.width = canvas.height = 0;
   return blob && blob.size > 0 ? { blob, width, height } : undefined;
+}
+
+/**
+ * The photo in the middle of a see-through square of each size, never stretched, saved
+ * as PNG. The photo is opened once and drawn once per size.
+ */
+export async function paintSquaresOnCanvas(
+  file: File,
+  sizes: readonly number[],
+  context?: ToolRunContext,
+): Promise<Painted[]> {
+  const source = await openSource(file, context);
+  try {
+    const squares: Painted[] = [];
+    for (const size of sizes) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      const drawing = canvas.getContext('2d');
+      if (!drawing) throw new Error('Could not draw an icon');
+      // The canvas starts see-through, so the padding and any see-through parts stay so.
+      drawing.imageSmoothingQuality = 'high';
+      const fit = fitInSquare(source.width, source.height, size);
+      drawing.drawImage(source.image, fit.x, fit.y, fit.width, fit.height);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+      canvas.width = canvas.height = 0;
+      if (!blob || blob.size === 0) throw new Error(`Could not draw a ${size} px icon`);
+      squares.push({ blob, width: size, height: size });
+    }
+    return squares;
+  } finally {
+    source.close();
+  }
 }
