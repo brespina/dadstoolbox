@@ -58,7 +58,7 @@
       if (next.result && !before.result) {
         announcement = [text.tool.typed.ready, warnings].filter(Boolean).join(' ');
       } else if (next.reason && next.reason !== before.reason) announcement = next.reason;
-      else if (next.result && warningsChanged && warnings) announcement = warnings;
+      else if (next.result && warningsChanged) announcement = warnings;
       else if (!next.result && !next.reason) announcement = '';
     });
   });

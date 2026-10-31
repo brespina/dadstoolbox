@@ -78,6 +78,7 @@ test('the Style section opens by keyboard, and its colours are in the saved pict
 
 test('close colours and no background warn, but the code is still made', async ({ page }) => {
   await box(page).fill('hello');
+  await expect(picture(page, 'hello')).toBeVisible();
   await styleSection(page).click();
   const warning = 'These colours may not scan.';
   const note = 'Put this on a light background so phones can read it.';
