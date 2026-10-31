@@ -108,8 +108,8 @@ field is required.
   `combined_dtb.pdf`.
 - **`none`, no file** (Make a QR code). The visitor types instead, and `run` gets the
   typed text. There is no Choose or start button: the result updates as the visitor types
-  and is saved like any other result. Leave `accept` empty and write the privacy line
-  about what they type.
+  or changes the options, and is saved like any other result. Leave `accept` empty and
+  write the privacy line about what they type.
 
   A Tool whose options hold all the input (Make a Wi-Fi QR code: a network name and a
   password) sets `typeBox: false`. The page hides the type box, `run` gets `""` as the
@@ -122,8 +122,15 @@ field is required.
 The template uses `each`. Each mode has its own `run` type in `types.ts`: `ToolRun`
 (`each`), `ToolRunTogether` (`together`) and `ToolTextRun` (`none`). Combine PDFs and
 QR code maker are the worked examples for `together` and `none`, and Make a Wi-Fi QR code
-for `none` with no type box. The QR code Tools share their drawing, `qrPng` in
-`src/qr/draw.ts`.
+for `none` with no type box.
+
+The QR code Tools share their drawing and their Style (see the glossary). `drawQr` in
+`src/qr/draw.ts` takes the text and a `QrStyle` (`src/qr/style.ts`) and gives the PNG
+and its warnings, ready to return from `run`. Each Tool keeps its Style in
+`options.style`, starting from `plainStyle` (black on white), and shows the shared
+`StyleSection.svelte` from `src/qr/` in its options. A new Style choice is a new field
+of `QrStyle`, drawn in `drawQr` and offered in `StyleSection.svelte`, so both Tools get
+it at once.
 
 ## The `run` contract
 
@@ -131,7 +138,7 @@ for `none` with no type box. The QR code Tools share their drawing, `qrPng` in
 and the options. It returns a list of results:
 
 ```ts
-{ blob: Blob; detail?: string }
+{ blob: Blob; detail?: string; warnings?: readonly string[] }
 ```
 
 - **`blob`** is the result's bytes. Its type, such as `application/pdf`, sets the file
@@ -141,6 +148,10 @@ and the options. It returns a list of results:
 - **`detail`** is added to the name, as in `report_dtb_page3.pdf`. Shared code builds
   every name as `<original>_dtb[_<detail>].<ext>` and adds `_2`, `_3` for repeats, so a
   result never overwrites an original. Don't build names in `run`.
+- **`warnings`**, for input mode `none` only, are notes shown under the result picture
+  and read out when they change, such as "These colours may not scan." They never stop
+  the result. Write them in shared text or the declaration's `notes`, so the
+  banned-words scan reads them. Other input modes ignore them.
 - One input can give any number of results (Split a PDF gives one per page).
 
 **Failing.** When `run` knows what went wrong, throw `new ToolFailure(tool.reasons.<key>)`

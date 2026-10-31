@@ -29,5 +29,5 @@ What the Site guarantees every visitor: no name, email or account asked for, no 
 _Avoid_: Privacy policy, guarantee
 
 **Style**:
-How a QR code looks: its colours, its background or none, its dot and corner shapes, and a logo in the middle. Without a Style, a code is black on white.
+How a QR code looks: its colours and its background or none. Dot and corner shapes (#74), the save type (#75) and a logo in the middle (#76) are planned. Without a Style, a code is black on white.
 _Avoid_: Theme, design, skin

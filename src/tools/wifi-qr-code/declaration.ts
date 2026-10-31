@@ -1,3 +1,4 @@
+import { plainStyle } from '../../qr/style';
 import { defineTool } from '../types';
 
 export const tool = defineTool({
@@ -27,5 +28,5 @@ export const tool = defineTool({
   },
   worker: false,
   outsideAddresses: [],
-  defaultOptions: { name: '', password: '' },
+  defaultOptions: { name: '', password: '', style: plainStyle },
 });

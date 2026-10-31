@@ -166,6 +166,18 @@ export const text = {
       tiny: { name: 'Tiny', hint: 'Smallest file. Looks soft up close.' },
     },
   },
+  // Shared by the QR code Tools: the Style section and its notes under the code.
+  qr: {
+    style: 'Style',
+    styleHint: 'Change how your code looks.',
+    codeColour: 'Code colour',
+    backgroundColour: 'Background colour',
+    noBackground: 'No background',
+    noBackgroundHint: 'See-through, for a web page.',
+    // Notes under the code. The code is still made.
+    colourWarning: 'These colours may not scan.',
+    noBackgroundNote: 'Put this on a light background so phones can read it.',
+  },
   footer: {
     label: 'More about the Site',
     promise: 'Our promise',

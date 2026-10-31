@@ -1,8 +1,11 @@
 import jsQR from 'jsqr';
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
+import { plainStyle } from '../../qr/style';
 import { ToolFailure } from '../types';
 import { run } from './run';
+
+const plain = { style: plainStyle };
 
 /** Reads the code in a PNG back to text, with decoders that are not the Tool's own. */
 async function readCode(blob: Blob) {
@@ -17,26 +20,35 @@ describe('QR code maker', () => {
     'Wi-Fi password: garden shed 42',
     'Café crème ☕ for Zoë',
   ])('makes one PNG that reads back as %j', async (typed) => {
-    const results = await run(typed, {});
+    const results = await run(typed, plain);
     expect(results).toHaveLength(1);
     expect(results[0]!.blob.type).toBe('image/png');
     expect(results[0]!.detail).toBeUndefined();
     expect((await readCode(results[0]!.blob)).text).toBe(typed);
   });
 
+  it('makes a styled code that reads back, with its warnings', async () => {
+    const style = { code: '#1a237e', background: '#fff59d', noBackground: false };
+    const [result] = await run('https://example.com/menu', { style });
+    expect((await readCode(result!.blob)).text).toBe('https://example.com/menu');
+    expect(result!.warnings).toEqual([]);
+    const [pale] = await run('hello', { style: { ...style, code: '#ffeb3b' } });
+    expect(pale!.warnings).toEqual(['These colours may not scan.']);
+  });
+
   it('is square and big enough to print', async () => {
-    const code = await readCode((await run('hello', {}))[0]!.blob);
+    const code = await readCode((await run('hello', plain))[0]!.blob);
     expect(code.width).toBe(code.height);
     expect(code.width).toBeGreaterThanOrEqual(600);
   });
 
   it('reads back a long text near the limit', async () => {
     const typed = 'a'.repeat(2000);
-    expect((await readCode((await run(typed, {}))[0]!.blob)).text).toBe(typed);
+    expect((await readCode((await run(typed, plain))[0]!.blob)).text).toBe(typed);
   });
 
   it('fails with a plain reason when the text is too long for one code', async () => {
-    const failure = await run('a'.repeat(5000), {}).catch((e: unknown) => e);
+    const failure = await run('a'.repeat(5000), plain).catch((e: unknown) => e);
     expect(failure).toBeInstanceOf(ToolFailure);
     expect((failure as ToolFailure).reason).toBe(
       'This is too long for one code. Try a shorter text.',
