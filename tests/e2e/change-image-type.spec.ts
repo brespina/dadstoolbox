@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import exifr from 'exifr';
-import type { Page } from '@playwright/test';
+import type { FileChooser, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 
 const folder = fileURLToPath(new URL('../../src/tools/change-image-type/', import.meta.url));
@@ -13,8 +13,16 @@ const sample = `${folder}rotated.jpg`;
 // taken and a location.
 const iphone = `${folder}sample.heic`;
 const seeThrough = `${folder}transparent.png`;
+// 32 × 48, 24-bit.
+const bmp = `${folder}sample.bmp`;
+// 32 × 48, the left half red and the right half see-through.
+const avif = `${folder}sample.avif`;
+// 40 × 30 as stated, the left half red and the right half see-through.
+const sizedSvg = `${folder}sized.svg`;
+// The same shape, with a viewBox of 40 × 30 and no stated size.
+const viewBoxSvg = `${folder}viewbox-only.svg`;
 
-async function choose(page: Page, files: string[]) {
+async function choose(page: Page, files: Parameters<FileChooser['setFiles']>[0]) {
   const chooser = page.waitForEvent('filechooser');
   await page.getByText(/Choose (more )?images/).click();
   await (await chooser).setFiles(files);
@@ -41,6 +49,25 @@ const thumbnailSize = (page: Page, name: string) =>
       await img.decode();
       return [img.naturalWidth, img.naturalHeight];
     });
+
+/** The red, green, blue and alpha of a result's thumbnail at (x, y). */
+const pixelAt = (page: Page, name: string, x: number, y: number) =>
+  page
+    .getByRole('listitem')
+    .filter({ hasText: name })
+    .locator('img')
+    .evaluate(
+      async (img: HTMLImageElement, at: number[]) => {
+        await img.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const context = canvas.getContext('2d')!;
+        context.drawImage(img, 0, 0);
+        return [...context.getImageData(at[0]!, at[1]!, 1, 1).data];
+      },
+      [x, y],
+    );
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -91,6 +118,97 @@ test('see-through parts of a PNG turn white in a JPG', async ({ page }) => {
       return [...context.getImageData(5, 5, 1, 1).data];
     });
   for (const channel of pixel) expect(channel).toBeGreaterThan(245);
+});
+
+test('an SVG with a stated size comes out at that size, see-through in a PNG', async ({ page }) => {
+  await choose(page, [sizedSvg]);
+  await page.getByText('PNG', { exact: true }).click();
+  await page.getByRole('button', { name: 'Change to PNG' }).click();
+  await expect(page.getByRole('button', { name: 'Save sized_dtb.png' })).toBeVisible();
+  expect(await thumbnailSize(page, 'sized_dtb.png')).toEqual([40, 30]);
+  const [red, , , opaque] = await pixelAt(page, 'sized_dtb.png', 5, 5);
+  expect(red).toBeGreaterThan(150);
+  expect(opaque).toBe(255);
+  expect((await pixelAt(page, 'sized_dtb.png', 35, 5))[3]).toBe(0);
+});
+
+test('an SVG with only a viewBox comes out 1024 wide, keeping its shape', async ({ page }) => {
+  await choose(page, [viewBoxSvg]);
+  await page.getByText('PNG', { exact: true }).click();
+  await page.getByRole('button', { name: 'Change to PNG' }).click();
+  await expect(page.getByRole('button', { name: 'Save viewbox-only_dtb.png' })).toBeVisible();
+  expect(await thumbnailSize(page, 'viewbox-only_dtb.png')).toEqual([1024, 768]);
+  // The red half is scaled with it.
+  expect((await pixelAt(page, 'viewbox-only_dtb.png', 500, 700))[0]).toBeGreaterThan(150);
+  expect((await pixelAt(page, 'viewbox-only_dtb.png', 520, 700))[3]).toBe(0);
+});
+
+test('an SVG with no size at all comes out 1024 wide too', async ({ page }) => {
+  const bare =
+    '<svg xmlns="http://www.w3.org/2000/svg"><rect width="150" height="150" fill="#00f"/></svg>';
+  await choose(page, [{ name: 'bare.svg', mimeType: '', buffer: Buffer.from(bare) }]);
+  await page.getByText('PNG', { exact: true }).click();
+  await page.getByRole('button', { name: 'Change to PNG' }).click();
+  await expect(page.getByRole('button', { name: 'Save bare_dtb.png' })).toBeVisible();
+  expect(await thumbnailSize(page, 'bare_dtb.png')).toEqual([1024, 512]);
+});
+
+test('see-through parts of an SVG turn white in a JPG', async ({ page }) => {
+  await choose(page, [sizedSvg]);
+  await page.getByRole('button', { name: 'Change to JPG' }).click();
+  await expect(page.getByRole('button', { name: 'Save sized_dtb.jpg' })).toBeVisible();
+  for (const channel of await pixelAt(page, 'sized_dtb.jpg', 35, 5)) {
+    expect(channel).toBeGreaterThan(245);
+  }
+});
+
+test('a BMP and an AVIF change to PNG, the AVIF staying see-through', async ({ page }) => {
+  await choose(page, [bmp, avif]);
+  await page.getByText('PNG', { exact: true }).click();
+  await page.getByRole('button', { name: 'Change to PNG' }).click();
+  await expect(page.getByRole('button', { name: 'Save sample_dtb.png' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save sample_dtb_2.png' })).toBeVisible();
+  for (const name of ['sample_dtb.png', 'sample_dtb_2.png']) {
+    expect(await thumbnailSize(page, name)).toEqual([32, 48]);
+  }
+  // Which result is which depends on the order they finish, so look at both.
+  const left = [
+    await pixelAt(page, 'sample_dtb.png', 5, 5),
+    await pixelAt(page, 'sample_dtb_2.png', 5, 5),
+  ];
+  for (const pixel of left) expect(pixel[0]).toBeGreaterThan(150);
+  const right = [
+    (await pixelAt(page, 'sample_dtb.png', 28, 5))[3]!,
+    (await pixelAt(page, 'sample_dtb_2.png', 28, 5))[3]!,
+  ].sort((a, b) => a - b);
+  // The BMP has nothing see-through; the AVIF does.
+  expect(right[0]).toBe(0);
+  expect(right[1]).toBe(255);
+});
+
+test('a BMP, an AVIF and an SVG all change to JPG', async ({ page }) => {
+  await choose(page, [bmp, avif, sizedSvg]);
+  await page.getByRole('button', { name: 'Change to JPG' }).click();
+  await expect(page.getByRole('button', { name: /^Save / })).toHaveCount(3);
+});
+
+test('a damaged file of a new type gets the plain failure reason', async ({ page }) => {
+  await choose(page, [
+    { name: 'broken.bmp', mimeType: 'image/bmp', buffer: Buffer.from('BM not really') },
+    { name: 'broken.avif', mimeType: 'image/avif', buffer: Buffer.from('not really') },
+    { name: 'broken.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg><oops') },
+  ]);
+  await page.getByRole('button', { name: 'Change to JPG' }).click();
+  const failed = page
+    .getByRole('listitem')
+    .filter({ hasText: "Didn't work. This file may be damaged or not supported." });
+  await expect(failed).toHaveCount(3);
+});
+
+test('GIF is not offered at the Choose button', async ({ page }) => {
+  const accept = (await page.locator('input[type="file"]').getAttribute('accept'))!;
+  expect(accept).toContain('.svg');
+  expect(accept).not.toMatch(/gif/i);
 });
 
 test('WebP is offered only where the browser can save it', async ({ page }) => {
