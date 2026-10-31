@@ -195,9 +195,10 @@ Tool must not fetch anything itself. The page tests watch requests from workers 
 
 A Tool that saves a video calls `remakeVideo` from `src/video/remake.ts`, the shared
 video module. It remakes the video as an H.264 MP4 with AAC sound, the picture size
-kept, and copies sound that is already AAC. It asks first whether the browser can make
-this video, and fails with a plain reason rather than save a video missing its picture
-or sound. Make a video play anywhere (`src/tools/video-to-mp4/`) is the worked example:
+kept, and copies sound that is already AAC. Other sound, such as Opus, is remade as
+AAC with the browser's own sound features. It asks first whether the browser can make
+this video, and reads the first bit of any sound it remakes, and fails with a plain
+reason rather than save a video missing its picture or sound, or stay on Working… Make a video play anywhere (`src/tools/video-to-mp4/`) is the worked example:
 
 - Spread `videoReasons` (`src/video/reasons.ts`) into the declaration's `reasons`, and
   pass `tool.reasons` to `remakeVideo`.

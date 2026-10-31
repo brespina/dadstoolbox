@@ -15,7 +15,8 @@ export const tool = defineTool({
   startButton: text.photos.removeLocation,
   allDone: text.photos.allDoneLocationRemoved,
   reasons: {
-    notCarried: "This kind of photo doesn't carry a location.",
+    notCarried:
+      "This kind of photo doesn't carry a location. Choose a JPG or an iPhone photo (HEIC).",
   },
   worker: false,
   outsideAddresses: [],

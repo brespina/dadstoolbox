@@ -121,19 +121,16 @@ test.describe('with the video features', () => {
     await expect(failedWith(page, tool.reasons.cantMake!)).toBeVisible({ timeout: 20_000 });
   });
 
-  test('sound that is not AAC is remade as AAC where the browser can', async ({
+  // Remaking Opus sound as AAC can't be page-tested here: Chromium can't make AAC, and
+  // WebKit on Linux can't read Opus. The real-phone tries (#52) cover it on Safari.
+  test('sound the browser says it reads but never does fails plainly, not stuck', async ({
     page,
     browserName,
   }) => {
-    test.skip(browserName === 'chromium', 'Chromium here cannot make AAC sound');
-    // WebKit on Linux (CI) says it can make AAC, but stays on Working… with Opus sound.
-    // Real phones are tried before release; Safari on an iPhone is the one that matters.
-    test.fixme(browserName === 'webkit', 'WebKit on Linux never finishes remaking Opus sound');
+    test.skip(browserName !== 'webkit', 'Only WebKit here claims to read Opus but never does');
     await make(page, `${folder}opus.mp4`);
-    expect(await saveVideo(page, 'opus_dtb.mp4')).toMatchObject({
-      picture: { codec: 'avc', width: 320, height: 180 },
-      sound: 'aac',
-    });
+    await expect(failedWith(page, tool.reasons.cantKeepSound!)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: /^Save / })).toHaveCount(0);
   });
 
   test('sound the browser cannot keep fails plainly, never a silent video', async ({

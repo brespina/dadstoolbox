@@ -1,5 +1,7 @@
 // What `run` can cover in Node: the plain reasons. Making the video needs a browser's
 // video features, so the page tests check the saved file's size.
+// cantKeepSound needs a browser that makes the picture but not the sound, which Node is
+// not: the shared video module's page tests in tests/e2e/video-to-mp4.spec.ts cover it.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { ToolFailure } from '../types';

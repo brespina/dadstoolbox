@@ -1,3 +1,4 @@
+import { videoReasons } from '../../video/reasons';
 import { defineTool } from '../types';
 
 export const tool = defineTool({
@@ -16,7 +17,7 @@ export const tool = defineTool({
   largeFileLimit: 500_000_000,
   startButton: 'Get the sound',
   reasons: {
-    notVideo: "This file doesn't look like a video. Choose a video from your phone or computer.",
+    notVideo: videoReasons.notVideo,
     noSound: 'This video has no sound. Choose a video with sound.',
     cantCopy: "This video's sound can't be saved as an M4A file. Try another video.",
   },
