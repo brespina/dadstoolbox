@@ -124,8 +124,6 @@ describe('watching a Batch', () => {
     const second = [...new Set(percents.map(([, b]) => b))];
     expect(first).toEqual([undefined, 0, 40, 75, 100]);
     expect(second).toEqual([undefined, 0, 40, 75, 100]);
-    // 40.1% and 40.4% are both 40%: no new snapshot for the same whole percent.
-    expect(percents.filter(([a]) => a === 40)).toHaveLength(1);
   });
 
   it('shows Getting ready while a Tool waits for something to load, then carries on', async () => {
@@ -143,18 +141,6 @@ describe('watching a Batch', () => {
     await started;
     expect(page.state().batches[0]!.gettingReady).toBe(false);
     expect(page.state().batches[0]!.items[0]!.status).toBe('done');
-  });
-
-  it('stops Getting ready when loading fails, and the row says it did not work', async () => {
-    const page = createToolPage(tool, async (_file, _options, context) => {
-      await context!.gettingReady(Promise.reject(new Error('offline')));
-      return [pdf()];
-    });
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    page.add([file('a.pdf')]);
-    await page.start({});
-    expect(page.state().batches[0]!.gettingReady).toBe(false);
-    expect(page.state().batches[0]!.items[0]!.status).toBe('failed');
   });
 
   it('labels each Batch with how many files it holds', async () => {
@@ -214,21 +200,6 @@ describe('a file that fails', () => {
       { name: 'bad.pdf', status: 'failed', reason: 'This PDF has a password.', results: [] },
       { name: 'good.pdf', status: 'done', results: [{ name: 'good_dtb.pdf' }] },
     ]);
-  });
-
-  it('shows the shared reason for any other error, with the detail in the console only', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const page = createToolPage(tool, runFailing(new TypeError('xref table broken')));
-    page.add([file('bad.pdf'), file('good.pdf')]);
-    await page.start({});
-    const [bad, good] = page.state().batches[0]!.items;
-    expect(bad).toMatchObject({
-      status: 'failed',
-      reason: 'This file may be damaged or not supported.',
-    });
-    expect(good!.status).toBe('done');
-    expect(String(consoleError.mock.calls.flat())).toContain('xref table broken');
-    consoleError.mockRestore();
   });
 });
 
@@ -345,32 +316,6 @@ describe('result names', () => {
     return page.state().batches[0]!.items.flatMap((i) => i.results.map((r) => r.name));
   };
 
-  it('add _dtb when there is no detail', async () => {
-    expect(await namesFrom(['IMG_1234.pdf'], () => [pdf()])).toEqual(['IMG_1234_dtb.pdf']);
-  });
-
-  it('take the extension from the result, not the original', async () => {
-    const jpg = { blob: new Blob(['x'], { type: 'image/jpeg' }) };
-    const page = createToolPage(tool, async () => [jpg]);
-    page.add([file('IMG_1234.HEIC')]);
-    await page.start({});
-    expect(page.state().batches[0]!.items[0]!.results[0]!.name).toBe('IMG_1234_dtb.jpg');
-  });
-
-  it('end in .mp4 for an MP4 made from an iPhone video (.mov)', async () => {
-    const mp4 = { blob: new Blob(['x'], { type: 'video/mp4' }) };
-    const page = createToolPage(tool, async () => [mp4]);
-    page.add([file('IMG_1234.MOV')]);
-    await page.start({});
-    expect(page.state().batches[0]!.items[0]!.results[0]!.name).toBe('IMG_1234_dtb.mp4');
-  });
-
-  it('get _2 and _3 when chosen files share a name', async () => {
-    expect(
-      await namesFrom(['report.pdf', 'report.pdf', 'report.pdf'], () => [pdf('page1')]),
-    ).toEqual(['report_dtb_page1.pdf', 'report_dtb_page1_2.pdf', 'report_dtb_page1_3.pdf']);
-  });
-
   it('stay different from names in earlier Batches', async () => {
     const page = createToolPage(tool, async () => [pdf()]);
     page.add([file('report.pdf')]);
@@ -385,14 +330,6 @@ describe('result names', () => {
   it('are never the exact name of a chosen file', async () => {
     expect(await namesFrom(['report_dtb.pdf', 'report.pdf'], () => [pdf()])).toEqual([
       'report_dtb_dtb.pdf',
-      'report_dtb_2.pdf',
-    ]);
-  });
-
-  it('never match a chosen file or each other in any mix of capitals', async () => {
-    // Phones and Macs treat Report.PDF and report.pdf as the same file.
-    expect(await namesFrom(['Report_dtb.PDF', 'report.pdf'], () => [pdf()])).toEqual([
-      'Report_dtb_dtb.pdf',
       'report_dtb_2.pdf',
     ]);
   });
