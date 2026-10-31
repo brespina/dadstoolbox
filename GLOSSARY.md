@@ -27,3 +27,7 @@ _Avoid_: Run, job, session
 **Promise**:
 What the Site guarantees every visitor: no name, email or account asked for, no ads, no trackers or visitor counters, and a person's files are never kept or sent anywhere.
 _Avoid_: Privacy policy, guarantee
+
+**Style**:
+How a QR code looks: its colours, its background or none, its dot and corner shapes, and a logo in the middle. Without a Style, a code is black on white.
+_Avoid_: Theme, design, skin
