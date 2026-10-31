@@ -51,9 +51,14 @@
     return toolPage.subscribe((next) => {
       const before = state;
       state = next;
-      // Speak when a code first appears or a reason changes, not on every keypress.
-      if (next.result && !before.result) announcement = text.tool.typed.ready;
-      else if (next.reason && next.reason !== before.reason) announcement = next.reason;
+      // Speak when a code first appears, a reason changes or its warnings change, not on
+      // every keypress.
+      const warnings = next.result?.warnings.join(' ') ?? '';
+      const warningsChanged = warnings !== (before.result?.warnings.join(' ') ?? '');
+      if (next.result && !before.result) {
+        announcement = [text.tool.typed.ready, warnings].filter(Boolean).join(' ');
+      } else if (next.reason && next.reason !== before.reason) announcement = next.reason;
+      else if (next.result && warningsChanged) announcement = warnings;
       else if (!next.result && !next.reason) announcement = '';
     });
   });
@@ -70,11 +75,12 @@
     };
   });
 
-  // With no type box, the options hold all the input, so each change makes it again.
-  // Untracked, because the new state it sets must not count as an options change.
+  // Each change of options makes the result again, as typing does. With no type box, the
+  // options hold all the input. Untracked, because the new state it sets must not count
+  // as an options change.
   $effect(() => {
     const now = $state.snapshot(options);
-    if (hydrated && !tool.typeBox) untrack(() => toolPage.change(now));
+    if (hydrated) untrack(() => toolPage.change(now));
   });
 
   const save = () => {
@@ -113,6 +119,9 @@
         >
       </figcaption>
     </figure>
+    {#each state.result.warnings as warning, index (index)}
+      <p class="warning">{warning}</p>
+    {/each}
   {/if}
 
   <div class="visually-hidden" aria-live="polite">
@@ -163,13 +172,16 @@
     margin: 0;
   }
 
-  /* Black on white in both themes, so the code always reads. */
+  /*
+   * On a light checkerboard in both themes: a code reads, and a see-through background
+   * shows as see-through.
+   */
   img {
     display: block;
     width: 100%;
     max-width: 20rem;
     height: auto;
-    background: #fff;
+    background: repeating-conic-gradient(#e6e6e6 0% 25%, #ffffff 0% 50%) 0 0 / 1rem 1rem;
     image-rendering: pixelated;
   }
 
@@ -208,8 +220,14 @@
     opacity: 0.55;
   }
 
-  .failed {
+  .failed,
+  .warning {
     margin: 0;
     color: var(--problem);
+  }
+
+  /* Notes under the code, never a reason it wasn't made. */
+  .warning {
+    text-align: center;
   }
 </style>

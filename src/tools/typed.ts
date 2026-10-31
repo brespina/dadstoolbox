@@ -1,7 +1,7 @@
 // Shared logic for Tools the person types into (input mode "none"), in plain TypeScript
 // with no page or framework code. There is no Choose or start button and no Batch: the
-// result is made again each time typing pauses (or, for a Tool with no type box, each
-// time the options stop changing), and only the newest one is kept.
+// result is made again each time the typing or the options stop changing, and only the
+// newest one is kept.
 
 import { fillText, text } from '../text';
 import { runOnce } from './running';
@@ -17,6 +17,8 @@ export interface TypedResult {
   typed: string;
   /** The picture's description: what was typed, or the Tool's own `pictureLabel`. */
   label: string;
+  /** Notes shown under the picture, such as colours that may not scan. Often none. */
+  warnings: readonly string[];
 }
 
 export interface TypedToolPageState {
@@ -43,6 +45,8 @@ export function createTypedToolPage<Options extends object>(
   // Each change takes a new number; a result is only kept if its number is the newest.
   let latest = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // What is in the type box now, so a change of options remakes the same text.
+  let lastTyped = '';
   let current: TypedToolPageState = { result: null, reason: null, updating: false };
   const listeners = new Set<(state: TypedToolPageState) => void>();
 
@@ -66,6 +70,7 @@ export function createTypedToolPage<Options extends object>(
     const result = made && {
       id: nextId++,
       ...made,
+      warnings: made.warnings ?? [],
       typed,
       label:
         tool.textFor(options).pictureLabel ??
@@ -88,25 +93,32 @@ export function createTypedToolPage<Options extends object>(
       return () => void listeners.delete(listener);
     },
 
-    /** What is in the box now. The result follows once typing pauses. */
-    type(typed: string, options: Options) {
-      const ticket = ++latest;
-      clearTimeout(timer);
-      if (typed.trim() === '') {
-        set({ result: null, reason: null, updating: false });
-        return;
-      }
-      later(typed, options, ticket);
-    },
+    type,
 
     /**
-     * For a Tool with no type box: the options now. The result follows once they stop
-     * changing, and `run` gets "" as the typed text.
+     * The options now. The result follows once they stop changing, made from what is in
+     * the box. For a Tool with no type box, `run` gets "" as the typed text.
      */
     change(options: Options) {
+      if (tool.typeBox) {
+        type(lastTyped, options);
+        return;
+      }
       const ticket = ++latest;
       clearTimeout(timer);
       later('', options, ticket);
     },
   };
+
+  /** What is in the box now. The result follows once typing pauses. */
+  function type(typed: string, options: Options) {
+    lastTyped = typed;
+    const ticket = ++latest;
+    clearTimeout(timer);
+    if (typed.trim() === '') {
+      set({ result: null, reason: null, updating: false });
+      return;
+    }
+    later(typed, options, ticket);
+  }
 }

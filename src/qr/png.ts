@@ -1,6 +1,8 @@
-// A tiny PNG writer for black-and-white pictures, so `run` needs no canvas and works the
-// same in the browser and in plain Node. Pixels are 1 bit each and stored without
-// compression: CompressionStream would shrink them, but Safari only has it from 16.4.
+// A tiny PNG writer for pictures of a few colours, so `run` needs no canvas and works the
+// same in the browser and in plain Node. Each pixel is an index into a palette of up to
+// 256 colours, any of them see-through, so a two-colour code takes 1 bit a pixel. Pixels
+// are stored without compression: CompressionStream would shrink them, but Safari only
+// has it from 16.4.
 
 const crcTable = Array.from({ length: 256 }, (_, n) => {
   let c = n;
@@ -55,22 +57,29 @@ function zlibStored(raw: Uint8Array) {
   return out;
 }
 
-/** A PNG of a square grid `size` squares wide, each square `scale` pixels wide. */
-export function blackAndWhitePng(
-  size: number,
-  isBlack: (row: number, col: number) => boolean,
-  scale: number,
+/** A palette colour: red, green, blue and alpha (0 is see-through), each 0 to 255. */
+export type PaletteColour = readonly [number, number, number, number];
+
+/**
+ * A square PNG `pixels` wide, each pixel coloured from `palette` by its index. Up to 256
+ * colours; with 2, as a plain code has, each pixel takes 1 bit, so the file stays small.
+ */
+export function palettePng(
+  pixels: number,
+  palette: readonly PaletteColour[],
+  indexAt: (x: number, y: number) => number,
 ): Blob {
-  const pixels = size * scale;
-  const rowBytes = Math.ceil(pixels / 8);
+  if (palette.length < 1 || palette.length > 256) throw new Error('A palette holds 1 to 256');
+  const depth = [1, 2, 4, 8].find((bits) => palette.length <= 2 ** bits)!;
+  const perByte = 8 / depth;
+  const rowBytes = Math.ceil(pixels / perByte);
   const raw = new Uint8Array((rowBytes + 1) * pixels);
   for (let y = 0; y < pixels; y++) {
     const start = y * (rowBytes + 1) + 1; // the first byte of each row is filter 0
     for (let x = 0; x < pixels; x++) {
-      // In 1-bit greyscale, 1 is white.
-      if (!isBlack(Math.floor(y / scale), Math.floor(x / scale))) {
-        raw[start + (x >> 3)]! |= 0x80 >> (x & 7);
-      }
+      // The leftmost pixel takes the highest bits of its byte.
+      const shift = 8 - depth * ((x % perByte) + 1);
+      raw[start + Math.floor(x / perByte)]! |= indexAt(x, y) << shift;
     }
   }
 
@@ -78,13 +87,18 @@ export function blackAndWhitePng(
   const view = new DataView(header.buffer);
   view.setUint32(0, pixels);
   view.setUint32(4, pixels);
-  header[8] = 1; // bit depth
-  header[9] = 0; // greyscale
+  header[8] = depth;
+  header[9] = 3; // colours from a palette
 
   const signature = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   const parts = [
     signature,
     chunk('IHDR', header),
+    chunk('PLTE', new Uint8Array(palette.flatMap(([r, g, b]) => [r, g, b]))),
+    // Each palette colour's alpha, left out when every colour is solid.
+    ...(palette.some(([, , , a]) => a < 255)
+      ? [chunk('tRNS', new Uint8Array(palette.map(([, , , a]) => a)))]
+      : []),
     chunk('IDAT', zlibStored(raw)),
     chunk('IEND', new Uint8Array()),
   ];
