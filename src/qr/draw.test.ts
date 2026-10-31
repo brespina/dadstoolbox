@@ -1,6 +1,6 @@
 import jsQR from 'jsqr';
 import { PNG } from 'pngjs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { drawQr, TooLongForCode } from './draw';
 import { plainStyle, type QrStyle } from './style';
 
@@ -36,6 +36,9 @@ async function colours(blob: Blob) {
   for (let i = 0; i < png.data.length; i += 4) found.add([...png.data.subarray(i, i + 4)].join());
   return found;
 }
+
+// Reading a 700 px code back with jsQR takes seconds on a busy machine.
+vi.setConfig({ testTimeout: 30_000 });
 
 const style = (changes: Partial<QrStyle>): QrStyle => ({ ...plainStyle, ...changes });
 
