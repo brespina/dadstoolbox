@@ -5,13 +5,17 @@ import { discoverTools } from './src/tools/discover';
 import { toolRuns } from './src/tools/tool-runs';
 
 const tools = await discoverTools();
+const base = '/dadstoolbox';
 const outsideAddresses = tools.flatMap(({ tool }) => tool.outsideAddresses);
 
 export default defineConfig({
   site: 'https://bwandii.io',
-  base: '/dadstoolbox',
+  base,
   output: 'static',
   trailingSlash: 'always',
+  // The Tool's old address. The static Site can't send a server redirect, so Astro makes
+  // a page that forwards at once, with a link for anyone without scripts.
+  redirects: { '/photo-to-jpg': `${base}/change-image-type/` },
   integrations: [svelte()],
   // Shiki's inline styles break the browser lock, and the Site has no code samples.
   markdown: { syntaxHighlight: false },

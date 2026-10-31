@@ -14,7 +14,7 @@ be added.
 ## The steps
 
 1. **Copy the template.** Copy `src/tools/_template/` to `src/tools/<address>/`, where
-   `<address>` is the Tool's address in plain words, such as `photo-to-jpg`. Drop the
+   `<address>` is the Tool's address in plain words, such as `change-image-type`. Drop the
    leading `_`: folders starting with `_` are skipped everywhere, which is why the
    template never shows on the Site.
 2. **Fill the declaration** in `declaration.ts` (every field is described
@@ -73,7 +73,7 @@ field is required.
 | Field              | What it does                                                                                                                                                                                                                                                                                       |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `address`          | The Tool's flat address in plain words, such as `split-pdf`. The page is `…/dadstoolbox/<address>/`. Categories are not part of it.                                                                                                                                                                |
-| `name`             | The Tool's name, written as a task: "Split a PDF", "Change a photo to JPG". The page heading and home page row.                                                                                                                                                                                   |
+| `name`             | The Tool's name, written as a task: "Split a PDF", "Change image file type". The page heading and home page row.                                                                                                                                                                                   |
 | `blurb`            | One line in everyday words that names the visitor's problem: "iPhone photo won't open or upload?".                                                                                                                                                                                                 |
 | `category`         | One of the fixed Categories, in order: `Photos`, `PDFs`, `Video`, `Other`.                                                                                                                                                                                                                         |
 | `position`         | Order within the Category, lowest first. Keep it unique within the Category.                                                                                                                                                                                                                       |
@@ -99,7 +99,7 @@ field is required.
 
 ## Input modes
 
-- **`each`, each file on its own** (Split a PDF, Change a photo to JPG). `run` is called
+- **`each`, each file on its own** (Split a PDF, Change image file type). `run` is called
   once per file, with that file and the options. Each file has its own row, so one file
   that fails doesn't stop the others.
 - **`together`, all files together** (Combine PDFs). `run` is called once with the
@@ -250,6 +250,26 @@ video starts and ends. Tools without them work as before.
 
 Trim a video (`src/tools/trim-video/`) is the worked example: a preview with Start and
 End, each set from where the preview is paused.
+
+## Options that follow the chosen files
+
+For a Tool that takes files (`each` or `together`), the page gives `Options.svelte` a
+second prop, `fileTypes`: the types of the chosen files that are waiting to start, such as
+`image/jpeg`, as a read-only list. It is empty before anything is chosen, and again once
+a Batch has taken the files. Declare the props with `OptionsProps` from `types.ts`:
+
+```svelte
+let {
+  options = $bindable(),
+  fileTypes = [],
+}: OptionsProps<Options> = $props();
+```
+
+`fileTypeOf` (`src/tools/file-type.ts`) makes each type: the browser's own, or, when it
+gives none (some iPhone photos (HEIC)), the one the file's ending says. A Tool that
+doesn't need it ignores the prop. Change image file type
+(`src/tools/change-image-type/`) is the worked example: it leaves out a type every chosen
+image already is, and moves the choice to the first type still offered.
 
 ## Outside addresses
 

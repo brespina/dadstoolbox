@@ -96,7 +96,7 @@ test('Tiny makes it smaller than Medium, and each press adds a Batch', async ({ 
 test('a photo already under the size keeps its width and height', async ({ page }) => {
   // 32 × 48 once turned the right way up.
   await choose(page, [
-    fileURLToPath(new URL('../../src/tools/photo-to-jpg/rotated.jpg', import.meta.url)),
+    fileURLToPath(new URL('../../src/tools/change-image-type/rotated.jpg', import.meta.url)),
   ]);
   await page.getByRole('button', { name: 'Make smaller' }).click();
   expect(await thumbnailSize(page, 'rotated_dtb_small.jpg')).toEqual([32, 48]);
