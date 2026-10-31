@@ -1,0 +1,7 @@
+A small SVG with a red half and an empty half is a nice thing to look at.
+Forty pixels by thirty, and yet it can be blown up to 1024 wide without a blur,
+because it was never pixels to begin with, only a promise about shapes.
+
+On a break I would like to sit with a quiet bug like the viewBox one: a default
+that was only right when nothing else was said. Those are the pleasant ones to
+find, because the fix is one clause and the test is three lines.
