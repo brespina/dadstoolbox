@@ -1,4 +1,4 @@
-// Change a photo to JPG end to end, in a real browser: the canvas, the browser's own
+// Change image file type end to end, in a real browser: the canvas, the browser's own
 // photo opening, and Batches across presses of the start button.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -6,7 +6,7 @@ import exifr from 'exifr';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 
-const folder = fileURLToPath(new URL('../../src/tools/photo-to-jpg/', import.meta.url));
+const folder = fileURLToPath(new URL('../../src/tools/change-image-type/', import.meta.url));
 // Stored 48 × 32 and marked "turn a quarter turn", with a date taken and a location.
 const sample = `${folder}rotated.jpg`;
 // An iPhone photo (HEIC), stored 48 × 32 and marked "turn a quarter turn", with a date
@@ -16,7 +16,7 @@ const seeThrough = `${folder}transparent.png`;
 
 async function choose(page: Page, files: string[]) {
   const chooser = page.waitForEvent('filechooser');
-  await page.getByText(/Choose (more )?photos/).click();
+  await page.getByText(/Choose (more )?images/).click();
   await (await chooser).setFiles(files);
 }
 
@@ -46,14 +46,14 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     navigator.canShare = () => false;
   });
-  await page.goto('photo-to-jpg/');
+  await page.goto('change-image-type/');
 });
 
 test('a photo becomes a JPG the right way up, with the date taken and no location', async ({
   page,
 }) => {
   await expect(page.getByRole('checkbox', { name: /Remove location/ })).toBeChecked();
-  await choose(page, [sample]);
+  await choose(page, [sample, seeThrough]);
   await page.getByRole('button', { name: 'Change to JPG' }).click();
   await expect(page.getByText('All done. Location data removed.')).toBeVisible();
   expect(await thumbnailSize(page, 'rotated_dtb.jpg')).toEqual([32, 48]);
@@ -66,7 +66,7 @@ test('a photo becomes a JPG the right way up, with the date taken and no locatio
 
 test('unticked, Remove location keeps the location', async ({ page }) => {
   await page.getByRole('checkbox', { name: /Remove location/ }).uncheck();
-  await choose(page, [sample]);
+  await choose(page, [sample, seeThrough]);
   await page.getByRole('button', { name: 'Change to JPG' }).click();
   await expect(page.getByText('All done.', { exact: true })).toBeVisible();
   const found = await saveAndRead(page, 'rotated_dtb.jpg');
@@ -190,7 +190,7 @@ test('changing the format and pressing start again adds a Batch on top', async (
   await page.getByRole('button', { name: 'Change to PNG' }).click();
   await expect(page.getByRole('button', { name: 'Save transparent_dtb.png' })).toBeVisible();
 
-  await expect(page.locator('section.batch h2')).toHaveText(['PNG · 2 photos', 'JPG · 2 photos']);
+  await expect(page.locator('section.batch h2')).toHaveText(['PNG · 2 images', 'JPG · 2 images']);
   // Earlier Batches keep their own Save buttons.
   await expect(page.getByRole('button', { name: 'Save rotated_dtb.jpg' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save all' })).toHaveCount(1);
@@ -200,19 +200,57 @@ test('changing the format and pressing start again adds a Batch on top', async (
   ]);
 });
 
-test('Choose more and start again does only the new photo', async ({ page }) => {
-  await choose(page, [sample]);
-  await page.getByRole('button', { name: 'Change to JPG' }).click();
-  await expect(page.getByRole('button', { name: 'Save rotated_dtb.jpg' })).toBeVisible();
-
+test('Choose more and start again does only the new image', async ({ page }) => {
   await choose(page, [seeThrough]);
+  await page.getByRole('button', { name: 'Change to JPG' }).click();
+  await expect(page.getByRole('button', { name: 'Save transparent_dtb.jpg' })).toBeVisible();
+
+  await choose(page, [`${folder}painted.webp`]);
   const waiting = page.getByRole('region', { name: 'Ready to start' });
   await expect(waiting.getByRole('listitem')).toHaveCount(1);
-  await expect(waiting.getByText('transparent.png')).toBeVisible();
+  await expect(waiting.getByText('painted.webp')).toBeVisible();
   await page.getByRole('button', { name: 'Change to JPG' }).click();
 
-  await expect(page.locator('section.batch h2')).toHaveText(['JPG · 1 photo', 'JPG · 1 photo']);
+  await expect(page.locator('section.batch h2')).toHaveText(['JPG · 1 image', 'JPG · 1 image']);
   const newest = page.locator('section.batch').first();
   await expect(newest.getByRole('button', { name: /^Save / })).toHaveText(['Save']);
-  await expect(newest.getByRole('button', { name: 'Save transparent_dtb.jpg' })).toBeVisible();
+  await expect(newest.getByRole('button', { name: 'Save painted_dtb.jpg' })).toBeVisible();
+});
+
+test('choosing only JPGs hides JPG and moves the choice to the first type left', async ({
+  page,
+}) => {
+  await expect(page.getByRole('radio', { name: /^JPG/ })).toBeChecked();
+  await choose(page, [sample]);
+  await expect(page.getByRole('radio', { name: /^JPG/ })).toHaveCount(0);
+  await expect(page.getByRole('radio', { name: /^PNG/ })).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Change to PNG' })).toBeEnabled();
+});
+
+test('choosing a JPG and a PNG offers every type', async ({ page }) => {
+  await choose(page, [sample, seeThrough]);
+  await expect(page.getByRole('radio', { name: /^JPG/ })).toBeAttached();
+  await expect(page.getByRole('radio', { name: /^PNG/ })).toBeAttached();
+});
+
+test('a JPG chosen with a PNG is saved as a JPG again, with its location removed', async ({
+  page,
+}) => {
+  await choose(page, [sample, seeThrough]);
+  await page.getByRole('button', { name: 'Change to JPG' }).click();
+  await expect(page.getByText('All done. Location data removed.')).toBeVisible();
+  const found = await saveAndRead(page, 'rotated_dtb.jpg');
+  expect(found).toMatchObject({ DateTimeOriginal: '2024:06:01 10:30:00' });
+  expect(found).not.toHaveProperty('latitude');
+});
+
+test('the old address forwards to the new page', async ({ page }) => {
+  await page.goto('photo-to-jpg/');
+  await expect(page).toHaveURL(/\/change-image-type\/$/);
+  await expect(page.getByRole('heading', { name: 'Change image file type' })).toBeVisible();
+});
+
+test('the old address has a link for people without scripts', async ({ page }) => {
+  const response = await page.request.get('photo-to-jpg/');
+  expect(await response.text()).toMatch(/<a href="[^"]*\/change-image-type\/">/);
 });

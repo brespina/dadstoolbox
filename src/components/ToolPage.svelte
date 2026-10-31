@@ -11,7 +11,8 @@
     type ToolPageState,
   } from '../tools/batch';
   import { toolAt } from '../tools/registry';
-  import { wordsFor, type ReadyLine, type ReadyNote } from '../tools/types';
+  import { wordsFor, type OptionsProps, type ReadyLine, type ReadyNote } from '../tools/types';
+  import { fileTypeOf } from '../tools/file-type';
   import { runInWorker, type AnyRun } from '../tools/worker';
   import { saveFiles, type SavableFile } from '../site/save';
   import { formatSize } from '../site/size';
@@ -23,7 +24,7 @@
   // Options components are small, so every page has them all and they render with the
   // page. Each Tool's `run` (and its library) loads only on its own page, or only in the
   // worker for a Tool marked worker.
-  const optionsComponents = import.meta.glob<{ default: Component<{ options: object }> }>(
+  const optionsComponents = import.meta.glob<{ default: Component<OptionsProps<object>> }>(
     ['../tools/*/Options.svelte', '!../tools/_*/Options.svelte'],
     { eager: true },
   );
@@ -190,6 +191,8 @@
   let anyChosen = $derived(state.waiting.length > 0 || state.batches.length > 0);
   // The start button follows the options, and has work when a file hasn't run with them.
   let words = $derived(wordsFor(tool, options));
+  // What the Options are told about the chosen files, such as to hide a type they already are.
+  let fileTypes = $derived(state.waiting.map(({ file }) => fileTypeOf(file)));
   let hasWork = $derived(state && toolPage.hasWork($state.snapshot(options)));
 
   // One address per result picture, kept until the page closes, like the results.
@@ -203,7 +206,7 @@
 </script>
 
 <div class="tool">
-  <Options bind:options />
+  <Options bind:options {fileTypes} />
 
   {#if !supported}
     <p class="unsupported">{text.tool.unsupported}</p>

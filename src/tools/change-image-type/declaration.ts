@@ -16,12 +16,12 @@ export type Options = LocationOption & { format: Format };
 const formatName = (options: Options) => text.photos.formats[options.format].name;
 
 export const tool = defineTool({
-  address: 'photo-to-jpg',
-  name: 'Change a photo to JPG',
-  blurb: "iPhone photo won't open or send? Make it a JPG.",
+  address: 'change-image-type',
+  name: 'Change image file type',
+  blurb: "Picture won't open or send? Change it to a type that does.",
   category: 'Photos',
   position: 1,
-  noun: { one: 'photo', many: 'photos' },
+  noun: { one: 'image', many: 'images' },
   // The file type may be empty for an iPhone photo (HEIC), so the endings are listed too.
   accept: [
     'image/heic',

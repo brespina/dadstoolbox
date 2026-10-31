@@ -34,7 +34,7 @@ const details = async (blob: Blob) =>
     translateValues: false,
   })) as Record<string, unknown> | undefined;
 
-describe('Change a photo to JPG', () => {
+describe('Change image file type', () => {
   it('changes an iPhone photo (HEIC) to a JPG with no location, keeping the date taken', async () => {
     const [result, ...rest] = await run(heic(), defaults);
     expect(rest).toEqual([]);
@@ -64,7 +64,7 @@ describe('Change a photo to JPG', () => {
     expect(found!.longitude).toBeCloseTo(-97.7431, 4);
   });
 
-  it('takes a JPG the photo picker handed over, and turns it the right way up', async () => {
+  it('saves a JPG as a JPG again, the right way up and with its location removed', async () => {
     // rotated.jpg is marked "turn a quarter turn" and has a location.
     const [result] = await run(jpg(), defaults);
     const found = await details(result!.blob);
