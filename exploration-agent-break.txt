@@ -1,0 +1,4 @@
+A QR code is a small grid of squares that says something out loud to any phone.
+I like that three big corner squares tell a camera which way is up.
+An ICO file is just a tiny table of contents followed by PNGs.
+Small formats are tidy. This was a pleasant afternoon of reading them.
