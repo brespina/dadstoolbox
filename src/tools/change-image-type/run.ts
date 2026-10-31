@@ -8,7 +8,8 @@ import {
 } from '../../photos/exif';
 import { ToolFailure, type ToolRun, type ToolRunContext } from '../types';
 import { formatTypes, tool, type Options } from './declaration';
-import { paintOnCanvas } from './canvas';
+import { paintOnCanvas, paintSquaresOnCanvas } from './canvas';
+import { iconSizes, makeIco } from './ico';
 
 /** A photo drawn the right way up and saved as `type`, with no photo details. */
 export interface Painted {
@@ -18,19 +19,42 @@ export interface Painted {
 }
 export type Paint = (file: File, type: string, context?: ToolRunContext) => Promise<Painted>;
 
-/** The Tool's job, with the drawing step passed in so tests can stand in for the canvas. */
-export function makeRun(paint: Paint): ToolRun<Options> {
+/** The photo in the middle of a see-through square of each size, saved as PNG. */
+export type PaintSquares = (
+  file: File,
+  sizes: readonly number[],
+  context?: ToolRunContext,
+) => Promise<Painted[]>;
+
+/** The Tool's job, with the drawing steps passed in so tests can stand in for the canvas. */
+export function makeRun(
+  paint: Paint,
+  paintSquares: PaintSquares = paintSquaresOnCanvas,
+): ToolRun<Options> {
   return async (file, options, context) => {
     const original = new Uint8Array(await file.arrayBuffer());
     const type = formatTypes[options.format];
 
-    let painted: Painted;
+    let painted: Painted | undefined;
+    let squares: Painted[] = [];
     try {
-      painted = await paint(file, type, context);
+      if (options.format === 'ico') squares = await paintSquares(file, iconSizes, context);
+      else painted = await paint(file, type, context);
     } catch (error) {
       // Neither the browser nor the late-loaded decoder could open this iPhone photo.
       if (isHeif(original)) throw new ToolFailure(tool.reasons.heic!);
       throw error;
+    }
+
+    // An ICO holds no photo details.
+    if (!painted) {
+      const pictures = await Promise.all(
+        squares.map(async ({ blob, width }) => ({
+          size: width,
+          png: new Uint8Array(await blob.arrayBuffer()),
+        })),
+      );
+      return [{ blob: new Blob([makeIco(pictures)], { type }) }];
     }
 
     const tiff = buildTiff(readDetails(original), !options.removeLocation);

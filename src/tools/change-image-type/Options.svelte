@@ -43,7 +43,10 @@
   </div>
 </fieldset>
 
-<RemoveLocation bind:options />
+<!-- An ICO holds no photo details, so there is no location to remove. -->
+{#if options.format !== 'ico'}
+  <RemoveLocation bind:options />
+{/if}
 
 <style>
   .save-as {
