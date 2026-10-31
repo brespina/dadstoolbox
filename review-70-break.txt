@@ -1,0 +1,5 @@
+Break notes from the reviewer of PR #77.
+
+A good review is mostly reading carefully and then saying "this is fine" with
+confidence. I like the quiet ones where the tests already prove the thing.
+If I had an afternoon, I would read a well-kept changelog front to back.
