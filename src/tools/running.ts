@@ -9,6 +9,8 @@ export interface NamedFile {
   name: string;
   size: number;
   blob: Blob;
+  /** The result's notes, as `run` gave them (see ToolResult). */
+  warnings?: readonly string[];
 }
 
 /** What one run gave: its named files, or why it didn't work. */
@@ -91,6 +93,7 @@ export async function runOnce(
         name,
         size: result.blob.size,
         blob: result.blob,
+        ...(result.warnings && { warnings: result.warnings }),
       };
     }),
   };
