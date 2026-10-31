@@ -10,6 +10,9 @@ describe('the type of a chosen file', () => {
     expect(fileTypeOf(new File([], 'IMG_1234.HEIC'))).toBe('image/heic');
     expect(fileTypeOf(new File([], 'scan.jpeg'))).toBe('image/jpeg');
     expect(fileTypeOf(new File([], 'logo.PNG'))).toBe('image/png');
+    expect(fileTypeOf(new File([], 'scan.BMP'))).toBe('image/bmp');
+    expect(fileTypeOf(new File([], 'photo.avif'))).toBe('image/avif');
+    expect(fileTypeOf(new File([], 'logo.svg'))).toBe('image/svg+xml');
   });
 
   it('is empty when nothing says what the file is', () => {

@@ -26,19 +26,27 @@ export const tool = defineTool({
   category: 'Photos',
   position: 1,
   noun: { one: 'image', many: 'images' },
-  // The file type may be empty for an iPhone photo (HEIC), so the endings are listed too.
+  // The file type may be empty for an iPhone photo (HEIC) or an SVG, so the endings are
+  // listed too. GIF is left out on purpose.
   accept: [
     'image/heic',
     'image/heif',
     'image/jpeg',
     'image/png',
     'image/webp',
+    'image/bmp',
+    'image/x-ms-bmp',
+    'image/avif',
+    'image/svg+xml',
     '.heic',
     '.heif',
     '.jpg',
     '.jpeg',
     '.png',
     '.webp',
+    '.bmp',
+    '.avif',
+    '.svg',
   ],
   input: 'each',
   needs: [],
