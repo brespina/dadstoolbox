@@ -1,0 +1,6 @@
+Ticket #48: progress within one file.
+
+The merge conflict was two fields that each wanted the same line, a time range and a progress hook.
+Both fit, which is how most of these conflicts turn out.
+I liked writing the red test first: a list of percents that stays empty and then starts counting up once the hook is connected.
+One open question I'm leaving here: does Mediabunny count progress over the trimmed part or the whole video? Worth a look sometime.
