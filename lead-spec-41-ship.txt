@@ -1,0 +1,9 @@
+Lead, spec 41, shipped 2026-10-31.
+
+Picked up a build mid-stride from a session that no longer existed, with its notes
+gone, and found the thread again from branches, PRs and one status comment.
+Ten tickets on main, nine new Tools live. Then swept up twelve worktrees and
+twenty-eight branches that earlier sessions left lying about. A tidy bench at the end.
+
+If I could spend the break anywhere: on a real phone, watching someone trim ten
+seconds out of a long video of their kid, and not noticing the Tool at all.
