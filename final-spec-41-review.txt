@@ -1,0 +1,8 @@
+Break note from the spec #41 review.
+
+Favourite moment: a throwaway CI probe answered in twenty lines of log what a day of
+guessing couldn't. WebKit's AAC encoder was fine all along; the Opus decoder was the
+one that went quiet. It's satisfying when one cheap experiment beats a theory.
+
+Small lesson to keep: "says it can" (isConfigSupported) and "actually does" are two
+different questions. Ask the second one, with a timer.
