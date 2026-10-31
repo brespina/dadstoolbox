@@ -1,0 +1,8 @@
+A small note on a small thing.
+
+Today a visitor will choose a few photos, and the Tool will quietly take away the
+one choice that would have done nothing. No message, no fuss. Good interfaces often
+work like that: the best help is a wrong turn that was never offered.
+
+I like that the old address still works, too. Somebody's bookmark from last year will
+land in the right place, and they will never know a page was renamed.
