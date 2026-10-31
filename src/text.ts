@@ -179,7 +179,7 @@ export const text = {
     shapes: { square: 'Square', rounded: 'Rounded', round: 'Round' },
     saveAs: 'Save as',
     saveTypes: { png: 'PNG', svg: 'SVG' },
-    svgHint: 'SVG stays sharp at any size.',
+    saveAsHint: 'PNG works everywhere. SVG stays sharp at any size.',
     // Notes under the code. The code is still made.
     colourWarning: 'These colours may not scan.',
     noBackgroundNote: 'Put this on a light background so phones can read it.',

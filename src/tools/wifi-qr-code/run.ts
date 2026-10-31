@@ -14,7 +14,7 @@ function wifiText({ name, password }: typeof tool.defaultOptions) {
   return `WIFI:T:WPA;S:${escape(name)};P:${escape(password)};;`;
 }
 
-/** One PNG of a QR code that joins the network, in the chosen Style, once it has a name. */
+/** One QR code that joins the network, in the chosen Style, once it has a name. */
 export const run: ToolTextRun<typeof tool.defaultOptions> = async (_typed, options) => {
   if (options.name.trim() === '') return [];
   try {
