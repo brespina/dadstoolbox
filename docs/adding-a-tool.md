@@ -57,6 +57,7 @@ new Tool shows on the home page under its Category and gets its own page test on
 | `run.test.ts`    | The Vitest test of `run`.                                                                                                                                                            |
 | `sample.<ext>`   | The file the generated page test chooses. Extra test files, such as `sample-password.pdf`, can sit beside it. For input mode `none`, `sample.txt` holds the text the test types, or, with no type box, `sample.json` holds each field's value by its label. |
 | `ready.ts`       | Optional. Lines for a chosen file's Ready row, such as an estimated size. See [Notes on the Ready row](#notes-on-the-ready-row).                                                   |
+| `FileOptions.svelte` | Optional. An editor on each chosen file's Ready row, for options that belong to that file. See [Options for each file](#options-for-each-file). |
 
 `src/tools/types.ts` defines the declaration and `run` types. It is the source of truth:
 if this guide and that file disagree, the file wins. `src/tools/split-pdf/` is a worked
@@ -65,7 +66,8 @@ example.
 ## The declaration
 
 `defineTool` fills the defaults for the fields marked optional below (`largeFileNote`,
-`privacyLine`, `allDone`, `textFor`, `typeLabel`, `typeBox`, `reasons` and `notes`). Every other
+`privacyLine`, `allDone`, `textFor`, `typeLabel`, `typeBox`, `reasons`, `notes`,
+`fileOptions` and `optionsProblem`). Every other
 field is required.
 
 | Field              | What it does                                                                                                                                                                                                                                                                                       |
@@ -91,6 +93,8 @@ field is required.
 | `notes`            | Optional. Other words the Tool shows, by key, such as its option names or the lines its `ready.ts` gives. They are scanned for plain words like every other field.                                                                                                                             |
 | `worker`           | Whether `run` runs in a Web Worker. See [The worker flag](#the-worker-flag).                                                                                                                                                                                                                       |
 | `outsideAddresses` | Outside origins the Tool may contact. Leave it empty. See [Outside addresses](#outside-addresses).                                                                                                                                                                                                 |
+| `fileOptions`      | Optional, for input mode `each`. The option names each chosen file has its own value for, such as `['start', 'end']`. Defaults to none. See [Options for each file](#options-for-each-file). |
+| `optionsProblem`   | Optional. Given a file's options, the plain words for why start can't run it yet, or `undefined`. Start stays greyed out and the words show on the file's Ready row. Defaults to no problem. |
 | `defaultOptions`   | The options the page starts with. Their shape is the options type for `run` and `Options.svelte` (`typeof tool.defaultOptions`).                                                                                                                                                                  |
 
 ## Input modes
@@ -204,7 +208,9 @@ or sound. Make a video play anywhere (`src/tools/video-to-mp4/`) is the worked e
 - `longestSide` fits the picture's longest side to that many pixels, never larger (Make a
   video smaller). `fitLongestSide` in `src/video/size.ts` gives the size it makes, for an
   estimate.
-- A new setting, such as a time range, is a new field of `RemakeSettings`.
+- `range` keeps only the part from `start` to `end` (seconds), cut exactly (Trim a
+  video).
+- A new setting is a new field of `RemakeSettings`.
 
 ## Notes on the Ready row
 
@@ -217,6 +223,28 @@ declaration's `notes`.
 
 For a video, `videoFacts(file)` in `src/video/facts.ts` reads its shown size and length
 with the browser's own player, once per file.
+
+## Options for each file
+
+Most options apply to every chosen file. Some belong to one file, such as where Trim a
+video starts and ends. Tools without them work as before.
+
+- List those option names in `fileOptions`, and give their starting values in
+  `defaultOptions` as usual. Each chosen file starts from those values.
+- Add `FileOptions.svelte` to the Tool's folder. The shared page shows it full width on
+  each file's Ready row, with three props: `file` (the chosen File), `options` (that
+  file's own values) and `change(values)`, which sets some of them. Pass plain values:
+  a worker Tool gets a copy.
+- `run` gets one options object: the page's options, with the file's own values in place.
+  A changed value counts as new work for that file only, so start runs it again.
+- To stop start until the values make sense, give `optionsProblem`. Its words go in
+  `reasons` or `notes`, so the banned-words scan reads them. `run` can throw the same
+  reason, in case another caller skips the check.
+- Once a file has run, it leaves the waiting list with its editor. To make another clip
+  from the same file, choose it again.
+
+Trim a video (`src/tools/trim-video/`) is the worked example: a preview with Start and
+End, each set from where the preview is paused.
 
 ## Outside addresses
 

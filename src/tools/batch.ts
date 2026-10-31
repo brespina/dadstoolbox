@@ -23,6 +23,8 @@ export interface WaitingFile {
   large: boolean;
   /** The chosen file itself, for a Tool's note on its Ready row. */
   file: File;
+  /** This file's own values for the Tool's `fileOptions`, set on its Ready row. */
+  fileOptions: object;
 }
 
 export type ItemStatus = 'ready' | 'working' | 'done' | 'failed';
@@ -126,13 +128,26 @@ function makeToolPage<Options extends object>(
   // Each file on its own: every chosen file stays chosen until the page closes, so
   // changed options can run it again. `ranWith` holds the options it has run with, as
   // optionsKey text. All files together: the list is used up by each press.
-  let chosen: { entry: WaitingFile; file: File; ranWith: Set<string> }[] = [];
+  // `fileOptions` holds the file's own values for the Tool's `fileOptions`, which
+  // replace the page's options for that file.
+  type Chosen = { entry: WaitingFile; file: File; ranWith: Set<string>; fileOptions: object };
+  let chosen: Chosen[] = [];
   const waiting = () => chosen.filter(({ ranWith }) => ranWith.size === 0);
+  const forFile = (options: Options, { fileOptions }: Chosen): Options => ({
+    ...options,
+    ...fileOptions,
+  });
   const toDo = (options: Options) => {
     if (tool.input === 'together') return waiting();
-    const key = optionsKey(options);
-    return chosen.filter(({ ranWith }) => !ranWith.has(key));
+    return chosen.filter((c) => !c.ranWith.has(optionsKey(forFile(options, c))));
   };
+  /** Files to run, unless one can't run with its options yet: then start waits. */
+  const ready = (options: Options) => {
+    const todo = toDo(options);
+    return todo.some((c) => tool.optionsProblem(forFile(options, c))) ? [] : todo;
+  };
+  const startingFileOptions = () =>
+    Object.fromEntries(tool.fileOptions.map((key) => [key, tool.defaultOptions[key]]));
   let batches: Batch[] = [];
   let working = false;
   // Kept in lower case: phones and Macs treat Report.PDF and report.pdf as one file.
@@ -143,7 +158,7 @@ function makeToolPage<Options extends object>(
 
   const state = (): ToolPageState => ({
     // Files never run yet. Files run before are in their Batches.
-    waiting: waiting().map(({ entry }) => entry),
+    waiting: waiting().map(({ entry, fileOptions }) => ({ ...entry, fileOptions })),
     batches,
     working,
   });
@@ -285,11 +300,24 @@ function makeToolPage<Options extends object>(
             status: 'ready',
             large: file.size > tool.largeFileLimit,
             file,
+            fileOptions: {},
           },
           file,
           ranWith: new Set(),
+          fileOptions: startingFileOptions(),
         });
       }
+      changed();
+    },
+
+    /**
+     * Sets a waiting file's own values for some of the Tool's `fileOptions`, such as
+     * where Trim a video starts. Plain values only: a worker gets a copy.
+     */
+    setFileOptions(id: number, values: Partial<Options>) {
+      chosen = chosen.map((c) =>
+        c.entry.id === id ? { ...c, fileOptions: { ...c.fileOptions, ...values } } : c,
+      );
       changed();
     },
 
@@ -318,7 +346,7 @@ function makeToolPage<Options extends object>(
      * again runs it again.
      */
     hasWork(options: Options): boolean {
-      return toDo(options).length > 0;
+      return ready(options).length > 0;
     },
 
     /**
@@ -326,13 +354,14 @@ function makeToolPage<Options extends object>(
      * own: only the files not yet run with these options.
      */
     async start(options: Options) {
-      const todo = toDo(options);
+      const todo = ready(options);
       if (working || todo.length === 0) return;
       working = true;
       if (tool.input === 'together') return startTogether(options);
-      const key = optionsKey(options);
-      for (const { ranWith } of todo) ranWith.add(key);
-      const work = todo.map(({ file }) => {
+      const work = todo.map((c) => {
+        const { file } = c;
+        const fileOptions = forFile(options, c);
+        c.ranWith.add(optionsKey(fileOptions));
         const item: BatchItem = {
           id: nextId++,
           name: file.name,
@@ -340,7 +369,7 @@ function makeToolPage<Options extends object>(
           status: 'ready',
           results: [],
         };
-        return { file, item };
+        return { file, item, fileOptions };
       });
       const total = work.length;
       batches = [
@@ -356,10 +385,10 @@ function makeToolPage<Options extends object>(
       ];
       changed();
 
-      for (const [index, { file, item }] of work.entries()) {
+      for (const [index, { file, item, fileOptions }] of work.entries()) {
         updateNewest((batch) => ({ ...batch, progress: { current: index + 1, total } }));
         updateItem(item.id, { status: 'working' });
-        await runOne(item, file, options);
+        await runOne(item, file, fileOptions);
       }
 
       working = false;

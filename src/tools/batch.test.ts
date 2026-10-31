@@ -548,3 +548,70 @@ describe('a Tool whose run is marked worker', () => {
     expect(page.state().batches[0]!.items[0]!.status).toBe('done');
   });
 });
+
+describe('options set per file', () => {
+  const trim = defineTool({
+    ...tool,
+    defaultOptions: { quality: 'high', start: 0, end: null as number | null },
+    fileOptions: ['start', 'end'],
+  });
+  type TrimOptions = typeof trim.defaultOptions;
+  const recording = () => {
+    const runs: string[] = [];
+    const run = async (f: File, options: TrimOptions) => {
+      runs.push(`${f.name} ${options.quality} ${options.start}-${options.end}`);
+      return [pdf()];
+    };
+    return { runs, page: createToolPage(trim, run) };
+  };
+
+  it("reach run with the page's options, each file keeping its own", async () => {
+    const { runs, page } = recording();
+    page.add([file('a.mp4'), file('b.mp4')]);
+    const [a, b] = page.state().waiting;
+    page.setFileOptions(a!.id, { start: 1, end: 2 });
+    page.setFileOptions(b!.id, { start: 3, end: 5 });
+    await page.start({ quality: 'low', start: 0, end: null });
+    expect(runs).toEqual(['a.mp4 low 1-2', 'b.mp4 low 3-5']);
+  });
+
+  it("start from the Tool's defaults, shown on the Ready row", () => {
+    const { page } = recording();
+    page.add([file('a.mp4')]);
+    expect(page.state().waiting[0]!.fileOptions).toEqual({ start: 0, end: null });
+    page.setFileOptions(page.state().waiting[0]!.id, { end: 4 });
+    expect(page.state().waiting[0]!.fileOptions).toEqual({ start: 0, end: 4 });
+  });
+
+  it('count as new work only for the file whose values changed', async () => {
+    const { runs, page } = recording();
+    page.add([file('a.mp4'), file('b.mp4')]);
+    const [a] = page.state().waiting;
+    await page.start({ quality: 'low', start: 0, end: null });
+    expect(page.hasWork({ quality: 'low', start: 0, end: null })).toBe(false);
+    page.setFileOptions(a!.id, { start: 2 });
+    expect(page.hasWork({ quality: 'low', start: 0, end: null })).toBe(true);
+    await page.start({ quality: 'low', start: 0, end: null });
+    expect(runs).toEqual(['a.mp4 low 0-null', 'b.mp4 low 0-null', 'a.mp4 low 2-null']);
+  });
+
+  it("hold start back while a file's values have a problem", async () => {
+    const page = createToolPage(
+      defineTool({
+        ...trim,
+        optionsProblem: ({ start, end }) =>
+          end !== null && end <= start ? 'End must be after Start.' : undefined,
+      }),
+      async () => [pdf()],
+    );
+    page.add([file('a.mp4'), file('b.mp4')]);
+    const [a] = page.state().waiting;
+    page.setFileOptions(a!.id, { start: 3, end: 3 });
+    const options = { quality: 'low', start: 0, end: null };
+    expect(page.hasWork(options)).toBe(false);
+    await page.start(options);
+    expect(page.state().batches).toEqual([]);
+    page.setFileOptions(a!.id, { end: 4 });
+    expect(page.hasWork(options)).toBe(true);
+  });
+});

@@ -28,6 +28,12 @@ export interface RemakeSettings {
   reasons: Readonly<Record<VideoReasonKey, Reason>>;
   /** At most this many pixels on the picture's longest side; never made larger. */
   longestSide?: number;
+  /**
+   * The part to keep, in seconds from the start of the video. End left out means to the
+   * end. The cut is exact, as the picture is always remade. The caller makes sure start
+   * comes before end.
+   */
+  range?: { start: number; end?: number };
   /** Called as the video is made, with how far along it is from 0 to 1 (`context.progress`). */
   onProgress?: (fraction: number) => void;
 }
@@ -40,7 +46,7 @@ export interface RemakeSettings {
  */
 export async function remakeVideo(
   file: Blob,
-  { reasons, longestSide, onProgress }: RemakeSettings,
+  { reasons, longestSide, range, onProgress }: RemakeSettings,
 ): Promise<Blob> {
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   try {
@@ -75,6 +81,7 @@ export async function remakeVideo(
         ...fit.set,
       },
       audio: { codec: 'aac' },
+      ...(range && { trim: range }),
       showWarnings: false,
     });
     // Mediabunny still makes a file when it drops a track, so never trust that alone.
