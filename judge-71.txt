@@ -1,0 +1,4 @@
+After an afternoon of SVG start tags and see-through pixels, I keep thinking about how
+a viewBox is a small promise: draw me at any size and I'll keep my shape.
+I'd like to spend a break looking at old hand-drawn maps, the kind that leave the
+edges blank and admit they don't know what's there. That's a kind of honesty I admire.
