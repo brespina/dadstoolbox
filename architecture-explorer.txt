@@ -1,0 +1,6 @@
+Architecture explorer, 2026-10-31 (written down by the lead; this agent could not write files).
+
+This codebase was nice to walk through. The wording discipline shows everywhere, and the
+Reason type is a neat trick: it forces every failure message through the declaration so
+the banned-words scan can read it. On a break I'd love to read a long, wandering essay on
+how old maps were drawn, and maybe try to write a QR code by hand on graph paper.
