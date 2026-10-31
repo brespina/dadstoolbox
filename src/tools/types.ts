@@ -4,7 +4,8 @@
 // - run.ts: exports `run`, the Tool's job, in plain TypeScript
 // - Options.svelte: the Tool's options, bound to an options object
 // - sample.<ext>: the file the generated page test chooses (sample.txt: the text it
-//   types, for input mode "none")
+//   types, for input mode "none"; sample.json: each field's value by its label, for a
+//   Tool with no type box)
 // Folders starting with "_" are skipped by discovery.
 
 import { fillText, text } from '../text';
@@ -22,7 +23,11 @@ export type Category = (typeof categories)[number];
 export type InputMode = 'each' | 'together' | 'none';
 
 /** Browser features a Tool may need, checked when the page runs. */
-export type BrowserFeature = 'webcodecs';
+/**
+ * - webcodecs: reading video frames
+ * - makeVideo: making video (a video encoder)
+ */
+export type BrowserFeature = 'webcodecs' | 'makeVideo';
 
 /** Words that follow the chosen options. */
 export interface OptionsText {
@@ -32,6 +37,12 @@ export interface OptionsText {
   batchLabel?: string;
   /** Replaces the "All done" message for a Batch made with these options. */
   allDone?: string;
+  /**
+   * The description of a typed Tool's result picture. Defaults to "{noun} that says:
+   * {typed}". A Tool with no type box (`typeBox: false`) sets it, so the picture is
+   * described from its options.
+   */
+  pictureLabel?: string;
 }
 
 export interface ToolDeclarationInput<Options extends object> {
@@ -51,6 +62,12 @@ export interface ToolDeclarationInput<Options extends object> {
   input: InputMode;
   /** The label on the box a person types into (input mode "none"). */
   typeLabel?: string;
+  /**
+   * Input mode "none" only: whether the page shows the shared type box. Defaults to true.
+   * With false, the options hold all the input: `run` gets "" as the typed text, and the
+   * result is made again whenever the options change.
+   */
+  typeBox?: boolean;
   needs: readonly BrowserFeature[];
   /** Files bigger than this (in bytes) get a note on their Ready row. */
   largeFileLimit: number;
@@ -76,6 +93,18 @@ export interface ToolDeclarationInput<Options extends object> {
   /** Outside origins the Tool may contact. They widen the browser lock. */
   outsideAddresses: readonly string[];
   defaultOptions: Options;
+  /**
+   * Options each chosen file has its own value for, such as Trim a video's start and
+   * end. FileOptions.svelte in the Tool's folder sets them on the file's Ready row. Each
+   * file starts from `defaultOptions`, and its own values replace the page's when `run`
+   * gets the options. Defaults to none.
+   */
+  fileOptions?: readonly (keyof Options)[];
+  /**
+   * Why start can't run a file with these options yet, in plain words from `notes`, or
+   * nothing. Asked for each chosen file, with its own values in. Defaults to nothing.
+   */
+  optionsProblem?: (options: Options) => string | undefined;
 }
 
 declare const reasonBrand: unique symbol;
@@ -104,7 +133,10 @@ export function defineTool<Options extends object>(
     largeFileNote: fillText(text.tool.largeFileNote, { noun: input.noun.one }),
     textFor: () => ({}),
     typeLabel: text.tool.typed.label,
+    typeBox: true,
     notes: {},
+    fileOptions: [],
+    optionsProblem: () => undefined,
     ...input,
     reasons: (input.reasons ?? {}) as Readonly<Record<string, Reason>>,
   };
@@ -153,6 +185,22 @@ export interface ToolRunContext {
    * something big that loads only once a file is chosen, such as a library.
    */
   gettingReady<T>(loading: Promise<T>): Promise<T>;
+  /**
+   * Tells the page how far along the current file is, from 0 to 1, shown on its row
+   * as "Working… 40%". Call it as often as you like: the page changes only when the
+   * whole percent does. A Tool that never calls it shows plain "Working…".
+   */
+  progress(fraction: number): void;
+}
+
+/**
+ * A `progress` fraction as a whole percent from 0 to 100, rounded down so 100 means
+ * finished. Anything that isn't a number counts as 0.
+ */
+export function wholePercent(fraction: number): number {
+  if (!Number.isFinite(fraction)) return 0;
+  // The small nudge keeps 0.29 at 29: 0.29 * 100 is 28.999… in floating point.
+  return Math.min(100, Math.max(0, Math.floor(fraction * 100 + 1e-9)));
 }
 
 /** A line on a chosen file's Ready row, such as how big the result may be. */

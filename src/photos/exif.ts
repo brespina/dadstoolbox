@@ -5,6 +5,9 @@
 //
 // Values are copied byte for byte, so the new details keep the original's byte order.
 // Any file this can't read simply has no details to keep.
+//
+// Remove photo location doesn't redraw: `jpegWithoutLocation` and `heifWithoutLocation`
+// blank the location in the file's own bytes and leave the rest as it was.
 
 /** One TIFF entry. `value` holds the entry's bytes in the original's byte order. */
 interface Entry {
@@ -71,9 +74,12 @@ export function isHeif(file: Uint8Array): boolean {
   );
 }
 
+/** True when the bytes are a JPEG. */
+export const isJpeg = (file: Uint8Array) => file[0] === 0xff && file[1] === 0xd8;
+
 function findTiff(file: Uint8Array): Uint8Array | undefined {
   const view = new DataView(file.buffer, file.byteOffset, file.byteLength);
-  if (view.getUint16(0) === 0xffd8) return findInJpeg(file, view);
+  if (isJpeg(file)) return findInJpeg(file, view);
   if (ascii(file, 1, 3) === 'PNG') return findInPng(file, view);
   if (ascii(file, 0, 4) === 'RIFF' && ascii(file, 8, 4) === 'WEBP') return findInWebp(file, view);
   if (ascii(file, 4, 4) === 'ftyp') return findInHeif(file, view);
@@ -135,28 +141,50 @@ function* boxes(file: Uint8Array, view: DataView, start: number, end: number) {
 }
 
 function findInHeif(file: Uint8Array, view: DataView) {
+  const exif = heifItems(file, view).find((item) => item.type === 'Exif');
+  return exif && tiffInExifItem(exif.bytes());
+}
+
+/** One item of a HEIF file, such as the picture, its photo details or its XMP text. */
+interface HeifItem {
+  type: string;
+  /** For a 'mime' item, what kind of text it holds. */
+  contentType?: string;
+  /**
+   * A view into the file's own bytes, so changes to it change the file. Throws when
+   * the item isn't stored in one piece straight in the file.
+   */
+  bytes: () => Uint8Array;
+}
+
+/** Every item listed in a HEIF file. Throws when the item lists can't be read. */
+function heifItems(file: Uint8Array, view: DataView): HeifItem[] {
   const meta = [...boxes(file, view, 0, file.length)].find(([type]) => type === 'meta');
-  if (!meta) return undefined;
+  if (!meta) throw new RangeError('No item list');
   // meta is a "full box": 4 bytes of version and flags come first.
   const inside = [...boxes(file, view, meta[1] + 4, meta[2])];
   const iinf = inside.find(([type]) => type === 'iinf');
   const iloc = inside.find(([type]) => type === 'iloc');
-  if (!iinf || !iloc) return undefined;
+  if (!iinf || !iloc) throw new RangeError('No item list');
 
-  // Find the Exif item's number in the item list.
-  let exifItem: number | undefined;
-  const iinfVersion = file[iinf[1]]!;
-  for (const [type, start] of boxes(file, view, iinf[1] + (iinfVersion === 0 ? 6 : 8), iinf[2])) {
+  // What each item is, by its number.
+  const kinds = new Map<number, { type: string; contentType?: string }>();
+  const iinfStart = iinf[1] + (file[iinf[1]] === 0 ? 6 : 8);
+  for (const [type, start, end] of boxes(file, view, iinfStart, iinf[2])) {
     if (type !== 'infe') continue;
     const version = file[start]!;
-    if (version < 2) continue;
+    // Older entries name no item type, so their items can't be told apart.
+    if (version < 2) throw new RangeError('Old item entry');
     const id = version === 2 ? view.getUint16(start + 4) : view.getUint32(start + 4);
     const typeAt = start + (version === 2 ? 8 : 10);
-    if (ascii(file, typeAt, 4) === 'Exif') exifItem = id;
+    const itemType = ascii(file, typeAt, 4);
+    // After the type: the item's name, then for 'mime' its content type, each ending in 0.
+    const strings = ascii(file, typeAt + 4, end - typeAt - 4).split('\0');
+    kinds.set(id, { type: itemType, contentType: itemType === 'mime' ? strings[1] : undefined });
   }
-  if (exifItem === undefined) return undefined;
 
-  // Find where that item's bytes are.
+  // Where each item's bytes are.
+  const where = new Map<number, () => Uint8Array>();
   let at = iloc[1];
   const version = file[at]!;
   at += 4;
@@ -192,23 +220,38 @@ function findInHeif(file: Uint8Array, view: DataView) {
     const baseOffset = readSized(baseOffsetSize);
     const extentCount = view.getUint16(at);
     at += 2;
-    let first: { offset: number; length: number } | undefined;
+    const extents: { offset: number; length: number }[] = [];
     for (let e = 0; e < extentCount; e++) {
       readSized(indexSize);
-      const offset = readSized(offsetSize);
-      const length = readSized(lengthSize);
-      first ??= { offset, length };
+      extents.push({ offset: readSized(offsetSize), length: readSized(lengthSize) });
     }
-    if (id !== exifItem) continue;
-    // Only items stored straight in the file, in one piece, are read.
-    if (method !== 0 || extentCount !== 1 || !first) return undefined;
-    const start = baseOffset + first.offset;
-    const item = file.subarray(start, start + first.length);
-    // The item starts with how far in the TIFF bytes begin.
-    const tiffAt = 4 + new DataView(item.buffer, item.byteOffset).getUint32(0);
-    return withoutPrefix(item.subarray(tiffAt));
+    where.set(id, () => {
+      // Only items stored straight in the file, in one piece, are read.
+      const [only] = extents;
+      if (method !== 0 || extents.length !== 1 || !only) throw new RangeError('Item in pieces');
+      const start = baseOffset + only.offset;
+      // A length of 0 means the rest of the file.
+      const end = only.length === 0 ? file.length : start + only.length;
+      if (end > file.length) throw new RangeError('Item runs past the end');
+      return file.subarray(start, end);
+    });
   }
-  return undefined;
+
+  return [...kinds].map(([id, kind]) => ({
+    ...kind,
+    bytes: () => {
+      const bytes = where.get(id);
+      if (!bytes) throw new RangeError('Item not found');
+      return bytes();
+    },
+  }));
+}
+
+/** The TIFF bytes in a HEIF photo details item. */
+function tiffInExifItem(item: Uint8Array): Uint8Array {
+  // The item starts with how far in the TIFF bytes begin.
+  const tiffAt = 4 + new DataView(item.buffer, item.byteOffset, item.byteLength).getUint32(0);
+  return withoutPrefix(item.subarray(tiffAt));
 }
 
 function readTiff(tiff: Uint8Array): PhotoDetails | undefined {
@@ -249,6 +292,127 @@ function readTiff(tiff: Uint8Array): PhotoDetails | undefined {
     dates: exifAt ? readList(exifAt).filter((e) => dateTags.has(e.tag)) : [],
     location: gpsAt ? readList(gpsAt) : [],
   };
+}
+
+/**
+ * Takes the location out of TIFF bytes in place, keeping their length, so nothing
+ * around them moves. The GPS list and its values are blanked, and the main list's
+ * pointer to it is removed. Everything else, such as the date taken, is untouched.
+ * Throws when the bytes can't be read, so a copy never claims to have no location
+ * when it may still have one.
+ */
+function blankLocation(tiff: Uint8Array): void {
+  const littleEndian = ascii(tiff, 0, 2) === 'II';
+  const view = new DataView(tiff.buffer, tiff.byteOffset, tiff.byteLength);
+  const zero = (at: number, length: number) => {
+    if (at + length > tiff.length) throw new RangeError('Photo details run past the end');
+    tiff.fill(0, at, at + length);
+  };
+
+  const mainAt = view.getUint32(4, littleEndian);
+  const mainCount = view.getUint16(mainAt, littleEndian);
+  const mainEnd = mainAt + 2 + mainCount * 12 + 4; // The entries and the next-list mark.
+  if (mainEnd > tiff.length) throw new RangeError('Photo details run past the end');
+  const index = Array.from({ length: mainCount }, (_, i) => mainAt + 2 + i * 12).find(
+    (at) => view.getUint16(at, littleEndian) === tags.gpsList,
+  );
+  if (index === undefined) return;
+
+  const gpsAt = view.getUint32(index + 8, littleEndian);
+  const gpsCount = view.getUint16(gpsAt, littleEndian);
+  for (let i = 0; i < gpsCount; i++) {
+    const at = gpsAt + 2 + i * 12;
+    const size = typeSizes[view.getUint16(at + 2, littleEndian)];
+    if (!size) throw new RangeError('Unknown kind of location value');
+    const length = size * view.getUint32(at + 4, littleEndian);
+    if (length > 4) zero(view.getUint32(at + 8, littleEndian), length);
+  }
+  // The GPS list's own next-list mark is left alone: some files put a value there.
+  zero(gpsAt, 2 + gpsCount * 12);
+
+  // Drop the pointer, moving the later entries and the next-list mark up. Entries stay sorted.
+  tiff.copyWithin(index, index + 12, mainEnd);
+  zero(mainEnd - 12, 12);
+  view.setUint16(mainAt, mainCount - 1, littleEndian);
+}
+
+const isTiff = (bytes: Uint8Array) => ['II*\0', 'MM\0*'].includes(ascii(bytes, 0, 4));
+
+const xmpPrefix = 'http://ns.adobe.com/xap/1.0/\0';
+/** Location fields in XMP text: an attribute's value, or an element's whole content. */
+const xmpLocation = [
+  /\w+:GPS\w*\s*=\s*(["'])[^]*?\1/g,
+  /<(\w+:GPS\w*)(?:[^>]*[^/>])?>[^]*?<\/\1>/g,
+];
+
+/**
+ * Takes the location out of XMP text in place, the details some photo apps write as
+ * text. Each value becomes spaces, so the text keeps its length and stays readable.
+ */
+function blankXmpLocation(xmp: Uint8Array): void {
+  // One character per byte, so places in the text are places in the bytes.
+  let text = '';
+  for (const byte of xmp) text += String.fromCharCode(byte);
+  for (const pattern of xmpLocation) {
+    for (const found of text.matchAll(pattern)) {
+      // Blank the text between tags and inside quotes, keeping the names and marks.
+      const opening = found[0].startsWith('<') ? found[0].indexOf('>') : found[0].search(/["']/);
+      const start = found.index + opening + 1;
+      const end = found.index + found[0].length;
+      for (let at = start, inTag = false; at < end; at++) {
+        const c = text[at];
+        if (c === '<') inTag = true;
+        else if (c === '>') inTag = false;
+        else if (!inTag && !`"'`.includes(c!)) xmp[at] = 0x20;
+      }
+    }
+  }
+}
+
+/**
+ * A copy of a JPEG with the location taken out of its photo details, byte for byte
+ * the same otherwise: the same length, picture and date taken. Every set of details in
+ * the file is cleaned, including those of extra pictures stored after the main one,
+ * and a location some photo apps also write as text (XMP).
+ * A JPEG with no location comes back unchanged.
+ */
+export function jpegWithoutLocation(jpeg: Uint8Array): Uint8Array {
+  const copy = jpeg.slice();
+  const view = new DataView(copy.buffer);
+  // The picture's own bytes can never hold FF E1, so every match is a details segment.
+  for (let at = 2; at + 4 <= copy.length; at++) {
+    if (copy[at] !== 0xff || copy[at + 1] !== 0xe1) continue;
+    const segment = copy.subarray(at + 4, at + 2 + view.getUint16(at + 2));
+    if (ascii(segment, 0, exifPrefix.length) === exifPrefix) {
+      const tiff = segment.subarray(exifPrefix.length);
+      if (isTiff(tiff)) blankLocation(tiff);
+    } else if (ascii(segment, 0, xmpPrefix.length) === xmpPrefix) {
+      blankXmpLocation(segment);
+    }
+  }
+  return copy;
+}
+
+/**
+ * A copy of an iPhone photo (HEIC) or other HEIF file with the location taken out,
+ * byte for byte the same otherwise: the same length, picture and date taken. Every set
+ * of photo details in the file is cleaned, and so is any XMP text item.
+ * Nothing moves, so the file's item list still points at the right bytes.
+ * Throws when any details can't be read, so a copy never claims to have no location
+ * when it may still have one. A file with no details comes back unchanged.
+ */
+export function heifWithoutLocation(heif: Uint8Array): Uint8Array {
+  const copy = heif.slice();
+  for (const item of heifItems(copy, new DataView(copy.buffer))) {
+    if (item.type === 'Exif') {
+      const tiff = tiffInExifItem(item.bytes());
+      if (!isTiff(tiff)) throw new RangeError('Photo details not readable');
+      blankLocation(tiff);
+    } else if (item.type === 'mime' && item.contentType === 'application/rdf+xml') {
+      blankXmpLocation(item.bytes());
+    }
+  }
+  return copy;
 }
 
 /**

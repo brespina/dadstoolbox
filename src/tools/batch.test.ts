@@ -109,6 +109,25 @@ describe('watching a Batch', () => {
     ]);
   });
 
+  it('shows how far along the working row is, as a whole percent', async () => {
+    const percents: (number | undefined)[][] = [];
+    const page = createToolPage(tool, async (_f, _options, context) => {
+      for (const fraction of [0, 0.401, 0.404, 0.75, 1]) context!.progress(fraction);
+      return [pdf()];
+    });
+    page.subscribe(
+      (state) => state.batches[0] && percents.push(state.batches[0].items.map((i) => i.percent)),
+    );
+    page.add([file('a.pdf'), file('b.pdf')]);
+    await page.start({});
+    const first = [...new Set(percents.map(([a]) => a))];
+    const second = [...new Set(percents.map(([, b]) => b))];
+    expect(first).toEqual([undefined, 0, 40, 75, 100]);
+    expect(second).toEqual([undefined, 0, 40, 75, 100]);
+    // 40.1% and 40.4% are both 40%: no new snapshot for the same whole percent.
+    expect(percents.filter(([a]) => a === 40)).toHaveLength(1);
+  });
+
   it('shows Getting ready while a Tool waits for something to load, then carries on', async () => {
     let loaded!: () => void;
     const loading = new Promise<void>((resolve) => (loaded = resolve));
@@ -338,6 +357,14 @@ describe('result names', () => {
     expect(page.state().batches[0]!.items[0]!.results[0]!.name).toBe('IMG_1234_dtb.jpg');
   });
 
+  it('end in .mp4 for an MP4 made from an iPhone video (.mov)', async () => {
+    const mp4 = { blob: new Blob(['x'], { type: 'video/mp4' }) };
+    const page = createToolPage(tool, async () => [mp4]);
+    page.add([file('IMG_1234.MOV')]);
+    await page.start({});
+    expect(page.state().batches[0]!.items[0]!.results[0]!.name).toBe('IMG_1234_dtb.mp4');
+  });
+
   it('get _2 and _3 when chosen files share a name', async () => {
     expect(
       await namesFrom(['report.pdf', 'report.pdf', 'report.pdf'], () => [pdf('page1')]),
@@ -490,6 +517,19 @@ describe('a Tool whose run is marked worker', () => {
     ]);
   });
 
+  it('shows how far along the file in the worker is', async () => {
+    const page = inWorker(async (_f, _options, context) => {
+      for (const fraction of [0.1, 0.105, 0.29, 0.5]) context!.progress(fraction);
+      return [pdf()];
+    });
+    const seen: (number | undefined)[] = [];
+    page.subscribe((state) => state.batches[0] && seen.push(state.batches[0].items[0]!.percent));
+    page.add([file('a.pdf')]);
+    await page.start({});
+    // Progress comes on its own line, so it may arrive just after the result.
+    await vi.waitFor(() => expect([...new Set(seen)]).toEqual([undefined, 10, 29, 50]));
+  });
+
   it('shows Getting ready while the worker loads something', async () => {
     let loaded!: () => void;
     const loading = new Promise<void>((resolve) => (loaded = resolve));
@@ -506,5 +546,72 @@ describe('a Tool whose run is marked worker', () => {
     await started;
     expect(page.state().batches[0]!.gettingReady).toBe(false);
     expect(page.state().batches[0]!.items[0]!.status).toBe('done');
+  });
+});
+
+describe('options set per file', () => {
+  const trim = defineTool({
+    ...tool,
+    defaultOptions: { quality: 'high', start: 0, end: null as number | null },
+    fileOptions: ['start', 'end'],
+  });
+  type TrimOptions = typeof trim.defaultOptions;
+  const recording = () => {
+    const runs: string[] = [];
+    const run = async (f: File, options: TrimOptions) => {
+      runs.push(`${f.name} ${options.quality} ${options.start}-${options.end}`);
+      return [pdf()];
+    };
+    return { runs, page: createToolPage(trim, run) };
+  };
+
+  it("reach run with the page's options, each file keeping its own", async () => {
+    const { runs, page } = recording();
+    page.add([file('a.mp4'), file('b.mp4')]);
+    const [a, b] = page.state().waiting;
+    page.setFileOptions(a!.id, { start: 1, end: 2 });
+    page.setFileOptions(b!.id, { start: 3, end: 5 });
+    await page.start({ quality: 'low', start: 0, end: null });
+    expect(runs).toEqual(['a.mp4 low 1-2', 'b.mp4 low 3-5']);
+  });
+
+  it("start from the Tool's defaults, shown on the Ready row", () => {
+    const { page } = recording();
+    page.add([file('a.mp4')]);
+    expect(page.state().waiting[0]!.fileOptions).toEqual({ start: 0, end: null });
+    page.setFileOptions(page.state().waiting[0]!.id, { end: 4 });
+    expect(page.state().waiting[0]!.fileOptions).toEqual({ start: 0, end: 4 });
+  });
+
+  it('count as new work only for the file whose values changed', async () => {
+    const { runs, page } = recording();
+    page.add([file('a.mp4'), file('b.mp4')]);
+    const [a] = page.state().waiting;
+    await page.start({ quality: 'low', start: 0, end: null });
+    expect(page.hasWork({ quality: 'low', start: 0, end: null })).toBe(false);
+    page.setFileOptions(a!.id, { start: 2 });
+    expect(page.hasWork({ quality: 'low', start: 0, end: null })).toBe(true);
+    await page.start({ quality: 'low', start: 0, end: null });
+    expect(runs).toEqual(['a.mp4 low 0-null', 'b.mp4 low 0-null', 'a.mp4 low 2-null']);
+  });
+
+  it("hold start back while a file's values have a problem", async () => {
+    const page = createToolPage(
+      defineTool({
+        ...trim,
+        optionsProblem: ({ start, end }) =>
+          end !== null && end <= start ? 'End must be after Start.' : undefined,
+      }),
+      async () => [pdf()],
+    );
+    page.add([file('a.mp4'), file('b.mp4')]);
+    const [a] = page.state().waiting;
+    page.setFileOptions(a!.id, { start: 3, end: 3 });
+    const options = { quality: 'low', start: 0, end: null };
+    expect(page.hasWork(options)).toBe(false);
+    await page.start(options);
+    expect(page.state().batches).toEqual([]);
+    page.setFileOptions(a!.id, { end: 4 });
+    expect(page.hasWork(options)).toBe(true);
   });
 });

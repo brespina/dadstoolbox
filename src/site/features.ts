@@ -7,6 +7,9 @@ const checks: Record<BrowserFeature, () => boolean> = {
   // Reading video frames, drawn off the page in a worker (Safari 16.4, Chrome 94,
   // Firefox 130; not Firefox for Android).
   webcodecs: () => 'VideoDecoder' in globalThis && 'OffscreenCanvas' in globalThis,
+  // Making video (Safari 16.4, Chrome 94, Firefox 130). Whether it can make one video at
+  // its size is asked when the video starts, as that answer isn't instant.
+  makeVideo: () => 'VideoEncoder' in globalThis,
 };
 
 /** Whether this browser has every feature in `needs`. */

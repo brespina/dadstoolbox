@@ -34,7 +34,7 @@ export const credits: Credit[] = [
     package: 'pdf-lib',
     version: '1.17.1',
     license: 'MIT',
-    does: 'Splits and combines PDFs.',
+    does: 'Makes and changes PDFs.',
     ...github('Hopding/pdf-lib', 'v1.17.1', 'LICENSE.md'),
   },
   {
@@ -123,7 +123,7 @@ export const credits: Credit[] = [
     package: 'mediabunny',
     version: '1.61.4',
     license: 'MPL-2.0',
-    does: 'Reads your video when you make a gif from it.',
+    does: 'Reads your video to make a gif, an MP4, a smaller video or a trimmed clip, or get its sound.',
     ...github('Vanilagy/mediabunny', 'v1.61.4', 'LICENSE'),
   },
   {

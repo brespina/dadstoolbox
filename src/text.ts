@@ -114,6 +114,8 @@ export const text = {
       done: 'Done',
       failed: "Didn't work",
     },
+    // A working row whose Tool says how far along the file is.
+    workingPercent: 'Working… {percent}%',
     // {name} is the file name and {status} its new status.
     announcement: '{name}: {status}',
     // A row that didn't work. {reason} is the Tool's own reason, or failedFallback.
@@ -133,6 +135,10 @@ export const text = {
     },
   },
   // Shared by the photo Tools.
+  pdfs: {
+    // Split a PDF and Rotate PDF pages can't open a PDF with a password.
+    password: 'This PDF has a password. Remove it and try again.',
+  },
   photos: {
     removeLocation: 'Remove location',
     removeLocationHint: 'So no one can tell where a photo was taken.',

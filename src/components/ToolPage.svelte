@@ -27,6 +27,17 @@
     ['../tools/*/Options.svelte', '!../tools/_*/Options.svelte'],
     { eager: true },
   );
+  // A Tool's editor for one chosen file's own options (`fileOptions`), on its Ready row,
+  // such as Trim a video's Start and End. Few Tools have one, and it is small.
+  type FileOptionsProps = {
+    file: File;
+    options: object;
+    change: (values: object) => void;
+  };
+  const fileOptionsComponents = import.meta.glob<{ default: Component<FileOptionsProps> }>(
+    ['../tools/*/FileOptions.svelte', '!../tools/_*/FileOptions.svelte'],
+    { eager: true },
+  );
   // A Tool's own lines for a Ready row, such as an estimated size. Few Tools have one.
   const readyModules = import.meta.glob<{ readyNote: ReadyNote }>([
     '../tools/*/ready.ts',
@@ -40,6 +51,7 @@
   // This page takes files, so its `run` does too. A worker Tool has none here.
   const loadRun = pageRuns[tool.address] as (() => Promise<{ run: AnyRun }>) | undefined;
   const loadReady = readyModules[`../tools/${tool.address}/ready.ts`];
+  const FileOptions = fileOptionsComponents[`../tools/${tool.address}/FileOptions.svelte`]?.default;
 
   // A Tool marked worker runs there, and its `run` loads in the worker, not the page.
   // If the worker stops, the file it was on fails, and the next file starts a new one.
@@ -87,11 +99,17 @@
   let supported = $state(true);
   let canChoose = $derived(hydrated && supported);
 
-  /** "Done", or "Didn't work. <reason>". */
-  const statusLine = (item: Pick<BatchItem, 'status' | 'reason'>) =>
-    item.status === 'failed'
-      ? fill(text.tool.failedLine, { reason: item.reason ?? text.tool.failedFallback })
-      : text.tool.status[item.status];
+  /** "Done", "Working… 40%", or "Didn't work. <reason>". */
+  const statusLine = (item: Pick<BatchItem, 'status' | 'reason' | 'percent'>) => {
+    if (item.status === 'failed')
+      return fill(text.tool.failedLine, { reason: item.reason ?? text.tool.failedFallback });
+    if (item.status === 'working' && item.percent !== undefined)
+      return fill(text.tool.workingPercent, { percent: item.percent });
+    return text.tool.status[item.status];
+  };
+
+  // How often a working row's percent is announced: at 25%, 50% and 75%, not every tick.
+  const announceEvery = 25;
 
   onMount(() => {
     hydrated = true;
@@ -101,16 +119,25 @@
     getRun().catch((error: unknown) => console.error('Could not load the Tool', error));
 
     const lastStatus = new Map<number, ItemStatus>();
+    const lastStep = new Map<number, number>();
     let nextAnnouncement = 1;
+    const announce = (item: BatchItem) => {
+      const line = fill(text.tool.announcement, { name: item.name, status: statusLine(item) });
+      announcements = [...announcements, { id: nextAnnouncement++, text: line }];
+    };
     return toolPage.subscribe((next) => {
       state = next;
-      // One polite announcement per row status change.
       for (const item of next.batches.flatMap((batch) => batch.items)) {
+        // One polite announcement per row status change.
         const before = lastStatus.get(item.id);
         lastStatus.set(item.id, item.status);
-        if (before === undefined || before === item.status) continue;
-        const line = fill(text.tool.announcement, { name: item.name, status: statusLine(item) });
-        announcements = [...announcements, { id: nextAnnouncement++, text: line }];
+        if (before !== undefined && before !== item.status) announce(item);
+        // And a few for a working row's percent, below 100 (Done comes next).
+        if (item.status !== 'working' || item.percent === undefined || item.percent >= 100)
+          continue;
+        const step = Math.floor(item.percent / announceEvery);
+        if (step > (lastStep.get(item.id) ?? 0)) announce(item);
+        lastStep.set(item.id, Math.max(step, lastStep.get(item.id) ?? 0));
       }
     });
   });
@@ -199,10 +226,17 @@
       <h2 id="waiting-heading">{text.tool.waitingHeading}</h2>
       <ul class="rows" bind:this={waitingList}>
         {#each state.waiting as file, index (file.id)}
-          <li class="row">
+          {@const problem = tool.optionsProblem({
+            ...$state.snapshot(options),
+            ...file.fileOptions,
+          })}
+          <li class="row" class:has-editor={FileOptions}>
             <div class="row-text">
               <span class="file-name">{file.name}</span>
               <span class="muted">{formatSize(file.size)} · {statusLine(file)}</span>
+              {#if problem}
+                <span class="warning">{problem}</span>
+              {/if}
               {#each readyLines.get(file.id) ?? [] as line (line.text)}
                 <span class:warning={line.warning}>{line.text}</span>
               {/each}
@@ -236,6 +270,15 @@
                 onclick={() => toolPage.remove(file.id)}>{text.tool.remove}</button
               >
             </div>
+            {#if FileOptions}
+              <div class="file-options">
+                <FileOptions
+                  file={file.file}
+                  options={file.fileOptions}
+                  change={(values) => toolPage.setFileOptions(file.id, values)}
+                />
+              </div>
+            {/if}
           </li>
         {/each}
       </ul>
@@ -409,6 +452,15 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
+  }
+
+  /* A Tool's editor for the file goes full width under its name and buttons. */
+  .row.has-editor {
+    flex-wrap: wrap;
+  }
+
+  .file-options {
+    flex-basis: 100%;
   }
 
   .item > .rows {
