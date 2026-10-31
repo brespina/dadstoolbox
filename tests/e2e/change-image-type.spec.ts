@@ -1,8 +1,9 @@
 // Change image file type end to end, in a real browser: the canvas, the browser's own
 // photo opening, and Batches across presses of the start button.
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import exifr from 'exifr';
+import { PNG } from 'pngjs';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 
@@ -253,4 +254,84 @@ test('the old address forwards to the new page', async ({ page }) => {
 test('the old address has a link for people without scripts', async ({ page }) => {
   const response = await page.request.get('photo-to-jpg/');
   expect(await response.text()).toMatch(/<a href="[^"]*\/change-image-type\/">/);
+});
+
+/** The pictures inside a saved ICO, read by hand (not by the Site's own code). */
+function readIco(bytes: Buffer) {
+  expect([bytes.readUInt16LE(0), bytes.readUInt16LE(2)]).toEqual([0, 1]);
+  return Array.from({ length: bytes.readUInt16LE(4) }, (_, i) => {
+    const at = 6 + i * 16;
+    const start = bytes.readUInt32LE(at + 12);
+    const picture = PNG.sync.read(bytes.subarray(start, start + bytes.readUInt32LE(at + 8)));
+    return { width: bytes[at]! || 256, height: bytes[at + 1]! || 256, picture };
+  });
+}
+
+const alphaAt = ({ picture }: ReturnType<typeof readIco>[number], x: number, y: number) =>
+  picture.data[(y * picture.width + x) * 4 + 3]!;
+
+test('ICO is saved with 16, 32, 48 and 256 px pictures and no location choice', async ({
+  page,
+}, testInfo) => {
+  // 40 × 20: the left half solid red, the right half see-through.
+  const wide = new PNG({ width: 40, height: 20 });
+  for (let y = 0; y < 20; y++)
+    for (let x = 0; x < 20; x++) wide.data.set([255, 0, 0, 255], (y * 40 + x) * 4);
+  const wideFile = testInfo.outputPath('wide.png');
+  writeFileSync(wideFile, PNG.sync.write(wide));
+
+  await page.getByText('ICO', { exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: /Remove location/ })).toHaveCount(0);
+  await choose(page, [wideFile]);
+  await page.getByRole('button', { name: 'Change to ICO' }).click();
+  await expect(page.getByText('All done.', { exact: true })).toBeVisible();
+
+  const saved = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save wide_dtb.ico' }).click();
+  const download = await saved;
+  expect(download.suggestedFilename()).toBe('wide_dtb.ico');
+  const icons = readIco(readFileSync((await download.path())!));
+
+  expect(icons.map((i) => [i.width, i.height])).toEqual([
+    [16, 16],
+    [32, 32],
+    [48, 48],
+    [256, 256],
+  ]);
+  for (const icon of icons) {
+    expect([icon.picture.width, icon.picture.height]).toEqual([icon.width, icon.height]);
+    const size = icon.width;
+    // The wide image fills the middle half, not stretched: see-through above and below.
+    expect(alphaAt(icon, size >> 1, 0)).toBe(0);
+    expect(alphaAt(icon, size >> 1, size - 1)).toBe(0);
+    // Its solid left half is solid, and its see-through right half stays see-through.
+    expect(alphaAt(icon, Math.round(size * 0.25), size >> 1)).toBe(255);
+    expect(alphaAt(icon, Math.round(size * 0.75), size >> 1)).toBe(0);
+  }
+});
+
+test('a tall photo sits in the middle of the ICO square, not stretched', async ({ page }) => {
+  // Stored 48 × 32 and turned upright, so 32 × 48.
+  await page.getByText('ICO', { exact: true }).click();
+  await choose(page, [sample]);
+  await page.getByRole('button', { name: 'Change to ICO' }).click();
+  const saved = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save rotated_dtb.ico' }).click();
+  const icons = readIco(readFileSync((await (await saved).path())!));
+  const big = icons[3]!;
+  // 32 × 48 fits 171 wide at most 256 tall: about 85 px of see-through at each side.
+  expect(alphaAt(big, 5, 128)).toBe(0);
+  expect(alphaAt(big, 250, 128)).toBe(0);
+  expect(alphaAt(big, 128, 128)).toBe(255);
+  expect(alphaAt(big, 128, 0)).toBe(255);
+});
+
+test('the browser can show a saved ICO', async ({ page }) => {
+  await page.getByText('ICO', { exact: true }).click();
+  await choose(page, [seeThrough]);
+  await page.getByRole('button', { name: 'Change to ICO' }).click();
+  await expect(page.getByRole('button', { name: 'Save transparent_dtb.ico' })).toBeVisible();
+  const size = await thumbnailSize(page, 'transparent_dtb.ico');
+  expect(size[0]).toBeGreaterThan(0);
+  expect(size[0]).toBe(size[1]);
 });
