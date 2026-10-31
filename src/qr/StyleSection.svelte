@@ -6,6 +6,11 @@
   import { shapeNames, type QrStyle } from './style';
 
   let { style = $bindable() }: { style: QrStyle } = $props();
+
+  const shapeChoices = [
+    { field: 'dotShape', legend: text.qr.dotShape, name: 'dot-shape' },
+    { field: 'cornerShape', legend: text.qr.cornerShape, name: 'corner-shape' },
+  ] as const;
 </script>
 
 <details class="style">
@@ -33,41 +38,25 @@
       </span>
     </label>
 
-    <fieldset class="shapes">
-      <legend class="label">{text.qr.dotShape}</legend>
-      <div class="options">
-        {#each shapeNames as shape (shape)}
-          <label class="choice">
-            <input
-              type="radio"
-              class="visually-hidden"
-              name="dot-shape"
-              value={shape}
-              bind:group={style.dotShape}
-            />
-            <span class="face">{text.qr.shapes[shape]}</span>
-          </label>
-        {/each}
-      </div>
-    </fieldset>
-
-    <fieldset class="shapes">
-      <legend class="label">{text.qr.cornerShape}</legend>
-      <div class="options">
-        {#each shapeNames as shape (shape)}
-          <label class="choice">
-            <input
-              type="radio"
-              class="visually-hidden"
-              name="corner-shape"
-              value={shape}
-              bind:group={style.cornerShape}
-            />
-            <span class="face">{text.qr.shapes[shape]}</span>
-          </label>
-        {/each}
-      </div>
-    </fieldset>
+    {#each shapeChoices as { field, legend, name } (field)}
+      <fieldset class="shapes">
+        <legend class="label">{legend}</legend>
+        <div class="options">
+          {#each shapeNames as shape (shape)}
+            <label class="choice">
+              <input
+                type="radio"
+                class="visually-hidden"
+                {name}
+                value={shape}
+                bind:group={style[field]}
+              />
+              <span class="face">{text.qr.shapes[shape]}</span>
+            </label>
+          {/each}
+        </div>
+      </fieldset>
+    {/each}
   </div>
 </details>
 

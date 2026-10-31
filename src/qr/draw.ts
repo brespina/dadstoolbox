@@ -52,21 +52,23 @@ export function drawQr(content: string, style: QrStyle): QrDrawing {
     style.dotShape,
     style.cornerShape,
   );
-  // A code of square shapes needs only code and background; rounded edges need the shades
-  // between, so they look smooth rather than stair-stepped.
-  const squareOnly = style.dotShape === 'square' && style.cornerShape === 'square';
-  const shades = squareOnly ? 2 : edgeShades;
-  const levels = paintParts(parts, pixels, scale, shades);
-  const blob = palettePng(pixels, shadePalette(style, shades), (x, y) => levels[y * pixels + x]!);
+  const levels = paintParts(parts, pixels, scale);
+  // Only the shades that appear get a palette colour: a code of square shapes has just
+  // background and code, so it stays a 2-colour, 1-bit PNG.
+  const used = [...new Set(levels)].sort((a, b) => a - b);
+  const indexOf = new Map(used.map((shade, index) => [shade, index]));
+  const blob = palettePng(pixels, shadePalette(style, used), (x, y) =>
+    indexOf.get(levels[y * pixels + x]!)!,
+  );
   return { blob, warnings: styleWarnings(style) };
 }
 
-/** The palette of a Style: shade 0 is all background, the last is all code colour. */
-function shadePalette(style: QrStyle, shades: number): PaletteColour[] {
+/** The palette colours of a Style for these shades: 0 is all background, `edgeShades - 1` all code. */
+function shadePalette(style: QrStyle, used: readonly number[]): PaletteColour[] {
   const code = rgb(style.code);
   const background = rgb(style.background);
-  return Array.from({ length: shades }, (_, shade): PaletteColour => {
-    const codeShare = shade / (shades - 1);
+  return used.map((shade): PaletteColour => {
+    const codeShare = shade / (edgeShades - 1);
     if (style.noBackground) {
       // The edge keeps the code's colour and gets more see-through, so it blends into
       // whatever the code is put on.
@@ -79,11 +81,11 @@ function shadePalette(style: QrStyle, shades: number): PaletteColour[] {
 }
 
 /**
- * How much of each pixel the parts cover, as a shade from 0 (none) to `shades - 1` (all),
- * row by row. The parts are in squares from the code's top left, `scale` pixels each,
+ * How much of each pixel the parts cover, as a shade from 0 (none) to `edgeShades - 1`
+ * (all), row by row. The parts are in squares from the code's top left, `scale` pixels each,
  * inside the border.
  */
-function paintParts(parts: readonly Part[], pixels: number, scale: number, shades: number) {
+function paintParts(parts: readonly Part[], pixels: number, scale: number) {
   const levels = new Uint8Array(pixels * pixels);
   const shift = margin * scale;
   for (const { outer, hole } of parts) {
@@ -98,7 +100,7 @@ function paintParts(parts: readonly Part[], pixels: number, scale: number, shade
         const py = (y + 0.5 - shift) / scale;
         let covered = coverage(outer, px, py, scale);
         if (hole) covered *= 1 - coverage(hole, px, py, scale);
-        const shade = Math.round(covered * (shades - 1));
+        const shade = Math.round(covered * (edgeShades - 1));
         if (shade > levels[y * pixels + x]!) levels[y * pixels + x] = shade;
       }
     }
@@ -108,7 +110,7 @@ function paintParts(parts: readonly Part[], pixels: number, scale: number, shade
 
 /**
  * How much of a pixel (0 to 1) a rounded square covers, from the distance of the pixel's
- * middle to its edge: the pixel's edge pixels are part covered, which is what smooths them.
+ * middle to the square's edge: pixels on the edge are part covered, which smooths it.
  */
 function coverage(shape: RoundedSquare, px: number, py: number, scale: number) {
   const half = shape.size / 2;

@@ -44,7 +44,7 @@ function cornerStarts(size: number): [number, number][] {
 }
 
 /** True when the square at this row and column belongs to a big corner square. */
-export function inCorner(size: number, row: number, col: number) {
+function inCorner(size: number, row: number, col: number) {
   return cornerStarts(size).some(
     ([r, c]) => row >= r && row < r + cornerSize && col >= c && col < c + cornerSize,
   );
@@ -55,10 +55,10 @@ function cornerParts(row: number, col: number, shape: ShapeName): Part[] {
   const radius = cornerRadius[shape];
   return [
     {
-      outer: { x: col, y: row, size: 7, radius: radius.outer },
-      hole: { x: col + 1, y: row + 1, size: 5, radius: radius.hole },
+      outer: { x: col, y: row, size: cornerSize, radius: radius.outer },
+      hole: { x: col + 1, y: row + 1, size: cornerSize - 2, radius: radius.hole },
     },
-    { outer: { x: col + 2, y: row + 2, size: 3, radius: radius.centre } },
+    { outer: { x: col + 2, y: row + 2, size: cornerSize - 4, radius: radius.centre } },
   ];
 }
 

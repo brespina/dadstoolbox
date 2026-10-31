@@ -2,7 +2,7 @@ import jsQR from 'jsqr';
 import { PNG } from 'pngjs';
 import { describe, expect, it, vi } from 'vitest';
 import { drawQr, TooLongForCode } from './draw';
-import { plainStyle, type QrStyle } from './style';
+import { plainStyle, shapeNames, type QrStyle } from './style';
 
 /** The PNG's pixels, as [r, g, b, a] for each. */
 async function pixels(blob: Blob) {
@@ -115,13 +115,12 @@ describe('the shared QR drawing', () => {
   });
 
   describe('dot and corner shapes', () => {
-    const shapes = ['square', 'rounded', 'round'] as const;
-    const combos = shapes.flatMap((dotShape) =>
-      shapes.map((cornerShape) => [dotShape, cornerShape]),
+    const combos = shapeNames.flatMap((dotShape) =>
+      shapeNames.map((cornerShape) => [dotShape, cornerShape] as const),
     );
 
     it.each(combos)('reads back with %s dots and %s corners', async (dotShape, cornerShape) => {
-      const shaped = style({ dotShape, cornerShape } as Partial<QrStyle>);
+      const shaped = style({ dotShape, cornerShape });
       for (const typed of ['hello', 'https://example.com/menu?table=4', 'Café crème ☕ for Zoë']) {
         expect(await readCode(drawQr(typed, shaped).blob)).toBe(typed);
       }
@@ -186,6 +185,15 @@ describe('the shared QR drawing', () => {
       expect(dark.at(x, y)).toEqual([0, 0, 0, 255]);
       expect(dot.at(x, y)).toEqual([255, 255, 255, 255]);
       expect(dot.at(x + 12, y + 12)).toEqual([0, 0, 0, 255]);
+    });
+
+    it('rounds the outer corner of the big corner squares, and only for rounded and round', async () => {
+      // The pixel just inside the top left corner of the first big corner square.
+      const at = async (cornerShape: 'square' | 'rounded' | 'round') =>
+        (await pixels(drawQr('hello', style({ cornerShape })).blob)).at(4 * 25 + 1, 4 * 25 + 1);
+      expect(await at('square')).toEqual([0, 0, 0, 255]);
+      expect(await at('rounded')).toEqual([255, 255, 255, 255]);
+      expect(await at('round')).toEqual([255, 255, 255, 255]);
     });
 
     it('draws a round corner with the finder rings still one module thick on the middle row', async () => {
