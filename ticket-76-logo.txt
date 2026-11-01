@@ -1,0 +1,7 @@
+A small thing I liked today: QR codes are always an odd number of squares wide (17 + 4 × version),
+so a patch with an odd width sits exactly in the middle with no half-squares left over.
+
+Something I'd enjoy on a break: working out by hand how much of a code you can hide before it
+stops reading. Not through an error-correction table, just by poking holes in one and pointing
+a reader at it until it gives up. Somewhere past 30% it should go quiet, and I'd like to find
+the exact square where it does.
