@@ -6,16 +6,16 @@ Which model and effort each subagent gets, and the evidence behind each choice. 
 
 Pass the Model and Effort below as the Agent tool's `model` and `effort`.
 
-| Role                               | Model  | Effort | Evidence                                                   |
-| ---------------------------------- | ------ | ------ | ---------------------------------------------------------- |
-| Implementer, **pattern** ticket    | sonnet | high   | Starting guess                                             |
-| Implementer, **foundation** ticket | opus   | high   | Starting guess                                             |
-| Implementer, **hand-drawn** ticket | opus   | high   | Starting guess                                             |
-| Exploration (notes folder)         | sonnet | medium | Starting guess                                             |
-| Quick lookup (find a file or fact) | haiku  | low    | Starting guess                                             |
-| Reviewer, one PR                   | sonnet | high   | Starting guess                                             |
-| Reviewer, whole branch             | opus   | high   | Starting guess                                             |
-| Duel judge                         | opus   | high   | Fixed: the judge is the measuring stick, so it never duels |
+| Role                               | Model  | Effort | Evidence                                                           |
+| ---------------------------------- | ------ | ------ | ------------------------------------------------------------------ |
+| Implementer, **pattern** ticket    | sonnet | high   | Kept: haiku lost to it 14 to 18 (log row 1)                        |
+| Implementer, **foundation** ticket | opus   | high   | Starting guess                                                     |
+| Implementer, **hand-drawn** ticket | opus   | high   | Sonnet tied it once (log row 2); one more tie or win downgrades it |
+| Exploration (notes folder)         | sonnet | medium | Starting guess                                                     |
+| Quick lookup (find a file or fact) | haiku  | low    | Starting guess                                                     |
+| Reviewer, one PR                   | sonnet | high   | Starting guess                                                     |
+| Reviewer, whole branch             | opus   | high   | Starting guess                                                     |
+| Duel judge                         | opus   | high   | Fixed: the judge is the measuring stick, so it never duels         |
 
 The lead is the user's session. Suggest Opus at medium effort, and high for grilling and spec writing.
 
@@ -48,13 +48,15 @@ A tie goes to the cheaper arm: the question is whether the cheaper model is enou
 
 ## Open questions
 
-- Is haiku at high effort enough for **pattern** tickets? (Duel: sonnet high against haiku high.)
-- Is sonnet at high effort enough for **hand-drawn** tickets? (Duel: opus high against sonnet high.)
+- ~~Is haiku at high effort enough for **pattern** tickets?~~ No (log row 1): it copied shared code and cost more tokens. Closed.
+- Is sonnet at high effort enough for **hand-drawn** tickets? One tie so far (log row 2); duel once more.
 - Is opus at medium effort a better one-PR reviewer than sonnet at high? Not duelled yet: reviewers fix code, so a duel needs a findings-only variant.
 
 ## Log
 
 One row per duel or rescue. Tokens, tool calls and minutes come from each subagent's task notification. Judge scores are out of 20.
 
-| Date | Spec | Ticket | Kind | A   | B   | Checks green on first push (A / B) | Judge (A / B) | Tokens (A / B) | Minutes (A / B) | Winner | Note |
-| ---- | ---- | ------ | ---- | --- | --- | ---------------------------------- | ------------- | -------------- | --------------- | ------ | ---- |
+| Date       | Spec | Ticket | Kind       | A           | B           | Checks green on first push (A / B) | Judge (A / B) | Tokens (A / B) | Minutes (A / B) | Winner                     | Note                                                                                                |
+| ---------- | ---- | ------ | ---------- | ----------- | ----------- | ---------------------------------- | ------------- | -------------- | --------------- | -------------------------- | --------------------------------------------------------------------------------------------------- |
+| 2026-10-31 | #67  | #71    | pattern    | haiku high  | sonnet high | no / yes                           | 14 / 18       | ~147k / ~92k   | 15 / 14         | B (sonnet)                 | Haiku added its own copies of the shared failure reason and file-type lookup.                       |
+| 2026-10-31 | #67  | #74    | hand-drawn | sonnet high | opus high   | yes / yes                          | 18 / 18       | ~115k / ~105k  | 44 / 36         | A (sonnet), tie to cheaper | Sonnet: fuller tests and docs; opus: leaner code. Sonnet took longer and used slightly more tokens. |
