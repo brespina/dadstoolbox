@@ -91,6 +91,56 @@ describe('typing', () => {
     expect(page.state().reason).toBe("That didn't work. Try changing what you typed.");
   });
 
+  it('makes the result again with the typed text when the options change', async () => {
+    const run = vi.fn<ToolTextRun<{ colour: string }>>(async (typed, { colour }) => [
+      png(`${typed}|${colour}`),
+    ]);
+    const page = createTypedToolPage({ ...tool, defaultOptions: { colour: 'black' } }, run, 150);
+    page.change({ colour: 'black' });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(run).not.toHaveBeenCalled();
+    page.type('hello', { colour: 'black' });
+    await vi.advanceTimersByTimeAsync(150);
+    page.change({ colour: 'red' });
+    expect(page.state().updating).toBe(true);
+    await vi.advanceTimersByTimeAsync(150);
+    expect(await page.state().result?.blob.text()).toBe('hello|red');
+  });
+
+  it('passes a file held in the options to run, and makes the result again when it changes', async () => {
+    type Options = { logo: File | null };
+    const run: ToolTextRun<Options> = async (typed, { logo }) => [
+      png(`${typed}|${logo ? await logo.text() : 'no logo'}`),
+    ];
+    const page = createTypedToolPage<Options>({ ...tool, defaultOptions: { logo: null } }, run);
+    page.type('hello', { logo: null });
+    await vi.advanceTimersByTimeAsync(150);
+    page.change({ logo: new File(['cat'], 'cat.png', { type: 'image/png' }) });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(await page.state().result?.blob.text()).toBe('hello|cat');
+    page.change({ logo: null });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(await page.state().result?.blob.text()).toBe('hello|no logo');
+  });
+
+  it("carries the result's warnings, or none", async () => {
+    const page = createTypedToolPage(
+      tool,
+      async (typed) => [
+        typed === 'pale'
+          ? { ...png(typed), warnings: ['These colours may not scan.'] }
+          : png(typed),
+      ],
+      150,
+    );
+    page.type('pale', {});
+    await vi.advanceTimersByTimeAsync(150);
+    expect(page.state().result?.warnings).toEqual(['These colours may not scan.']);
+    page.type('plain', {});
+    await vi.advanceTimersByTimeAsync(150);
+    expect(page.state().result?.warnings).toEqual([]);
+  });
+
   it('tells listeners about each change', async () => {
     const page = createTypedToolPage(tool, echo, 150);
     const seen: boolean[] = [];

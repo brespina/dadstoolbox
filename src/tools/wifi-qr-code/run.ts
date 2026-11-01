@@ -1,4 +1,4 @@
-import { qrPng, TooLongForCode } from '../../qr/draw';
+import { drawQr, LogoNotOpened, TooLongForCode } from '../../qr/draw';
 import { ToolFailure, type ToolTextRun } from '../types';
 import { tool } from './declaration';
 
@@ -14,13 +14,14 @@ function wifiText({ name, password }: typeof tool.defaultOptions) {
   return `WIFI:T:WPA;S:${escape(name)};P:${escape(password)};;`;
 }
 
-/** One black-on-white PNG of a QR code that joins the network, once it has a name. */
+/** One QR code that joins the network, in the chosen Style, once it has a name. */
 export const run: ToolTextRun<typeof tool.defaultOptions> = async (_typed, options) => {
   if (options.name.trim() === '') return [];
   try {
-    return [{ blob: qrPng(wifiText(options)) }];
+    return [await drawQr(wifiText(options), options.style)];
   } catch (error) {
     if (error instanceof TooLongForCode) throw new ToolFailure(tool.reasons.tooLong!);
+    if (error instanceof LogoNotOpened) throw new ToolFailure(tool.reasons.logo!);
     throw error;
   }
 };

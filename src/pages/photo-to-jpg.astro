@@ -1,5 +1,26 @@
 ---
-import ToolLayout from '../layouts/ToolLayout.astro';
+// The old address of Change image file type. The static Site can't send a server
+// redirect, so this page forwards at once, with a link for anyone without scripts. It is
+// a page of its own, not Astro's `redirects`, so it carries the browser lock (ADR-0003)
+// like every other page.
+import { sitePath } from '../site/paths';
+import { tool } from '../tools/change-image-type/declaration';
+
+const to = sitePath(tool.address);
 ---
 
-<ToolLayout address="photo-to-jpg" />
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content={`0;url=${to}`} />
+    <meta name="robots" content="noindex" />
+    <meta name="referrer" content="no-referrer" />
+    <link rel="canonical" href={new URL(to, Astro.site)} />
+    <title>{tool.name}</title>
+  </head>
+  <body>
+    <a href={to}>{tool.name}</a>
+  </body>
+</html>

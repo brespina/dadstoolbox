@@ -14,7 +14,7 @@ be added.
 ## The steps
 
 1. **Copy the template.** Copy `src/tools/_template/` to `src/tools/<address>/`, where
-   `<address>` is the Tool's address in plain words, such as `photo-to-jpg`. Drop the
+   `<address>` is the Tool's address in plain words, such as `change-image-type`. Drop the
    leading `_`: folders starting with `_` are skipped everywhere, which is why the
    template never shows on the Site.
 2. **Fill the declaration** in `declaration.ts` (every field is described
@@ -73,7 +73,7 @@ field is required.
 | Field              | What it does                                                                                                                                                                                                                                                                                       |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `address`          | The Tool's flat address in plain words, such as `split-pdf`. The page is `…/dadstoolbox/<address>/`. Categories are not part of it.                                                                                                                                                                |
-| `name`             | The Tool's name, written as a task: "Split a PDF", "Change a photo to JPG". The page heading and home page row.                                                                                                                                                                                   |
+| `name`             | The Tool's name, written as a task: "Split a PDF", "Change image file type". The page heading and home page row.                                                                                                                                                                                   |
 | `blurb`            | One line in everyday words that names the visitor's problem: "iPhone photo won't open or upload?".                                                                                                                                                                                                 |
 | `category`         | One of the fixed Categories, in order: `Photos`, `PDFs`, `Video`, `Other`.                                                                                                                                                                                                                         |
 | `position`         | Order within the Category, lowest first. Keep it unique within the Category.                                                                                                                                                                                                                       |
@@ -99,7 +99,7 @@ field is required.
 
 ## Input modes
 
-- **`each`, each file on its own** (Split a PDF, Change a photo to JPG). `run` is called
+- **`each`, each file on its own** (Split a PDF, Change image file type). `run` is called
   once per file, with that file and the options. Each file has its own row, so one file
   that fails doesn't stop the others.
 - **`together`, all files together** (Combine PDFs). `run` is called once with the
@@ -108,8 +108,8 @@ field is required.
   `combined_dtb.pdf`.
 - **`none`, no file** (Make a QR code). The visitor types instead, and `run` gets the
   typed text. There is no Choose or start button: the result updates as the visitor types
-  and is saved like any other result. Leave `accept` empty and write the privacy line
-  about what they type.
+  or changes the options, and is saved like any other result. Leave `accept` empty and
+  write the privacy line about what they type.
 
   A Tool whose options hold all the input (Make a Wi-Fi QR code: a network name and a
   password) sets `typeBox: false`. The page hides the type box, `run` gets `""` as the
@@ -119,11 +119,33 @@ field is required.
   `textFor` a `pictureLabel`, so the picture is described from the options, without
   anything private such as a password.
 
+  A typed Tool's options may hold a file the visitor chooses, such as the logo in a QR
+  code's Style. `Options.svelte` puts the `File` in the options (start it as `null` in
+  `defaultOptions`), and `run` gets that `File` as it is: options are copied with
+  `$state.snapshot`, which keeps a file a file, and are never turned into text. The file
+  stays in the page's memory. Never store it (no `localStorage`) or send it anywhere,
+  and test a file that won't open, with a plain reason. This is for input mode `none`
+  only: for `each` and `together`, options are compared as text to tell new work from
+  old, and a file shows as `{}` there.
+
 The template uses `each`. Each mode has its own `run` type in `types.ts`: `ToolRun`
 (`each`), `ToolRunTogether` (`together`) and `ToolTextRun` (`none`). Combine PDFs and
-QR code maker are the worked examples for `together` and `none`, and Make a Wi-Fi QR code
-for `none` with no type box. The QR code Tools share their drawing, `qrPng` in
-`src/qr/draw.ts`.
+Make a QR code are the worked examples for `together` and `none`, and Make a Wi-Fi QR code
+for `none` with no type box.
+
+The QR code Tools share their drawing and their Style (see the glossary). `drawQr` in
+`src/qr/draw.ts` takes the text and a `QrStyle` (`src/qr/style.ts`) and gives the PNG (or the SVG,
+when `saveAs` is `svg`) and its warnings, ready to return from `run`. Each Tool keeps its Style in
+`options.style`, starting from `plainStyle` (black on white), and shows the shared
+`StyleSection.svelte` from `src/qr/` in its options. A new Style choice is a new field
+of `QrStyle`, drawn in `drawQr` and offered in `StyleSection.svelte`, so both Tools get
+it at once. The shapes themselves are plain geometry in `src/qr/shapes.ts` (`codeParts` gives
+rounded squares and rings in module units, with no pixels or colours), so the PNG and the
+SVG draw the same shapes. `drawQr` rasterises them with smooth edges; `src/qr/svg.ts` writes
+them as one vector path. A logo (`style.logo`, a `File`) sits on a patch with no dots
+(`logoPlace` in `shapes.ts`), and the code then uses the strongest error correction (H).
+Its pixels come from the browser's canvas (`src/qr/paint-logo.ts`); `drawQr` takes that
+step as its third argument, so tests pass a stand-in.
 
 ## The `run` contract
 
@@ -131,7 +153,7 @@ for `none` with no type box. The QR code Tools share their drawing, `qrPng` in
 and the options. It returns a list of results:
 
 ```ts
-{ blob: Blob; detail?: string }
+{ blob: Blob; detail?: string; warnings?: readonly string[] }
 ```
 
 - **`blob`** is the result's bytes. Its type, such as `application/pdf`, sets the file
@@ -141,6 +163,10 @@ and the options. It returns a list of results:
 - **`detail`** is added to the name, as in `report_dtb_page3.pdf`. Shared code builds
   every name as `<original>_dtb[_<detail>].<ext>` and adds `_2`, `_3` for repeats, so a
   result never overwrites an original. Don't build names in `run`.
+- **`warnings`**, for input mode `none` only, are notes shown under the result picture
+  and read out when they change, such as "These colours may not scan." They never stop
+  the result. Write them in shared text or the declaration's `notes`, so the
+  banned-words scan reads them. Other input modes ignore them.
 - One input can give any number of results (Split a PDF gives one per page).
 
 **Failing.** When `run` knows what went wrong, throw `new ToolFailure(tool.reasons.<key>)`
@@ -154,7 +180,10 @@ them.
 right way up and opens iPhone photos (HEIC) where the browser can't. To draw one as a JPG
 with no photo details, no bigger than a longest side, use `shrinkOnCanvas`
 (`src/photos/shrink.ts`), as Make a photo smaller and Photos to one PDF do. It needs the
-page, so those Tools set `worker: false`.
+page, so those Tools set `worker: false`. For a picture that may also be an SVG, open it
+with `openPicture` (`src/photos/picture.ts`): it opens a photo through `openPhoto` and an
+SVG at the size `sizeSvg` works out. To draw one whole and centred on a see-through
+square, use `drawInSquare` there, as Change image file type's ICO and the QR codes' logo do.
 
 **Progress.** Shared code shows "Working on 2 of 5…" as it works through the files, so
 `run` needs to report nothing. For a file that takes a while, `run` may also call
@@ -250,6 +279,26 @@ video starts and ends. Tools without them work as before.
 
 Trim a video (`src/tools/trim-video/`) is the worked example: a preview with Start and
 End, each set from where the preview is paused.
+
+## Options that follow the chosen files
+
+For a Tool that takes files (`each` or `together`), the page gives `Options.svelte` a
+second prop, `fileTypes`: the types of the chosen files that are waiting to start, such as
+`image/jpeg`, as a read-only list. It is empty before anything is chosen, and again once
+a Batch has taken the files. Declare the props with `OptionsProps` from `types.ts`:
+
+```svelte
+let {
+  options = $bindable(),
+  fileTypes = [],
+}: OptionsProps<Options> = $props();
+```
+
+`fileTypeOf` (`src/tools/file-type.ts`) makes each type: the browser's own, or, when it
+gives none (some iPhone photos (HEIC)), the one the file's ending says. A Tool that
+doesn't need it ignores the prop. Change image file type
+(`src/tools/change-image-type/`) is the worked example: it leaves out a type every chosen
+image already is, and moves the choice to the first type still offered.
 
 ## Outside addresses
 
