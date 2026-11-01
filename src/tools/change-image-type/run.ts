@@ -11,7 +11,7 @@ import { formatTypes, tool, type Options } from './declaration';
 import { paintOnCanvas, paintSquaresOnCanvas } from './canvas';
 import { iconSizes, makeIco } from './ico';
 
-/** A photo drawn the right way up and saved as `type`, with no photo details. */
+/** An image drawn the right way up and saved as `type`, with no photo details. */
 export interface Painted {
   blob: Blob;
   width: number;
@@ -19,7 +19,7 @@ export interface Painted {
 }
 export type Paint = (file: File, type: string, context?: ToolRunContext) => Promise<Painted>;
 
-/** The photo in the middle of a see-through square of each size, saved as PNG. */
+/** The image in the middle of a see-through square of each size, saved as PNG. */
 export type PaintSquares = (
   file: File,
   sizes: readonly number[],

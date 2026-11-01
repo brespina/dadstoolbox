@@ -1,4 +1,5 @@
 import { plainStyle } from '../../qr/style';
+import { text } from '../../text';
 import { defineTool } from '../types';
 
 export const tool = defineTool({
@@ -20,7 +21,7 @@ export const tool = defineTool({
   textFor: (options) => ({ pictureLabel: `Wi-Fi QR code for ${options.name}` }),
   reasons: {
     tooLong: 'This is too long for one code. Try a shorter name or password.',
-    logo: "This logo didn't open. Choose a PNG, JPG, WebP or SVG.",
+    logo: text.qr.logoWontOpen,
   },
   notes: {
     name: 'Network name',

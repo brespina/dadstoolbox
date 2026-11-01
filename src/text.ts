@@ -184,6 +184,8 @@ export const text = {
     logoHint: 'Goes in the middle of the code. A PNG, JPG, WebP or SVG.',
     chooseLogo: 'Choose a logo',
     removeLogo: 'Remove logo',
+    // The reason when the chosen logo is not a picture the browser can open.
+    logoWontOpen: "This logo didn't open. Choose a PNG, JPG, WebP or SVG.",
     // Notes under the code. The code is still made.
     colourWarning: 'These colours may not scan.',
     noBackgroundNote: 'Put this on a light background so phones can read it.',

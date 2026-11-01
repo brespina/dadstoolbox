@@ -1,4 +1,5 @@
 import { plainStyle } from '../../qr/style';
+import { text } from '../../text';
 import { defineTool } from '../types';
 
 export const tool = defineTool({
@@ -18,7 +19,7 @@ export const tool = defineTool({
   privacyLine: 'What you type stays on your device.',
   reasons: {
     tooLong: 'This is too long for one code. Try a shorter text.',
-    logo: "This logo didn't open. Choose a PNG, JPG, WebP or SVG.",
+    logo: text.qr.logoWontOpen,
   },
   worker: false,
   outsideAddresses: [],

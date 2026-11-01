@@ -1,7 +1,7 @@
-// The browser's own drawing step: open the photo, draw it on a canvas and save it.
+// The browser's own drawing step: open the image, draw it on a canvas and save it.
 // Pixel work runs only in a browser; the page tests cover it.
 
-import { fitInSquare, openPicture, type Picture } from '../../photos/picture';
+import { drawInSquare, openPicture, type Picture } from '../../photos/picture';
 import type { ToolRunContext } from '../types';
 import type { Painted } from './run';
 
@@ -21,7 +21,7 @@ export async function paintOnCanvas(
     const scale = Math.sqrt(phoneCanvasLimit / (source.width * source.height));
     const smaller = scale < 1 ? await draw(source, type, scale) : undefined;
     if (smaller) return smaller;
-    throw new Error(`Could not draw a ${source.width}×${source.height} photo`);
+    throw new Error(`Could not draw a ${source.width}×${source.height} image`);
   } finally {
     source.close();
   }
@@ -47,8 +47,8 @@ async function draw(source: Picture, type: string, scale: number) {
 }
 
 /**
- * The photo in the middle of a see-through square of each size, never stretched, saved
- * as PNG. The photo is opened once and drawn once per size.
+ * The image in the middle of a see-through square of each size, never stretched, saved
+ * as PNG. The image is opened once and drawn once per size.
  */
 export async function paintSquaresOnCanvas(
   file: File,
@@ -59,14 +59,8 @@ export async function paintSquaresOnCanvas(
   try {
     const squares: Painted[] = [];
     for (const size of sizes) {
-      const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = size;
-      const drawing = canvas.getContext('2d');
-      if (!drawing) throw new Error('Could not draw an icon');
-      // The canvas starts see-through, so the padding and any see-through parts stay so.
-      drawing.imageSmoothingQuality = 'high';
-      const fit = fitInSquare(source.width, source.height, size);
-      drawing.drawImage(source.image, fit.x, fit.y, fit.width, fit.height);
+      // The padding and any see-through parts stay see-through.
+      const { canvas } = drawInSquare(source, size);
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
       canvas.width = canvas.height = 0;
       if (!blob || blob.size === 0) throw new Error(`Could not draw a ${size} px icon`);
