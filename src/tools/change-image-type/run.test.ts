@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import exifr from 'exifr';
+import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import { ToolFailure } from '../types';
 import { tool } from './declaration';
-import { makeRun, type Paint } from './run';
+import { makeRun, type Paint, type PaintSquares } from './run';
 
 const bytes = (name: string) => readFileSync(new URL(name, import.meta.url));
 const sample = (name: string, type: string) => new File([bytes(name)], name, { type });
@@ -22,7 +23,20 @@ const paint: Paint = async (_file, type) => ({
   width: 32,
   height: 48,
 });
-const run = makeRun(paint);
+// Likewise for the squares of an ICO: each is a real PNG, the asked-for size, in solid
+// red, so the test can check the file's layout and what it holds.
+const paintSquares: PaintSquares = async (_file, sizes) =>
+  sizes.map((size) => {
+    const square = new PNG({ width: size, height: size });
+    for (let at = 0; at < square.data.length; at += 4) square.data.set([255, 0, 0, 255], at);
+    const data = PNG.sync.write(square);
+    return {
+      blob: new Blob([new Uint8Array(data)], { type: 'image/png' }),
+      width: size,
+      height: size,
+    };
+  });
+const run = makeRun(paint, paintSquares);
 
 const defaults = tool.defaultOptions;
 const details = async (blob: Blob) =>
@@ -34,7 +48,56 @@ const details = async (blob: Blob) =>
     translateValues: false,
   })) as Record<string, unknown> | undefined;
 
-describe('Change a photo to JPG', () => {
+describe('Change image file type', () => {
+  it('takes BMP, AVIF and SVG pictures but not GIF at the Choose button', () => {
+    for (const accepted of [
+      'image/bmp',
+      'image/x-ms-bmp',
+      'image/avif',
+      'image/svg+xml',
+      '.bmp',
+      '.avif',
+      '.svg',
+    ]) {
+      expect(tool.accept).toContain(accepted);
+    }
+    expect(tool.accept.filter((a) => /gif/i.test(a))).toEqual([]);
+  });
+
+  describe.each([
+    ['a BMP', 'sample.bmp', 'image/bmp'],
+    ['an AVIF', 'sample.avif', 'image/avif'],
+    ['an SVG', 'sized.svg', 'image/svg+xml'],
+  ])('given %s', (_name, file, fileType) => {
+    it.each([
+      ['jpg', 'image/jpeg'],
+      ['png', 'image/png'],
+      ['webp', 'image/webp'],
+    ] as const)('changes it to %s, with no photo details added', async (format, type) => {
+      const [result, ...rest] = await run(sample(file, fileType), {
+        ...defaults,
+        format,
+        removeLocation: false,
+      });
+      expect(rest).toEqual([]);
+      expect(result!.blob.type).toBe(type);
+      // exifr refuses a file with no details at all, which is fine here.
+      const found = (await details(result!.blob).catch(() => undefined)) ?? {};
+      expect(found).not.toHaveProperty('DateTimeOriginal');
+      expect(found).not.toHaveProperty('latitude');
+    });
+
+    it('gives the ordinary failure for a damaged one', async () => {
+      const cantOpen = makeRun(async () => {
+        throw new DOMException('The source image could not be decoded.', 'InvalidStateError');
+      });
+      const damaged = new File([new Uint8Array([1, 2, 3, 4])], file, { type: fileType });
+      const failure = await cantOpen(damaged, defaults).catch((e: unknown) => e);
+      expect(failure).toBeInstanceOf(Error);
+      expect(failure).not.toBeInstanceOf(ToolFailure);
+    });
+  });
+
   it('changes an iPhone photo (HEIC) to a JPG with no location, keeping the date taken', async () => {
     const [result, ...rest] = await run(heic(), defaults);
     expect(rest).toEqual([]);
@@ -64,7 +127,7 @@ describe('Change a photo to JPG', () => {
     expect(found!.longitude).toBeCloseTo(-97.7431, 4);
   });
 
-  it('takes a JPG the photo picker handed over, and turns it the right way up', async () => {
+  it('saves a JPG as a JPG again, the right way up and with its location removed', async () => {
     // rotated.jpg is marked "turn a quarter turn" and has a location.
     const [result] = await run(jpg(), defaults);
     const found = await details(result!.blob);
@@ -105,6 +168,24 @@ describe('Change a photo to JPG', () => {
     expect(found?.Orientation ?? 1).toBe(1);
   });
 
+  it('saves as an ICO that holds 16, 32, 48 and 256 px pictures', async () => {
+    const [result, ...rest] = await run(jpg(), { ...defaults, format: 'ico' });
+    expect(rest).toEqual([]);
+    expect(result!.blob.type).toBe('image/x-icon');
+    const entries = icoEntries(new Uint8Array(await result!.blob.arrayBuffer()));
+    expect(entries.map((e) => [e.width, e.height])).toEqual([
+      [16, 16],
+      [32, 32],
+      [48, 48],
+      [256, 256],
+    ]);
+    // Each picture is a whole PNG that opens as the size the directory says.
+    for (const entry of entries) {
+      const picture = PNG.sync.read(Buffer.from(entry.png));
+      expect([picture.width, picture.height]).toEqual([entry.width, entry.height]);
+    }
+  });
+
   it("fails with a plain reason for an iPhone photo (HEIC) that won't open", async () => {
     const cantOpen = makeRun(async () => {
       throw new DOMException('The source image could not be decoded.', 'InvalidStateError');
@@ -112,6 +193,20 @@ describe('Change a photo to JPG', () => {
     // The picker may give no file type, so the photo itself is checked.
     const unnamed = new File([bytes('sample.heic')], 'IMG_1234.HEIC');
     const failure = await cantOpen(unnamed, defaults).catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(ToolFailure);
+    expect((failure as ToolFailure).reason).toBe(
+      "This iPhone photo (HEIC) wouldn't open. Choose it again, or try another photo.",
+    );
+  });
+
+  it("fails with the same plain reason for a HEIC that won't open when saving as ICO", async () => {
+    const cantOpen = makeRun(paint, async () => {
+      throw new DOMException('The source image could not be decoded.', 'InvalidStateError');
+    });
+    const unnamed = new File([bytes('sample.heic')], 'IMG_1234.HEIC');
+    const failure = await cantOpen(unnamed, { ...defaults, format: 'ico' }).catch(
+      (e: unknown) => e,
+    );
     expect(failure).toBeInstanceOf(ToolFailure);
     expect((failure as ToolFailure).reason).toBe(
       "This iPhone photo (HEIC) wouldn't open. Choose it again, or try another photo.",
@@ -139,4 +234,22 @@ function webpChunks(file: Uint8Array) {
     at += 8 + length + (length % 2);
   }
   return chunks;
+}
+
+/** The pictures in an ICO file, read straight from its bytes. */
+function icoEntries(file: Uint8Array) {
+  const view = new DataView(file.buffer, file.byteOffset, file.byteLength);
+  // Reserved, then 1 for an icon, then how many pictures.
+  expect([view.getUint16(0, true), view.getUint16(2, true)]).toEqual([0, 1]);
+  return Array.from({ length: view.getUint16(4, true) }, (_, i) => {
+    const at = 6 + i * 16;
+    const length = view.getUint32(at + 8, true);
+    const offset = view.getUint32(at + 12, true);
+    return {
+      // A 0 in the file means 256.
+      width: view.getUint8(at) || 256,
+      height: view.getUint8(at + 1) || 256,
+      png: file.subarray(offset, offset + length),
+    };
+  });
 }

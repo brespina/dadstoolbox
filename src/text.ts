@@ -154,6 +154,7 @@ export const text = {
       jpg: { name: 'JPG', hint: 'Opens and sends anywhere.' },
       png: { name: 'PNG', hint: 'Sharpest, but a bigger file.' },
       webp: { name: 'WebP', hint: "Small file. Some apps can't open it." },
+      ico: { name: 'ICO', hint: 'The small icon a website shows in its browser tab.' },
     },
     // Make a photo smaller: how small to make it.
     howSmall: 'How small',
@@ -164,6 +165,30 @@ export const text = {
       small: { name: 'Small', hint: 'Fine on a phone. For sites with a size limit.' },
       tiny: { name: 'Tiny', hint: 'Smallest file. Looks soft up close.' },
     },
+  },
+  // Shared by the QR code Tools: the Style section and its notes under the code.
+  qr: {
+    style: 'Style',
+    styleHint: 'Change how your code looks.',
+    codeColour: 'Code colour',
+    backgroundColour: 'Background colour',
+    noBackground: 'No background',
+    noBackgroundHint: 'See-through, for a web page.',
+    dotShape: 'Dot shape',
+    cornerShape: 'Corner shape',
+    shapes: { square: 'Square', rounded: 'Rounded', round: 'Round' },
+    saveAs: 'Save as',
+    saveTypes: { png: 'PNG', svg: 'SVG' },
+    saveAsHint: 'PNG works everywhere. SVG stays sharp at any size.',
+    logo: 'Logo',
+    logoHint: 'Goes in the middle of the code. A PNG, JPG, WebP or SVG.',
+    chooseLogo: 'Choose a logo',
+    removeLogo: 'Remove logo',
+    // The reason when the chosen logo is not a picture the browser can open.
+    logoWontOpen: "This logo didn't open. Choose a PNG, JPG, WebP or SVG.",
+    // Notes under the code. The code is still made.
+    colourWarning: 'These colours may not scan.',
+    noBackgroundNote: 'Put this on a light background so phones can read it.',
   },
   footer: {
     label: 'More about the Site',

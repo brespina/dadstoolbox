@@ -170,12 +170,30 @@ export function declarationText(tool: ToolDeclaration): string[] {
   ];
 }
 
+/**
+ * What the page gives a Tool's `Options.svelte`. `options` is bound; a Tool that doesn't
+ * need `fileTypes` ignores it.
+ */
+export interface OptionsProps<Options extends object> {
+  options: Options;
+  /**
+   * The types of the chosen files that are waiting to start, such as "image/jpeg" (see
+   * `fileTypeOf`). Read-only, and empty before anything is chosen.
+   */
+  fileTypes?: readonly string[];
+}
+
 /** One file a Tool made. */
 export interface ToolResult {
   /** The file's bytes. Its type, such as "application/pdf", sets the file extension. */
   blob: Blob;
   /** Added to the file name, as in report_dtb_page3.pdf. */
   detail?: string;
+  /**
+   * Input mode "none" only: notes shown under the result picture, such as colours that
+   * may not scan. They never stop the result. Write them in shared text or `notes`.
+   */
+  warnings?: readonly string[];
 }
 
 /** What shared code hands a Tool's `run` while it works. Tests may leave it out. */
