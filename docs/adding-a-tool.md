@@ -119,6 +119,15 @@ field is required.
   `textFor` a `pictureLabel`, so the picture is described from the options, without
   anything private such as a password.
 
+  A typed Tool's options may hold a file the visitor chooses, such as the logo in a QR
+  code's Style. `Options.svelte` puts the `File` in the options (start it as `null` in
+  `defaultOptions`), and `run` gets that `File` as it is: options are copied with
+  `$state.snapshot`, which keeps a file a file, and are never turned into text. The file
+  stays in the page's memory. Never store it (no `localStorage`) or send it anywhere,
+  and test a file that won't open, with a plain reason. This is for input mode `none`
+  only: for `each` and `together`, options are compared as text to tell new work from
+  old, and a file shows as `{}` there.
+
 The template uses `each`. Each mode has its own `run` type in `types.ts`: `ToolRun`
 (`each`), `ToolRunTogether` (`together`) and `ToolTextRun` (`none`). Combine PDFs and
 QR code maker are the worked examples for `together` and `none`, and Make a Wi-Fi QR code
@@ -133,7 +142,10 @@ of `QrStyle`, drawn in `drawQr` and offered in `StyleSection.svelte`, so both To
 it at once. The shapes themselves are plain geometry in `src/qr/shapes.ts` (`codeParts` gives
 rounded squares and rings in module units, with no pixels or colours), so the PNG and the
 SVG draw the same shapes. `drawQr` rasterises them with smooth edges; `src/qr/svg.ts` writes
-them as one vector path.
+them as one vector path. A logo (`style.logo`, a `File`) sits on a patch with no dots
+(`logoPlace` in `shapes.ts`), and the code then uses the strongest error correction (H).
+Its pixels come from the browser's canvas (`src/qr/paint-logo.ts`); `drawQr` takes that
+step as its third argument, so tests pass a stand-in.
 
 ## The `run` contract
 

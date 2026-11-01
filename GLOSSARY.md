@@ -29,5 +29,5 @@ What the Site guarantees every visitor: no name, email or account asked for, no 
 _Avoid_: Privacy policy, guarantee
 
 **Style**:
-How a QR code looks: its colours, its background or none, its dot shape and its corner shape (square, rounded or round; the corner shape is for the three big corner squares only). Whether it is saved as PNG or SVG is part of it too. A logo in the middle (#76) is planned. Without a Style, a code is black on white with square dots and corners.
+How a QR code looks: its colours, its background or none, its dot shape and its corner shape (square, rounded or round; the corner shape is for the three big corner squares only). Whether it is saved as PNG or SVG is part of it too, and so is a logo in the middle, on a small patch of the background colour. Without a Style, a code is black on white with square dots and corners and no logo.
 _Avoid_: Theme, design, skin
