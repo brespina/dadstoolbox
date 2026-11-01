@@ -71,4 +71,18 @@ describe('Wi-Fi QR code maker', () => {
       'This is too long for one code. Try a shorter name or password.',
     );
   });
+
+  it('fails with a plain reason when the logo is not a picture the browser can open', async () => {
+    // Plain Node cannot open any picture, as a browser cannot open a file that is not one.
+    const logo = new File(['not a picture'], 'logo.png', { type: 'image/png' });
+    const failure = await run('', {
+      name: 'Garden Shed',
+      password: '',
+      style: { ...plainStyle, logo },
+    }).catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(ToolFailure);
+    expect((failure as ToolFailure).reason).toBe(
+      "This logo didn't open. Choose a PNG, JPG, WebP or SVG.",
+    );
+  });
 });

@@ -103,7 +103,7 @@ export async function drawQr(
   const levels = paintParts(parts, pixels, scale);
   if (style.logo && place) {
     const logo = await logoPixels(paintLogo, style.logo, Math.round(place.logo.size * scale));
-    return { blob: pngWithLogo(levels, pixels, scale, style, place, logo), warnings };
+    return { blob: await pngWithLogo(levels, pixels, scale, style, place, logo), warnings };
   }
   // Only the shades that appear get a palette colour: a code of square shapes has just
   // background and code, so it stays a 2-colour, 1-bit PNG.
@@ -154,7 +154,7 @@ async function svgLogo(
     fileTypeOf(logo) === 'image/svg+xml'
       ? // Sized, so a logo that states no size still fills its box.
         dataAddress('image/svg+xml', new TextEncoder().encode(sizeSvg(await logo.text()).markup))
-      : dataAddress('image/png', new Uint8Array(await rgbaPng(side, drawn).arrayBuffer()));
+      : dataAddress('image/png', new Uint8Array(await (await rgbaPng(side, drawn)).arrayBuffer()));
   return { patch: place.patch, patchColour: patchColour(style), box: place.logo, href };
 }
 
@@ -179,7 +179,7 @@ function pngWithLogo(
   style: QrStyle,
   place: LogoPlace,
   logo: Uint8ClampedArray,
-) {
+): Promise<Blob> {
   const palette = shadePalette(
     style,
     Array.from({ length: edgeShades }, (_, shade) => shade),
