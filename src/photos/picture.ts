@@ -56,3 +56,18 @@ export function fitInSquare(width: number, height: number, size: number) {
   const h = Math.max(1, Math.round(height * scale));
   return { x: Math.round((size - w) / 2), y: Math.round((size - h) / 2), width: w, height: h };
 }
+
+/**
+ * A canvas `size` wide and tall with the picture drawn on it whole, in the middle, never
+ * stretched. The rest stays see-through. Throws if the browser gives no canvas to draw on.
+ */
+export function drawInSquare(picture: Picture, size: number) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const drawing = canvas.getContext('2d');
+  if (!drawing) throw new Error(`Could not draw a ${size} px square`);
+  drawing.imageSmoothingQuality = 'high';
+  const fit = fitInSquare(picture.width, picture.height, size);
+  drawing.drawImage(picture.image, fit.x, fit.y, fit.width, fit.height);
+  return { canvas, drawing };
+}

@@ -371,9 +371,15 @@ test('the old address forwards to the new page', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Change image file type' })).toBeVisible();
 });
 
-test('the old address has a link for people without scripts', async ({ page }) => {
+test('the old address has a link for people without scripts, and the browser lock', async ({
+  page,
+}) => {
   const response = await page.request.get('photo-to-jpg/');
-  expect(await response.text()).toMatch(/<a href="[^"]*\/change-image-type\/">/);
+  const html = await response.text();
+  expect(html).toMatch(/<a href="[^"]*\/change-image-type\/">/);
+  expect(html).toMatch(
+    /<meta http-equiv="content-security-policy" content="[^"]*default-src 'self'/i,
+  );
 });
 
 /** The pictures inside a saved ICO, read by hand (not by the Site's own code). */

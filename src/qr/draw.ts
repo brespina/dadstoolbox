@@ -5,7 +5,7 @@ import { fileTypeOf } from '../tools/file-type';
 import { paintLogoOnCanvas } from './paint-logo';
 import { palettePng, rgbaPng, type PaletteColour } from './png';
 import { codeParts, logoPlace, type LogoPlace, type Part, type RoundedSquare } from './shapes';
-import { rgb, styleWarnings, type QrStyle } from './style';
+import { paper, rgb, styleWarnings, type QrStyle } from './style';
 import { svgBlob, type SvgLogo } from './svg';
 
 /** The border around the code, in squares. Scanners need at least 4. */
@@ -129,7 +129,7 @@ async function logoPixels(paintLogo: PaintLogo, logo: File, side: number) {
  * none, so the logo and the code around it still read on any surface.
  */
 function patchColour(style: QrStyle) {
-  return style.noBackground ? '#ffffff' : style.background;
+  return style.noBackground ? paper : style.background;
 }
 
 /** A raster logo in an SVG has twice the pixels the file's stated size needs, so it stays sharp zoomed in. */

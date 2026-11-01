@@ -43,8 +43,8 @@ export const plainStyle: QrStyle = {
   logo: null,
 };
 
-/** What a code with no background is meant to sit on. */
-const paper = '#ffffff';
+/** What a code with no background is meant to sit on, and the colour of its logo's patch. */
+export const paper = '#ffffff';
 
 /** Below this contrast between code and background, many phone cameras struggle. */
 const leastContrast = 3;

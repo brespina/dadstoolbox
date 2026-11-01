@@ -130,7 +130,7 @@ field is required.
 
 The template uses `each`. Each mode has its own `run` type in `types.ts`: `ToolRun`
 (`each`), `ToolRunTogether` (`together`) and `ToolTextRun` (`none`). Combine PDFs and
-QR code maker are the worked examples for `together` and `none`, and Make a Wi-Fi QR code
+Make a QR code are the worked examples for `together` and `none`, and Make a Wi-Fi QR code
 for `none` with no type box.
 
 The QR code Tools share their drawing and their Style (see the glossary). `drawQr` in
@@ -180,7 +180,10 @@ them.
 right way up and opens iPhone photos (HEIC) where the browser can't. To draw one as a JPG
 with no photo details, no bigger than a longest side, use `shrinkOnCanvas`
 (`src/photos/shrink.ts`), as Make a photo smaller and Photos to one PDF do. It needs the
-page, so those Tools set `worker: false`.
+page, so those Tools set `worker: false`. For a picture that may also be an SVG, open it
+with `openPicture` (`src/photos/picture.ts`): it opens a photo through `openPhoto` and an
+SVG at the size `sizeSvg` works out. To draw one whole and centred on a see-through
+square, use `drawInSquare` there, as Change image file type's ICO and the QR codes' logo do.
 
 **Progress.** Shared code shows "Working on 2 of 5…" as it works through the files, so
 `run` needs to report nothing. For a file that takes a while, `run` may also call
