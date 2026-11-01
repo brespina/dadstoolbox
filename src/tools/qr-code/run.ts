@@ -1,13 +1,14 @@
-import { drawQr, TooLongForCode } from '../../qr/draw';
+import { drawQr, LogoNotOpened, TooLongForCode } from '../../qr/draw';
 import { ToolFailure, type ToolTextRun } from '../types';
 import { tool } from './declaration';
 
 /** One QR code for the typed text, in the chosen Style. */
 export const run: ToolTextRun<typeof tool.defaultOptions> = async (typed, options) => {
   try {
-    return [drawQr(typed, options.style)];
+    return [await drawQr(typed, options.style)];
   } catch (error) {
     if (error instanceof TooLongForCode) throw new ToolFailure(tool.reasons.tooLong!);
+    if (error instanceof LogoNotOpened) throw new ToolFailure(tool.reasons.logo!);
     throw error;
   }
 };

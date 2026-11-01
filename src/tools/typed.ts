@@ -1,7 +1,8 @@
 // Shared logic for Tools the person types into (input mode "none"), in plain TypeScript
 // with no page or framework code. There is no Choose or start button and no Batch: the
 // result is made again each time the typing or the options stop changing, and only the
-// newest one is kept.
+// newest one is kept. Options reach `run` as they are, never turned into text, so they
+// may hold a chosen file, such as a QR code's logo; it stays in the page's memory.
 
 import { fillText, text } from '../text';
 import { runOnce } from './running';

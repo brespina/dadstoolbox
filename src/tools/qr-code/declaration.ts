@@ -18,6 +18,7 @@ export const tool = defineTool({
   privacyLine: 'What you type stays on your device.',
   reasons: {
     tooLong: 'This is too long for one code. Try a shorter text.',
+    logo: "This logo didn't open. Choose a PNG, JPG, WebP or SVG.",
   },
   worker: false,
   outsideAddresses: [],

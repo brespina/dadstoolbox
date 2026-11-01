@@ -1,6 +1,6 @@
 // How a QR code looks (its Style, see GLOSSARY.md), shared by the QR code Tools. Plain
-// data, so the Tools' declarations can use the plain Style as their default.
-// A logo in the middle (#76) joins it later.
+// data apart from the logo, a chosen file held in the page's memory only, so the Tools'
+// declarations can use the plain Style (no logo) as their default.
 
 import { text } from '../text';
 
@@ -25,6 +25,11 @@ export interface QrStyle {
   cornerShape: ShapeName;
   /** The kind of file the code is saved as. */
   saveAs: SaveType;
+  /**
+   * A picture (PNG, JPG, WebP or SVG) for the middle of the code, or null for none. It
+   * never leaves the device.
+   */
+  logo: File | null;
 }
 
 /** Today's code: black on white. A closed Style section gives it. */
@@ -35,6 +40,7 @@ export const plainStyle: QrStyle = {
   dotShape: 'square',
   cornerShape: 'square',
   saveAs: 'png',
+  logo: null,
 };
 
 /** What a code with no background is meant to sit on. */

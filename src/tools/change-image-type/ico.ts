@@ -36,14 +36,3 @@ export function makeIco(pictures: readonly IconPicture[]): Uint8Array<ArrayBuffe
   });
   return file;
 }
-
-/**
- * Where an image goes on a see-through square so it fits whole, in the middle, never
- * stretched. Rounded to whole pixels; the square is `size` wide and tall.
- */
-export function fitInSquare(width: number, height: number, size: number) {
-  const scale = size / Math.max(width, height);
-  const w = Math.max(1, Math.round(width * scale));
-  const h = Math.max(1, Math.round(height * scale));
-  return { x: Math.round((size - w) / 2), y: Math.round((size - h) / 2), width: w, height: h };
-}

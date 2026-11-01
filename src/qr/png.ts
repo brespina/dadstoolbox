@@ -1,8 +1,9 @@
-// A tiny PNG writer for pictures of a few colours, so `run` needs no canvas and works the
-// same in the browser and in plain Node. Each pixel is an index into a palette of up to
-// 256 colours, any of them see-through, so a two-colour code takes 1 bit a pixel. Pixels
-// are stored without compression: CompressionStream would shrink them, but Safari only
-// has it from 16.4.
+// A tiny PNG writer, so `run` needs no canvas and works the same in the browser and in
+// plain Node. Most codes are a few colours: each pixel is an index into a palette of up to
+// 256 colours, any of them see-through, so a two-colour code takes 1 bit a pixel. A code
+// with a logo has the logo's colours too, so it is written in full colour, compressed with
+// CompressionStream where the browser has it (Safari only from 16.4). Palette pixels are
+// stored without compression, as they are already small.
 
 const crcTable = Array.from({ length: 256 }, (_, n) => {
   let c = n;
@@ -83,23 +84,67 @@ export function palettePng(
     }
   }
 
-  const header = new Uint8Array(13);
-  const view = new DataView(header.buffer);
-  view.setUint32(0, pixels);
-  view.setUint32(4, pixels);
-  header[8] = depth;
-  header[9] = 3; // colours from a palette
-
-  const signature = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  const parts = [
-    signature,
-    chunk('IHDR', header),
+  return pngFile(pixels, depth, colourTypes.palette, zlibStored(raw), [
     chunk('PLTE', new Uint8Array(palette.flatMap(([r, g, b]) => [r, g, b]))),
     // Each palette colour's alpha, left out when every colour is solid.
     ...(palette.some(([, , , a]) => a < 255)
       ? [chunk('tRNS', new Uint8Array(palette.map(([, , , a]) => a)))]
       : []),
-    chunk('IDAT', zlibStored(raw)),
+  ]);
+}
+
+/**
+ * A square PNG `pixels` wide in full colour, from its pixels row by row as red, green,
+ * blue and alpha (0 is see-through), 4 bytes each. Only a picture of many colours, such as
+ * a code with a logo, uses it. Compressed where the browser can, or about 2 MB for a code.
+ */
+export async function rgbaPng(pixels: number, rgba: Uint8Array | Uint8ClampedArray): Promise<Blob> {
+  if (rgba.length !== pixels * pixels * 4) throw new Error('The pixels do not fit the size');
+  const rowBytes = pixels * 4;
+  const raw = new Uint8Array((rowBytes + 1) * pixels);
+  // The first byte of each row is filter 0.
+  for (let y = 0; y < pixels; y++) {
+    raw.set(rgba.subarray(y * rowBytes, (y + 1) * rowBytes), y * (rowBytes + 1) + 1);
+  }
+  return pngFile(pixels, 8, colourTypes.rgba, await zlibCompressed(raw), []);
+}
+
+/**
+ * Wraps bytes in a zlib stream, compressed by the browser's own CompressionStream. Where
+ * there is none (Safari before 16.4), the bytes are stored, so the file is bigger but valid.
+ */
+async function zlibCompressed(raw: Uint8Array) {
+  if (typeof CompressionStream === 'undefined') return zlibStored(raw);
+  const stream = new Blob([raw as Uint8Array<ArrayBuffer>]).stream();
+  return new Uint8Array(
+    await new Response(stream.pipeThrough(new CompressionStream('deflate'))).arrayBuffer(),
+  );
+}
+
+/** The PNG colour types written here. */
+const colourTypes = { palette: 3, rgba: 6 };
+
+/** A square PNG `pixels` wide: its header, its colour chunks (if any) and its zlib-wrapped pixels. */
+function pngFile(
+  pixels: number,
+  depth: number,
+  colourType: number,
+  idat: Uint8Array,
+  colours: Uint8Array[],
+) {
+  const header = new Uint8Array(13);
+  const view = new DataView(header.buffer);
+  view.setUint32(0, pixels);
+  view.setUint32(4, pixels);
+  header[8] = depth;
+  header[9] = colourType;
+
+  const signature = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const parts = [
+    signature,
+    chunk('IHDR', header),
+    ...colours,
+    chunk('IDAT', idat),
     chunk('IEND', new Uint8Array()),
   ];
   return new Blob(parts as Uint8Array<ArrayBuffer>[], { type: 'image/png' });

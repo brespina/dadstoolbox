@@ -77,7 +77,8 @@
 
   // Each change of options makes the result again, as typing does. With no type box, the
   // options hold all the input. Untracked, because the new state it sets must not count
-  // as an options change.
+  // as an options change. A snapshot copies a file in the options (a QR code's logo) as a
+  // file, so it reaches `run` whole.
   $effect(() => {
     const now = $state.snapshot(options);
     if (hydrated) untrack(() => toolPage.change(now));

@@ -107,6 +107,22 @@ describe('typing', () => {
     expect(await page.state().result?.blob.text()).toBe('hello|red');
   });
 
+  it('passes a file held in the options to run, and makes the result again when it changes', async () => {
+    type Options = { logo: File | null };
+    const run: ToolTextRun<Options> = async (typed, { logo }) => [
+      png(`${typed}|${logo ? await logo.text() : 'no logo'}`),
+    ];
+    const page = createTypedToolPage<Options>({ ...tool, defaultOptions: { logo: null } }, run);
+    page.type('hello', { logo: null });
+    await vi.advanceTimersByTimeAsync(150);
+    page.change({ logo: new File(['cat'], 'cat.png', { type: 'image/png' }) });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(await page.state().result?.blob.text()).toBe('hello|cat');
+    page.change({ logo: null });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(await page.state().result?.blob.text()).toBe('hello|no logo');
+  });
+
   it("carries the result's warnings, or none", async () => {
     const page = createTypedToolPage(
       tool,
