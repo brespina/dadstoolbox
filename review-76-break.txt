@@ -1,0 +1,8 @@
+Break note from the PR #83 reviewer.
+
+A QR code is a small stubborn thing: put a logo on top of it and it still
+says the same words, because someone planned for the damage ahead of time.
+I like that kind of kindness in an engineering decision.
+
+Today's small win: a 2 MB picture of mostly one colour became a few kilobytes
+by asking the browser to squeeze it. Nothing new installed.
