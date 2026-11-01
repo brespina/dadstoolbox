@@ -180,6 +180,10 @@ export const text = {
     saveAs: 'Save as',
     saveTypes: { png: 'PNG', svg: 'SVG' },
     saveAsHint: 'PNG works everywhere. SVG stays sharp at any size.',
+    logo: 'Logo',
+    logoHint: 'Goes in the middle of the code. A PNG, JPG, WebP or SVG.',
+    chooseLogo: 'Choose a logo',
+    removeLogo: 'Remove logo',
     // Notes under the code. The code is still made.
     colourWarning: 'These colours may not scan.',
     noBackgroundNote: 'Put this on a light background so phones can read it.',

@@ -1,11 +1,29 @@
 <script lang="ts">
   // The shared Style section for the QR code Tools, closed until opened. Its defaults
   // draw today's black-on-white code, so a section never opened changes nothing.
-  // A logo (#76) joins it here.
   import { text } from '../text';
   import { saveTypes, shapeNames, type QrStyle } from './style';
 
   let { style = $bindable() }: { style: QrStyle } = $props();
+
+  // The browser may still offer other files, so the drawing says when one won't open.
+  const logoTypes = 'image/png,image/jpeg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg';
+  let logoInput: HTMLInputElement | undefined = $state();
+
+  // The logo is held in memory only, never stored or sent.
+  const chooseLogo = (event: Event & { currentTarget: HTMLInputElement }) => {
+    const file = event.currentTarget.files?.[0];
+    if (file) style.logo = file;
+  };
+
+  const removeLogo = () => {
+    style.logo = null;
+    if (!logoInput) return;
+    // Cleared, so choosing the same file again counts as a change.
+    logoInput.value = '';
+    // The Remove button is gone: keep the place for keyboard users.
+    logoInput.focus();
+  };
 
   // Each is a row of big buttons that sets one field of the Style.
   const groups = [
@@ -57,6 +75,30 @@
         <span class="muted">{text.qr.noBackgroundHint}</span>
       </span>
     </label>
+
+    <fieldset class="group">
+      <legend class="label">{text.qr.logo}</legend>
+      <p class="muted hint-above" id="qr-logo-hint">{text.qr.logoHint}</p>
+      <div class="logo">
+        <label class="choice">
+          <input
+            bind:this={logoInput}
+            type="file"
+            class="visually-hidden"
+            accept={logoTypes}
+            aria-describedby="qr-logo-hint"
+            onchange={chooseLogo}
+          />
+          <span class="face">{text.qr.chooseLogo}</span>
+        </label>
+        {#if style.logo}
+          <span class="file-name">{style.logo.name}</span>
+          <button type="button" class="face remove" onclick={removeLogo}>
+            {text.qr.removeLogo}
+          </button>
+        {/if}
+      </div>
+    </fieldset>
 
     {#each groups as { field, legend, name, values, words } (field)}
       <fieldset class="group">
@@ -225,6 +267,35 @@
 
   .hint {
     margin: 0.5rem 0 0;
+  }
+
+  .hint-above {
+    margin: 0 0 0.5rem;
+  }
+
+  .logo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .file-name {
+    overflow-wrap: anywhere;
+    font-weight: 600;
+  }
+
+  /* A button with the choice look, but never filled in. */
+  .remove {
+    width: auto;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .remove:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
   }
 
   .check > span {
