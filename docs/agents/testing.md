@@ -1,6 +1,6 @@
 # Running the checks locally
 
-CI runs the same four scripts as `.github/workflows/checks.yml`: `npm run check`, `npm run format:check`, `npm test`, `npm run test:e2e`. CI's run on a pushed branch is the final word.
+On Windows, `.gitattributes` keeps checkouts in LF so these match CI; after first adding it to an old clone, run `git rm -r --cached -q . && git reset --hard` once on a clean tree. CI runs the same four scripts as `.github/workflows/checks.yml`: `npm run check`, `npm run format:check`, `npm test`, `npm run test:e2e`. CI's run on a pushed branch is the final word.
 
 ## Page tests (Playwright)
 
