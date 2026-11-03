@@ -49,3 +49,24 @@ test('a Time test ends on the clock, counted from the first key press', async ({
   );
   await expect(page.getByText('15 seconds', { exact: true })).toBeVisible();
 });
+
+test('Ctrl+Backspace clears the word, and a phone keyboard that sends only text works', async ({
+  page,
+}) => {
+  await page.goto('typing-test/?seed=7');
+  await page.getByRole('radio', { name: tool.notes.words, exact: true }).check();
+  await page.getByRole('radio', { name: '10', exact: true }).check();
+  const words = wordStream(seededRandom(7))(10);
+
+  // Wrong letters, cleared with Ctrl+Backspace, then the first word right.
+  await page.keyboard.type('qqq');
+  await page.keyboard.press('Control+Backspace');
+  await page.keyboard.type(`${words[0]} `);
+  // A phone keyboard names no key: it sends the text, with no key press before it.
+  await page.keyboard.insertText(words.slice(1).join(' '));
+
+  await expect(page.getByRole('status')).toHaveText(
+    /^Test done\. \d+ words per minute\. \d+% right\.$/,
+  );
+  await expect(page.getByText('10 words', { exact: true })).toBeVisible();
+});

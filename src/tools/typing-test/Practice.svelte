@@ -42,6 +42,8 @@
   let lines: HTMLElement;
   let caret = $state({ x: 0, y: 0 });
   let scrolled = $state(0);
+  // Turning the phone or resizing the window moves the lines, so the caret is placed again.
+  let width = $state(0);
 
   const phase = $derived(status(test));
   const current = $derived(test.typed.length - 1);
@@ -56,9 +58,10 @@
     quiet = false;
   }
 
-  // A changed setting starts a new test (and the first test, once the page runs).
+  // A changed setting starts a new test (and the first test, once the page runs). The
+  // snapshot reads every field, so a setting added later restarts the test too.
   $effect(() => {
-    testLength(settings);
+    $state.snapshot(settings);
     untrack(restart);
   });
 
@@ -166,6 +169,7 @@
 
   // Moves the caret to the next letter, and keeps the current line second of three.
   $effect(() => {
+    width;
     if (!lines || phase === 'done') return;
     const typed = test.typed[current] ?? '';
     const word = lines.querySelectorAll<HTMLElement>('.word')[current];
@@ -184,7 +188,11 @@
   });
 </script>
 
-<svelte:window onkeydown={onWindowKeydown} onmousemove={() => (quiet = false)} />
+<svelte:window
+  bind:innerWidth={width}
+  onkeydown={onWindowKeydown}
+  onmousemove={() => (quiet = false)}
+/>
 
 <SettingsBar bind:settings {quiet} />
 
@@ -264,6 +272,7 @@
     aria-label={tool.areaLabel}
     autocomplete="off"
     autocapitalize="off"
+    autocorrect="off"
     spellcheck="false"
     {onkeydown}
     {onbeforeinput}
@@ -399,6 +408,11 @@
     opacity: 0;
     font-size: 16px;
     cursor: text;
+  }
+
+  /* With the results showing, the box no longer covers them, so they can be selected. */
+  .area.done .keys {
+    pointer-events: none;
   }
 
   dl {

@@ -118,6 +118,13 @@ describe('moving on', () => {
     expect(test.typed).toEqual(['']);
   });
 
+  it('keys pressed after a Words test ends change nothing', () => {
+    const done = typeKeys(wordsTest(['to']), 'to');
+    expect(status(done)).toBe('done');
+    expect(press(done, { type: 'char', char: 'x', at: 9000 })).toBe(done);
+    expect(press(done, { type: 'backspace', at: 9000 })).toBe(done);
+  });
+
   it('a space on the last word ends a Words test, even with a mistake', () => {
     const test = typeKeys(wordsTest(['cat']), 'cot ');
     expect(status(test)).toBe('done');

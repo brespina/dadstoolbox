@@ -202,8 +202,8 @@ Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage
   (`wordEnds`), which is enough to work out the speed at each second for a chart (#92).
   `wordLetters` gives each letter of a word as it shows.
 - `settings.ts` and `SettingsBar.svelte`: the settings bar. A new setting is a new field
-  of `TypingSettings` and a new `ChoiceGroup` in the bar; a changed setting starts a new
-  test.
+  of `TypingSettings` and a new `ChoiceGroup` in the bar; a changed setting (any field)
+  starts a new test.
 - `Practice.svelte`: the page. Key presses land on an unseen text box over the words, so
   a phone opens its keyboard there. A key with a known character is read on keydown; a
   phone keyboard that names no key is read from the text it would type.
