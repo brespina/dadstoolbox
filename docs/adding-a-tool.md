@@ -121,6 +121,9 @@ field is required.
   such as an empty network name: the page then shows no result and no reason. Give
   `textFor` a `pictureLabel`, so the picture is described from the options, without
   anything private such as a password.
+- **`practice`, a Practice Tool** (Typing test, Vim practice). No file, no `run` and
+  nothing to save: the Tool's own `Practice.svelte` is the page. `definePracticeTool`
+  sets this mode; see [Practice Tools](#practice-tools).
 
   A typed Tool's options may hold a file the visitor chooses, such as the logo in a QR
   code's Style. `Options.svelte` puts the `File` in the options (start it as `null` in
@@ -155,7 +158,8 @@ step as its third argument, so tests pass a stand-in.
 A **Practice Tool** (see the glossary) lets the visitor practise a skill on the page,
 such as the Typing test. It makes nothing to save, so it has no `run`, options component
 or sample file ([ADR-0005](adr/0005-practice-tools-are-their-own-page.md)). Its folder
-holds two files, plus its own plain TypeScript and tests:
+holds these two files, plus its own plain TypeScript, any smaller Svelte parts its page
+uses (the Typing test's `SettingsBar.svelte`, for one) and tests:
 
 | File               | What it holds                                                                                                                                                                                                                         |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -182,10 +186,28 @@ Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage
 - **Settings.** `src/practice/ChoiceGroup.svelte` is one labelled row of choices (radio
   buttons, at least 44 × 44 px), for a settings bar. `src/practice/Switch.svelte` is one
   on/off setting (a checkbox, same size and look) beside it.
+- **Keys.** `src/practice/keys.ts` holds the rules both practice pages share:
+  `isShortcut(event)` (Ctrl, Cmd or Alt shortcuts stay the browser's, but AltGr and a
+  Mac's Option typing a character count as typing), `startsPractice(event)` for "Click
+  or press any key to start" (a printable key pressed anywhere else on the page focuses
+  the area, unless it is typed into a box), and `watchTouchOnly(set)`, which tells the
+  page whether the device has no mouse or trackpad (`(any-pointer: fine)` doesn't
+  match), the nearest sign of no keyboard. The Typing test hides its Layout option
+  then; Vim practice keeps its area but says it needs a keyboard.
+- **The start hint, results and restart.** `src/practice/StartHint.svelte` is the "Click
+  or press any key to start" line over an unfocused area, `Headline.svelte` the big
+  numbers at the top of the results, and `Restart.svelte` the button under the area with
+  the "Or press Tab, then Enter." hint. Their words are in `text.practice`
+  (`src/text.ts`).
 - **Fixed-width text.** Use the `--mono` token from `src/styles/base.css`, the device's own
   fixed-width font.
 - **The Promise.** Keep nothing: no `localStorage`, no personal bests. Make no outside
   requests.
+- **Motion.** The Site turns transitions and animations off under reduced motion
+  (`base.css`), and every page test runs with reduced motion, so a check never sees a
+  fade halfway. Something that fades away while the visitor types, such as the Typing
+  test's settings bar, fades all the way (opacity 0), stays reachable with Tab and shows
+  again on focus.
 
 ### The Typing test
 
@@ -211,8 +233,8 @@ Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage
   physical key (`KeyboardEvent.code`) and Shift into the character that Layout types there
   (null for a key it leaves alone, or for "As my keyboard types"); `locate(layout, char)` is the
   reverse, which the keyboard picture uses to light the next key. The picture is
-  `aria-hidden`. The Layout option shows only where `(any-pointer: fine)` matches, so a
-  touch-only device never sees it.
+  `aria-hidden`. The Layout option shows only where `watchTouchOnly` finds a mouse or
+  trackpad, so a touch-only device never sees it.
 - `samples.ts` and `WpmChart.svelte`: `samples(test)` gives the wpm and raw wpm at each
   second of a finished test (and at the end, if that falls between seconds), as `{ second,
   wpm, raw }`. `WpmChart` draws them as inline SVG in the Site's tokens, with a text
@@ -482,7 +504,7 @@ Options must work for phones and keyboards: every tappable thing at least 44 × 
   `sample.json`, then waits for the picture and saves it. A Practice Tool's test opens
   the page and checks the heading, the privacy line, the back link and that the area
   named by `areaLabel` takes focus; what the Tool does is tested in its own page test,
-  such as `tests/e2e/typing-test.spec.ts`. Each page test also runs
+  such as `tests/e2e/typing-test.spec.ts`. Each page test runs with reduced motion, runs
   an accessibility check in both themes and fails on any request that leaves the Site.
 
 Ports, WebKit on this machine, and slow tests: see `docs/agents/testing.md`.

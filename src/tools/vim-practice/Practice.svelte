@@ -5,10 +5,14 @@
   //
   // Keys are read as `KeyboardEvent.key`, the character the visitor's own keyboard types,
   // so Vim on Colemak or Dvorak works as it does in their editor.
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { fillText } from '../../text';
   import { pageRandom } from '../../practice/random';
+  import { isShortcut, startsPractice, watchTouchOnly } from '../../practice/keys';
   import ChoiceGroup from '../../practice/ChoiceGroup.svelte';
+  import Headline from '../../practice/Headline.svelte';
+  import Restart from '../../practice/Restart.svelte';
+  import StartHint from '../../practice/StartHint.svelte';
   import { tool } from './declaration';
   import { lessonKeys, lessonLabel, lessons } from './lessons';
   import { drillsInRound, newRound, press, results, type Round } from './round';
@@ -40,10 +44,7 @@
     untrack(restart);
   });
 
-  $effect(() => {
-    touchOnly =
-      matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
-  });
+  onMount(() => watchTouchOnly((value) => (touchOnly = value)));
 
   function send(key: string) {
     if (!round) return;
@@ -58,18 +59,9 @@
     }
   }
 
-  /**
-   * A shortcut such as Ctrl+R, which stays the browser's. AltGr (Ctrl+Alt on Windows)
-   * types characters such as { on many keyboards, so it counts as typing.
-   */
-  function isShortcut(event: KeyboardEvent): boolean {
-    const altGr = event.ctrlKey && event.altKey && !event.metaKey;
-    return !altGr && (event.ctrlKey || event.metaKey || event.altKey);
-  }
-
   function onkeydown(event: KeyboardEvent) {
-    // Tab moves on as usual. Shift, arrows and other named keys aren't Vim key presses,
-    // so they aren't counted.
+    // Tab moves on as usual and shortcuts stay the browser's. Shift, arrows and other
+    // named keys aren't Vim key presses, so they aren't counted.
     if (event.key === 'Tab' || event.isComposing || isShortcut(event)) return;
     if (!round || score) return;
     if (event.key !== 'Escape' && event.key.length !== 1) return;
@@ -81,16 +73,7 @@
 
   // "Press any key to start": a key typed anywhere else on the page goes to the area.
   function onWindowKeydown(event: KeyboardEvent) {
-    if (focused || event.defaultPrevented || score) return;
-    if (event.key.length !== 1 || event.key === ' ') return;
-    if (isShortcut(event)) return;
-    const active = document.activeElement;
-    const typingElsewhere =
-      active instanceof HTMLTextAreaElement ||
-      active instanceof HTMLSelectElement ||
-      (active instanceof HTMLInputElement && !['radio', 'checkbox'].includes(active.type)) ||
-      (active instanceof HTMLElement && active.isContentEditable);
-    if (typingElsewhere) return;
+    if (focused || score || !startsPractice(event)) return;
     area.focus();
     onkeydown(event);
   }
@@ -127,20 +110,13 @@
 >
   {#if round && score}
     <div class="results">
-      <dl class="headline">
-        <div>
-          <dt>{notes.time}</dt>
-          <dd>{fillText(notes.seconds, { seconds: score.seconds })}</dd>
-        </div>
-        <div>
-          <dt>{notes.presses}</dt>
-          <dd>{score.presses}</dd>
-        </div>
-        <div>
-          <dt>{notes.fewest}</dt>
-          <dd class="fewest">{score.fewest}</dd>
-        </div>
-      </dl>
+      <Headline
+        items={[
+          { label: notes.time, value: fillText(notes.seconds, { seconds: score.seconds }) },
+          { label: notes.presses, value: score.presses },
+          { label: notes.fewest, value: score.fewest, plain: true },
+        ]}
+      />
       {#if score.mostExtra.length > 0}
         <h2>{notes.mostExtra}</h2>
         <ol class="extra">
@@ -186,7 +162,7 @@
         : fillText(notes.ignored, { key: keyName(round.ignored) })}
     </p>
     {#if !focused}
-      <p class="start">{notes.start}</p>
+      <StartHint />
     {/if}
   {/if}
 </div>
@@ -212,10 +188,7 @@
   <p class="muted">{notes.countHint}</p>
 </div>
 
-<div class="restart">
-  <button type="button" onclick={restartFromButton}>{notes.newRound}</button>
-  <span class="muted">{notes.restartHint}</span>
-</div>
+<Restart label={notes.newRound} onclick={restartFromButton} />
 
 <p class="visually-hidden" role="status">{announcement}</p>
 
@@ -339,19 +312,6 @@
     color: var(--text);
   }
 
-  .start {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0;
-    padding: 1rem;
-    font-weight: 600;
-    text-align: center;
-    cursor: text;
-  }
-
   .help {
     margin-top: 0.75rem;
     font-size: 0.95rem;
@@ -383,38 +343,6 @@
     text-align: center;
   }
 
-  dl {
-    margin: 0;
-  }
-
-  dd {
-    margin: 0;
-  }
-
-  .headline {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 2.5rem;
-    margin-bottom: 1rem;
-  }
-
-  .headline dt {
-    color: var(--muted);
-  }
-
-  .headline dd {
-    color: var(--action);
-    font-family: var(--mono);
-    font-size: 3rem;
-    font-weight: 700;
-    line-height: 1.1;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .headline dd.fewest {
-    color: var(--text);
-  }
-
   h2 {
     margin: 0 0 0.25rem;
     font-size: 1rem;
@@ -427,25 +355,5 @@
 
   .extra li {
     padding: 0.25rem 0;
-  }
-
-  .restart {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 1rem;
-    margin-top: 1.25rem;
-  }
-
-  button {
-    min-height: 2.75rem;
-    padding: 0 1.25rem;
-    border: 0;
-    border-radius: 0.5rem;
-    background: var(--action);
-    color: var(--action-text);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
   }
 </style>

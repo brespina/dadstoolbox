@@ -45,5 +45,5 @@ One step of Vim practice: a set of Vim motions to learn, which also allows the m
 _Avoid_: Level, chapter, unit
 
 **Drill**:
-One exercise in a Lesson: a short block of text, a cursor and a highlighted target to move the cursor to. A round is 10 Drills.
+One go at a Lesson: a short block of text, a cursor and a highlighted target to move the cursor to. A round is 10 Drills.
 _Avoid_: Puzzle, challenge, task

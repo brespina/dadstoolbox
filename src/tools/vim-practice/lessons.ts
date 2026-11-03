@@ -5,6 +5,7 @@
 // characters as code units) with no tabs, no spaces at the end of a line, at most 32
 // characters a line (to fit a phone), and no empty first or last line.
 // Every character must be reachable from the first one within the search's bound.
+import { tool } from './declaration';
 import { motions, type Motions, type Text } from './vim';
 
 export interface Lesson {
@@ -203,7 +204,7 @@ export const lessons: readonly Lesson[] = [
   {
     // Every motion, on longer texts that mix prose and code.
     adds: [],
-    label: 'Mixed',
+    label: tool.notes.mixed,
     texts: [
       [
         'Shopping list (for Saturday)',

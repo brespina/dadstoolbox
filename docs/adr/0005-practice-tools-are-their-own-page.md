@@ -9,3 +9,10 @@ A Practice Tool (such as the Typing test) lets a person practise a skill on the 
 - The practice area has a label in the declaration (`areaLabel`), so the generated page test can find it and check it takes focus. Anything else a Practice Tool does is tested by its own page test.
 - The Promise holds as for every Tool: a Practice Tool keeps nothing (no storage, no personal bests) and makes no outside requests. The words it shows go in the declaration's `notes`, so the banned-words scan reads them.
 - A Practice Tool's logic (the typing test's words, key presses and score) lives in plain TypeScript next to the page, tested with Vitest; the page component only turns events into calls and shows the state.
+
+## Note, 2026-11-03
+
+The decision stands, with Vim practice as the second Practice Tool. Two details have grown since it was written:
+
+- A Practice Tool's folder may hold smaller Svelte parts its `Practice.svelte` uses (the Typing test has `SettingsBar.svelte`, `Keyboard.svelte` and `WpmChart.svelte`). `Practice.svelte` is still the one page component.
+- What both practice pages share lives in `src/practice/`: the seeded random source, the settings controls, which key presses count (`keys.ts`), the start hint, the results' big numbers and the restart button. Their shared words are in `text.practice`.
