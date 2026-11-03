@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { addWords, newTest, press, score, status, type KeyPress, type TypingTest } from './typing';
+import {
+  addWords,
+  newTest,
+  press,
+  score,
+  status,
+  wordLetters,
+  type KeyPress,
+  type TypingTest,
+} from './typing';
 
 /** Presses one key a second from `start`: a character, or ⌫ for Backspace and ⌦ to clear the word. */
 function typeKeys(test: TypingTest, keys: string, start = 0): TypingTest {
@@ -116,6 +125,21 @@ describe('moving on', () => {
       wpm: 0,
       characters: { correct: 2, wrong: 1, extra: 0, missed: 0 },
     });
+  });
+});
+
+describe('wordLetters', () => {
+  it('marks each letter right, wrong (showing the letter wanted), extra or not typed yet', () => {
+    expect(wordLetters('cat', 'cu')).toEqual([
+      { char: 'c', kind: 'right' },
+      { char: 'a', kind: 'wrong' },
+      { char: 't', kind: 'untyped' },
+    ]);
+    expect(wordLetters('to', 'tox')).toEqual([
+      { char: 't', kind: 'right' },
+      { char: 'o', kind: 'right' },
+      { char: 'x', kind: 'extra' },
+    ]);
   });
 });
 

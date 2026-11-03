@@ -102,6 +102,22 @@ export function press(test: TypingTest, key: KeyPress): TypingTest {
   return finished ? { ...next, wordEnds: [...next.wordEnds, key.at], endedAt: key.at } : next;
 }
 
+/** How a letter shows. A wrong letter shows the letter wanted; an extra one, the one typed. */
+export type LetterKind = 'right' | 'wrong' | 'extra' | 'untyped';
+
+/** The letters to show for a word, given what was typed for it. */
+export function wordLetters(target: string, typed: string): { char: string; kind: LetterKind }[] {
+  const letters = [...target].map((char, i) => ({
+    char,
+    kind: (i >= typed.length ? 'untyped' : typed[i] === char ? 'right' : 'wrong') as LetterKind,
+  }));
+  const extras = [...typed.slice(target.length)].map((char) => ({
+    char,
+    kind: 'extra' as LetterKind,
+  }));
+  return [...letters, ...extras];
+}
+
 export interface Score {
   /** Characters of the words typed right, with the spaces after them, per minute, as words of 5. */
   wpm: number;
