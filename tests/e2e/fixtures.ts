@@ -21,18 +21,10 @@ export const test = base.extend<{ siteChecks: void }>({
 
       expect(outside, 'requests that left the Site').toEqual([]);
 
-      const csp = await page
-        .locator('meta[http-equiv="content-security-policy" i]')
-        .getAttribute('content');
-      expect(csp, 'browser lock tag').toBeTruthy();
-      expect(csp).toMatch(/(^|;)\s*default-src 'self'/);
-      // Exactly the Site plus what stays on the device; Tools that declare outside
-      // addresses will widen this list.
-      const connectSrc = csp!
-        .match(/(?:^|;)\s*connect-src ([^;]*)/)?.[1]
-        .trim()
-        .split(/\s+/);
-      expect(connectSrc, 'where the page may send requests').toEqual(["'self'", 'blob:', 'data:']);
+      expectBrowserLock(
+        await page.locator('meta[http-equiv="content-security-policy" i]').getAttribute('content'),
+        page.url(),
+      );
 
       // Both themes must meet AA contrast.
       for (const colorScheme of ['light', 'dark'] as const) {
@@ -46,5 +38,18 @@ export const test = base.extend<{ siteChecks: void }>({
     { auto: true },
   ],
 });
+
+/** Checks a page's browser lock (ADR-0003): the content of its CSP <meta> tag. */
+export function expectBrowserLock(csp: string | null | undefined, where: string) {
+  expect(csp, `browser lock tag on ${where}`).toBeTruthy();
+  expect(csp, `browser lock on ${where}`).toMatch(/(^|;)\s*default-src 'self'/);
+  // Exactly the Site plus what stays on the device; Tools that declare outside
+  // addresses will widen this list.
+  const connectSrc = csp!
+    .match(/(?:^|;)\s*connect-src ([^;]*)/)?.[1]
+    .trim()
+    .split(/\s+/);
+  expect(connectSrc, `where ${where} may send requests`).toEqual(["'self'", 'blob:', 'data:']);
+}
 
 export { expect };
