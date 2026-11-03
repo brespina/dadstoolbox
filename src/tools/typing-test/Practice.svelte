@@ -5,7 +5,7 @@
   // Key presses arrive on an unseen text box over the words, so a phone opens its
   // on-screen keyboard there. A key with a known character is read on keydown; a phone's
   // keyboard, which often names no key, is read from the text it would type instead.
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { fillText } from '../../text';
   import { pageRandom } from '../../practice/random';
   import { tool } from './declaration';
@@ -22,6 +22,8 @@
     type TypingTest,
   } from './typing';
   import { defaultSettings, testLength, type TypingSettings } from './settings';
+  import { resolve } from './layouts';
+  import Keyboard from './Keyboard.svelte';
   import SettingsBar from './SettingsBar.svelte';
   import { samples } from './samples';
   import WpmChart from './WpmChart.svelte';
@@ -47,8 +49,28 @@
   // Turning the phone or resizing the window moves the lines, so the caret is placed again.
   let width = $state(0);
 
+  // A Layout is for a physical keyboard, so a touch-only device (no mouse or trackpad) does
+  // not offer it. The browser can't be asked about a keyboard; a mouse is the nearest sign.
+  let canChooseLayout = $state(false);
+  onMount(() => {
+    const finePointer = matchMedia('(any-pointer: fine)');
+    canChooseLayout = finePointer.matches;
+    const changed = (event: MediaQueryListEvent) => (canChooseLayout = event.matches);
+    finePointer.addEventListener('change', changed);
+    return () => finePointer.removeEventListener('change', changed);
+  });
+  const layout = $derived(canChooseLayout ? settings.layout : 'own');
+
   const phase = $derived(status(test));
   const current = $derived(test.typed.length - 1);
+
+  // The character to type next, for the keyboard picture to light its key.
+  const nextChar = $derived.by(() => {
+    if (phase === 'done') return undefined;
+    const word = test.words[Math.max(current, 0)] ?? '';
+    const typed = test.typed[Math.max(current, 0)] ?? '';
+    return typed.length < word.length ? word[typed.length] : ' ';
+  });
 
   /** A new test with new words. With `?seed=` in the address, the same words each time. */
   function restart() {
@@ -103,6 +125,16 @@
     return String(Math.max(0, Math.ceil(left / 1000)));
   });
 
+  /** The character a key press types: from the Layout's map, else the key's own name. */
+  function typedChar(event: KeyboardEvent): string {
+    const mapped = resolve(layout, event.code, event.shiftKey);
+    if (mapped === null) return event.key.length === 1 ? event.key : '';
+    // Caps Lock turns a letter's case round, as it does on a real keyboard.
+    const letter = mapped.toLowerCase() !== mapped.toUpperCase();
+    if (!letter || !event.getModifierState('CapsLock')) return mapped;
+    return mapped === mapped.toLowerCase() ? mapped.toUpperCase() : mapped.toLowerCase();
+  }
+
   function onkeydown(event: KeyboardEvent) {
     // Tab moves to Restart as usual; shortcuts such as Ctrl+R stay the browser's.
     if (event.key === 'Tab' || event.isComposing || event.metaKey) return;
@@ -112,10 +144,13 @@
       event.preventDefault();
       now = at;
       send({ type: event.ctrlKey || event.altKey ? 'clearWord' : 'backspace', at });
-    } else if (event.key.length === 1 && !event.ctrlKey) {
+    } else if (!event.ctrlKey) {
+      // With a Layout, the key's place on the board says what it types, not its name.
+      const char = typedChar(event);
+      if (!char) return;
       event.preventDefault();
       now = at;
-      send({ type: 'char', char: event.key, at });
+      send({ type: 'char', char, at });
     }
   }
 
@@ -199,7 +234,7 @@
   onmousemove={() => (quiet = false)}
 />
 
-<SettingsBar bind:settings {quiet} />
+<SettingsBar bind:settings {quiet} {canChooseLayout} />
 
 <div class="area" class:focused class:done={phase === 'done'}>
   {#if result}
@@ -288,6 +323,10 @@
     onblur={() => (focused = false)}
   />
 </div>
+
+{#if layout !== 'own'}
+  <Keyboard {layout} next={nextChar} />
+{/if}
 
 <div class="restart">
   <button type="button" onclick={restartFromButton}>{notes.restart}</button>

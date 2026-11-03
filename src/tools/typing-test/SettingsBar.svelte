@@ -5,13 +5,24 @@
   import ChoiceGroup from '../../practice/ChoiceGroup.svelte';
   import Switch from '../../practice/Switch.svelte';
   import { tool } from './declaration';
+  import type { Layout } from './layouts';
   import { secondsChoices, wordChoices, type TypingSettings } from './settings';
 
-  let { settings = $bindable(), quiet }: { settings: TypingSettings; quiet: boolean } = $props();
+  let {
+    settings = $bindable(),
+    quiet,
+    canChooseLayout,
+  }: { settings: TypingSettings; quiet: boolean; canChooseLayout: boolean } = $props();
 
   const { notes } = tool;
   const numbers = <T extends number>(list: readonly T[]) =>
     list.map((value) => ({ value, label: String(value) }));
+  const layoutChoices: { value: Layout; label: string }[] = [
+    { value: 'own', label: notes.layoutOwn },
+    { value: 'colemak', label: notes.layoutColemak },
+    { value: 'dvorak', label: notes.layoutDvorak },
+    { value: 'programmer-dvorak', label: notes.layoutProgrammerDvorak },
+  ];
 </script>
 
 <div class="settings" class:quiet>
@@ -37,6 +48,14 @@
       name="typing-words"
       choices={numbers(wordChoices)}
       bind:value={settings.words}
+    />
+  {/if}
+  {#if canChooseLayout}
+    <ChoiceGroup
+      legend={notes.layout}
+      name="typing-layout"
+      choices={layoutChoices}
+      bind:value={settings.layout}
     />
   {/if}
   <Switch label={notes.punctuation} bind:checked={settings.punctuation} />
