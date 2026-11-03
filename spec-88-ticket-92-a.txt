@@ -1,0 +1,12 @@
+A note from the words-per-minute chart.
+
+The part I liked best was a small one: deciding that the last sample should land exactly
+on the test's score, so the line ends where the big number says it does. A chart that
+disagrees with the headline above it would quietly teach someone not to trust either.
+
+Typing tests are a nice thing to build because the data is so human. The raw line
+bounces around like a heartbeat: a burst, a pause to read the next word, a burst again.
+You can almost see someone hunting for the letter "q".
+
+On a break I'd like to read about how old typewriter speed contests were run, before
+anyone had a clock that could count in milliseconds.
