@@ -37,7 +37,7 @@ A Tool where a person practises a skill on the page, such as the Typing test. No
 _Avoid_: Game, trainer, exercise
 
 **Layout**:
-Which letter each key of a keyboard types, such as QWERTY, Colemak or Dvorak. The Typing test's Layout option (#91) lets a person practise a Layout their computer isn't set to.
+Which letter each key of a keyboard types, such as QWERTY, Colemak or Dvorak. The Typing test's Layout option lets a person practise a Layout their computer isn't set to.
 _Avoid_: Keymap, keyboard setting
 
 **Lesson**:
