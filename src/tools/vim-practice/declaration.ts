@@ -17,7 +17,8 @@ export const tool = definePracticeTool({
     ignored: '{key} isn’t a motion in this Lesson.',
     space: 'Space',
     allowed: 'Keys in this Lesson',
-    countHint: 'Type a number first to repeat a motion, as in 3j. Escape cancels it.',
+    countHint:
+      'Type a number first to repeat a motion, as in 3j. Escape cancels a half-typed count or motion.',
     needsKeyboard:
       'Vim practice needs a keyboard. Connect one to this phone or tablet, or come back on a computer.',
     // Read by screen readers with the practice area.

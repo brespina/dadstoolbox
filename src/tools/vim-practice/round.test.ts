@@ -8,6 +8,19 @@ describe('Lessons', () => {
   it('each allow their own motions and the earlier Lessons’ motions', () => {
     expect(Object.keys(lessonMotions(0)).sort()).toEqual(['h', 'j', 'k', 'l']);
     expect(Object.keys(lessonMotions(2)).sort()).toEqual([...'hjklwbeWBE', '0', '^', '$'].sort());
+    expect(Object.keys(lessonMotions(3)).sort()).toEqual(
+      [...'hjklwbeWBE', '0', '^', '$', ...'fFtT', ';', ','].sort(),
+    );
+    expect(Object.keys(lessonMotions(4)).sort()).toEqual(
+      [...'hjklwbeWBE', '0', '^', '$', ...'fFtT', ';', ',', 'G', 'gg'].sort(),
+    );
+  });
+
+  it('are labelled with the motions they add', () => {
+    expect(lessons.map((lesson) => lesson.adds.join(' ')).slice(3)).toEqual([
+      'f F t T ; ,',
+      'gg G',
+    ]);
   });
 
   it('have tidy texts: plain ASCII, no spaces at a line end, and short enough for a phone', () => {

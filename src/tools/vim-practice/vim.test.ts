@@ -176,3 +176,170 @@ describe('0, ^ and $', () => {
     expect(keys('abc\na|bcdef', '2$')).toBe('abc\na|bcdef');
   });
 });
+
+describe('f, F, t and T', () => {
+  it('f goes to the character, F back to it, t and T stop just short of it', () => {
+    expect(keys('|a,b,c', 'f,')).toBe('a|,b,c');
+    expect(keys('a,b|,c', 'F,')).toBe('a|,b,c');
+    expect(keys('|a,b,c', 't,')).toBe('|a,b,c');
+    expect(keys('|ab,c', 't,')).toBe('a|b,c');
+    expect(keys('a,b,c|d', 'T,')).toBe('a,b,|cd');
+    expect(keys('|abc', 'fc')).toBe('ab|c');
+  });
+
+  it('take a count: the count-th match, or no move if there are too few', () => {
+    expect(keys('|a,b,c,d', '2f,')).toBe('a,b|,c,d');
+    expect(keys('|a,b,c,d', '3t,')).toBe('a,b,|c,d');
+    expect(keys('a,b,c,|d', '2F,')).toBe('a,b|,c,d');
+    expect(keys('a,b,c,|d', '3T,')).toBe('a,|b,c,d');
+    expect(keys('|a,b,c', '3f,')).toBe('|a,b,c');
+    expect(keys('a,b,|c', '3F,')).toBe('a,b,|c');
+    expect(keys('|a,b,c', '9t,')).toBe('|a,b,c');
+  });
+
+  it('stay on the line, and skip the character under the cursor', () => {
+    expect(keys('|ab\n,c', 'f,')).toBe('|ab\n,c');
+    expect(keys('ab\nc|d,', 'F,')).toBe('ab\nc|d,');
+    expect(keys('|,a,', 'f,')).toBe(',a|,');
+    expect(keys('a,|,', 'F,')).toBe('a|,,');
+  });
+
+  it('take any single character, spaces and capitals and punctuation too', () => {
+    expect(keys('|a b', 'f ')).toBe('a| b');
+    expect(keys('|aB', 'fB')).toBe('a|B');
+    expect(keys('|a1(', 'f(')).toBe('a1|(');
+    expect(keys('|ab', 'f.')).toBe('|ab');
+  });
+
+  it('wait for the character, and Escape cancels, dropping the count', () => {
+    expect(keys('|a,b,c', 'f⎋l')).toBe('a|,b,c');
+    expect(keys('|a,b,c', '2f⎋f,')).toBe('a|,b,c');
+    expect(keys('|a,b,c', 'f⎋;')).toBe('|a,b,c');
+  });
+
+  it('report waiting for the character as pending', () => {
+    let state = startState({ line: 0, col: 0 });
+    const outcomes = ['2', 'f', ',', 'Escape'].map((key) => {
+      const result = feed(['a,b,c'], state, key, motions);
+      state = result.state;
+      return result.outcome;
+    });
+    expect(outcomes).toEqual(['count', 'pending', 'moved', 'cancelled']);
+  });
+
+  it('take the new column as the one j and k want', () => {
+    expect(keys('|a,bcd\nabcdef', 'f,j')).toBe('a,bcd\na|bcdef');
+  });
+
+  it('are ignored when the Lesson does not allow them', () => {
+    const { h } = motions;
+    expect(keys('|a,b', 'f,', { h })).toBe('|a,b');
+  });
+});
+
+describe('; and ,', () => {
+  it('; repeats the last find, and , repeats it the other way', () => {
+    expect(keys('|a,b,c,d', 'f,;')).toBe('a,b|,c,d');
+    expect(keys('|a,b,c,d', 'f,;;')).toBe('a,b,c|,d');
+    expect(keys('|a,b,c,d', 'f,;;,')).toBe('a,b|,c,d');
+    expect(keys('a,b,c|,d', 'F,;')).toBe('a|,b,c,d');
+    expect(keys('a,b,c|,d', 'F,;,')).toBe('a,b|,c,d');
+    expect(keys('a,b,c|,d', 'F,,')).toBe('a,b,c|,d');
+  });
+
+  it('; after f F t T goes on in the same direction', () => {
+    expect(keys('|xaxbxcx', 'fx;')).toBe('xaxb|xcx');
+    expect(keys('xaxbxc|x', 'Fx;')).toBe('xa|xbxcx');
+    expect(keys('|xaxbxcx', 'tx;')).toBe('xax|bxcx');
+    expect(keys('xaxbxc|x', 'Tx;')).toBe('xax|bxcx');
+  });
+
+  it(', after f F t T goes the other way', () => {
+    expect(keys('|xaxbxcx', 'fx;;,')).toBe('xaxb|xcx');
+    expect(keys('xaxbxc|x', 'Fx;,')).toBe('xaxb|xcx');
+    expect(keys('xaxbxc|x', 'Fx,')).toBe('xaxbxc|x');
+    expect(keys('|xaxbxcx', 'tx;,')).toBe('x|axbxcx');
+    expect(keys('xaxbxc|x', 'Tx,')).toBe('xaxbx|cx');
+    expect(keys('|xaxbxcx', 'Tx,')).toBe('x|axbxcx');
+  });
+
+  it('; after t or T skips a match right next to the cursor, so it always moves', () => {
+    expect(keys('|a,b,c,d', 't,;')).toBe('a,|b,c,d');
+    expect(keys('a|b,c,d', 't,;')).toBe('ab,|c,d');
+    expect(keys('|a,b,c,d', 't,;;')).toBe('a,b,|c,d');
+    expect(keys('a,b,c|d', 'T,;')).toBe('a,|b,cd');
+  });
+
+  it('a count before ; or , repeats it that many times', () => {
+    expect(keys('|a,b,c,d,e', 'f,2;')).toBe('a,b,c|,d,e');
+    expect(keys('|a,b,c,d,e', 'f,3;2,')).toBe('a,b|,c,d,e');
+    expect(keys('|a,b,c,d,e', 'f,9;')).toBe('a|,b,c,d,e');
+  });
+
+  it('do nothing before any find, and a failed find is still the one repeated', () => {
+    expect(keys('|a,b', ';')).toBe('|a,b');
+    expect(keys('|a,b', ',')).toBe('|a,b');
+    expect(keys('|ab\na,b', 'f,j;')).toBe('ab\na|,b');
+  });
+
+  it('; and , do not change the direction ; goes in', () => {
+    expect(keys('|xaxbxcx', 'fx,;')).toBe('xa|xbxcx');
+  });
+});
+
+describe('gg and G', () => {
+  it('G goes to the last line and gg to the first, on the first character that is not a space', () => {
+    expect(keys('a|bc\n  def\n  gh', 'G')).toBe('abc\n  def\n  |gh');
+    expect(keys('  ab\n  c|d\nef', 'gg')).toBe('  |ab\n  cd\nef');
+    expect(keys('ab\nc|d', 'gg')).toBe('|ab\ncd');
+    expect(keys('|ab\n   ', 'G')).toBe('ab\n  | ');
+  });
+
+  it('take a count as the line to go to, from the top for both', () => {
+    expect(keys('|a\nb\nc\nd', '3G')).toBe('a\nb\n|c\nd');
+    expect(keys('|a\nb\nc\nd', '3gg')).toBe('a\nb\n|c\nd');
+    expect(keys('a\nb\nc\n|d', '2gg')).toBe('a\n|b\nc\nd');
+    expect(keys('a\n|b\nc', '1G')).toBe('|a\nb\nc');
+  });
+
+  it('stop at the last line when the count is too large', () => {
+    expect(keys('|a\nb\nc', '99G')).toBe('a\nb\n|c');
+    expect(keys('|a\nb\nc', '99gg')).toBe('a\nb\n|c');
+    expect(keys('|a\nb\nc', '12G')).toBe('a\nb\n|c');
+  });
+
+  it('take the column landed on as the one j and k want', () => {
+    expect(keys('  abc\nabcdef\nabc|def', 'ggj')).toBe('  abc\nab|cdef\nabcdef');
+  });
+
+  it('g waits for a second g; any other key is ignored and drops the count', () => {
+    let state = startState({ line: 1, col: 0 });
+    const outcomes = ['g', 'g', '2', 'g', 'x', 'g', '3'].map((key) => {
+      const result = feed(['a', 'b', 'c'], state, key, motions);
+      state = result.state;
+      return result.outcome;
+    });
+    expect(outcomes).toEqual([
+      'pending',
+      'moved',
+      'count',
+      'pending',
+      'ignored',
+      'pending',
+      'ignored',
+    ]);
+    expect(keys('a\n|b\nc', 'gx')).toBe('a\n|b\nc');
+    expect(keys('a\n|b\nc', '2gxG')).toBe('a\nb\n|c');
+    expect(keys('a\n|b\nc', 'g3gg')).toBe('|a\nb\nc');
+  });
+
+  it('Escape cancels a half-typed g and its count', () => {
+    expect(keys('a\n|b\nc', 'g⎋G')).toBe('a\nb\n|c');
+    expect(keys('a\nb\n|c', '2g⎋gg')).toBe('|a\nb\nc');
+  });
+
+  it('a lone g is ignored when the Lesson has no gg', () => {
+    const { h } = motions;
+    expect(keys('a\n|b', 'gg', { h })).toBe('a\n|b');
+  });
+});

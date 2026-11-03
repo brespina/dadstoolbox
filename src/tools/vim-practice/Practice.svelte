@@ -162,8 +162,8 @@
     {@const cursor = round.vim.cursor}
     <div class="bar">
       <p class="counter">{round.current + 1}/{drillsInRound}</p>
-      <!-- A count typed so far, where Vim shows it. -->
-      <p class="pending" aria-hidden="true">{round.vim.count ?? ''}</p>
+      <!-- A count and the start of a motion (3, or f, or g) typed so far, where Vim shows them. -->
+      <p class="pending" aria-hidden="true">{round.vim.count ?? ''}{round.vim.keys ?? ''}</p>
     </div>
     <div class="buffer" aria-hidden="true">
       {#each drill.text as line, l (l)}
