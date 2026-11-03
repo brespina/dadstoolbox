@@ -70,15 +70,32 @@ describe('fewestKeys', () => {
     expect(fewest('  a\n  b\nc', [2, 0], [0, 2], { gg: motions.gg })).toBe(2);
   });
 
+  it('counts } { and % as one key, and a count of paragraphs as its digits', () => {
+    const text = 'a(b)\n\nc\n\nd\n\ne{\nf\n}';
+    const paragraphs = { '}': motions['}'], '{': motions['{'], '%': motions['%'] };
+    expect(fewest(text, [0, 0], [1, 0], paragraphs)).toBe(1);
+    expect(fewest(text, [0, 0], [3, 0], paragraphs)).toBe(2);
+    expect(fewest(text, [0, 0], [5, 0], paragraphs)).toBe(2);
+    expect(fewest(text, [0, 0], [5, 0], { ...paragraphs, j: motions.j })).toBe(2);
+    expect(fewest(text, [8, 0], [0, 0], paragraphs)).toBe(2);
+    expect(fewest(text, [0, 0], [0, 3], paragraphs)).toBe(1);
+    expect(fewest(text, [0, 3], [0, 1], paragraphs)).toBe(1);
+    expect(fewest(text, [6, 1], [8, 0], paragraphs)).toBe(1);
+    // The last paragraph asked for goes to the end of the text: 4} is the 4th and last.
+    expect(fewest(text, [0, 0], [8, 0], paragraphs)).toBe(2);
+    expect(fewest(text, [0, 0], [8, 0], { '}': motions['}'], G: motions.G })).toBe(1);
+  });
+
   it('agrees with typing every key sequence into the engine', () => {
     // Every sequence of up to 4 keys (digits and the characters of the text too), typed
     // through `feed`: the shortest one to each place is the fewest keys the search must
     // give. Typing the same state again with no fewer keys can't lead anywhere new.
-    const text = ['abcdefgh,jklm,o', '', '  e(f),g', 'ij,,k'];
+    const text = ['abcd,fgh(jk),o', '', '  e{f},g', 'ij,,k', '', 'l[m]n'];
     const alphabet = new Set([...Object.keys(motions).join(''), ...'123456789', ...text.join('')]);
     for (const [line, col] of [
       [0, 0],
       [3, 1],
+      [2, 3],
     ] as const) {
       const typed = new Map<string, number>();
       const seen = new Map<string, number>();
