@@ -248,8 +248,10 @@ motions and Lessons:
   onto the last line lands on its last character, even from that line; a count that runs
   out of paragraphs before its last step fails, and any failed `{` or `}` still makes the
   cursor's own column the one wanted. `%` jumps from the bracket under the cursor, or the
-  next one on the line, to its match among brackets of the same kind; a count is dropped
-  (Vim's `N%` is not taught). Vim also treats a line starting with `.` or a form feed as
+  next one on the line, to its match among brackets of the same kind; with a
+  count it is Vim's `N%` instead, N percent down the text at the first non-blank, which
+  the search doesn't try because `G` is never more keys (`round.test.ts` checks that).
+  Vim also treats a line starting with `.` or a form feed as
   a paragraph boundary, skips brackets in double quotes, comments and after a backslash,
   and reads `#` lines: Lessons 6 and 7 keep their texts free of all of these, and
   `round.test.ts` checks that.

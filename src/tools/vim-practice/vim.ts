@@ -362,6 +362,18 @@ function matchingBracket(text: Text, from: Cursor): Cursor {
   return from;
 }
 
+/**
+ * Vim's `N%`: the line N percent of the way down the text, at its first non-blank like
+ * `G`. Past 100 it fails. A visitor who types a count before `%` gets what Vim does, not
+ * the bracket jump. For a text of up to 100 lines the line is never above N, so `kG` or
+ * `gg`, which every Lesson with `%` allows, is never more keys: the search needn't try it
+ * (`round.test.ts` checks this for every text).
+ */
+function percentOfText(text: Text, from: Cursor, percent: number): Cursor {
+  if (percent > 100) return from;
+  return toLineNumber(text, from, Math.floor((percent * text.length + 99) / 100) - 1);
+}
+
 /** Every motion the engine knows, keyed by the keys that type it. */
 export const motions = {
   h: {
@@ -412,8 +424,14 @@ export const motions = {
     count: 'own',
     move: (text, from, count) => toLineNumber(text, from, (count ?? 1) - 1),
   },
-  // Vim's `N%` goes N percent down the text; the Lessons don't teach it, so a count is dropped.
-  '%': { count: 'none', move: matchingBracket },
+  // `N%` is not the bracket jump but a different motion, N percent down the text. The
+  // Lessons don't teach it, and the search needn't count on it: it lands where `G` does
+  // (see `percentOfText`).
+  '%': {
+    count: 'own',
+    move: (text, from, count) =>
+      count === undefined ? matchingBracket(text, from) : percentOfText(text, from, count),
+  },
   '}': paragraphMotion(1),
   '{': paragraphMotion(-1),
 } satisfies Motions;

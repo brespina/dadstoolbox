@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { seededRandom } from '../../practice/random';
 import { fewestKeys, placeKey } from './fewest';
 import { lessonLabel, lessonMotions, lessons } from './lessons';
-import { motions } from './vim';
+import { feed, motions, startState } from './vim';
 import { drillsInRound, newRound, press, results, type Round } from './round';
 
 describe('Lessons', () => {
@@ -33,6 +33,22 @@ describe('Lessons', () => {
       for (const line of lesson.texts.flat()) {
         expect(line, line).not.toMatch(/^[.\f]/);
         if (index >= 5) expect(line, line).not.toMatch(/["'\\#]|\/\*|\*\//);
+      }
+    });
+  });
+
+  it('never need N% for the fewest keys: G or gg gets to the same place in no more', () => {
+    // The search doesn't count on `N%` (N percent down the text). That holds while the line it
+    // reaches is never above N, so its digits are no fewer than G's.
+    const allowed = lessonMotions(5);
+    lessons.slice(5).forEach((lesson) => {
+      for (const text of lesson.texts) {
+        for (let percent = 1; percent <= 100; percent++) {
+          let state = startState({ line: 0, col: 0 });
+          for (const key of `${percent}%`) state = feed(text, state, key, allowed).state;
+          const line = state.cursor.line + 1;
+          expect(line, `${percent}% of ${text.length} lines`).toBeLessThanOrEqual(percent);
+        }
       }
     });
   });

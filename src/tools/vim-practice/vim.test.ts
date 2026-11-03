@@ -392,9 +392,28 @@ describe('%', () => {
     expect(keys('|a)(', '%')).toBe('|a)(');
   });
 
-  it('drops a count (the Lessons do not teach N%), and sets the column wanted', () => {
-    expect(keys('|(ab)', '3%')).toBe('(ab|)');
+  it('sets the column wanted', () => {
     expect(keys('|(abcd)\nabcdefgh', '%j')).toBe('(abcd)\nabcde|fgh');
+  });
+
+  it('with a count is Vim’s N%, N percent down the text, not the bracket jump', () => {
+    // Ten lines, each starting with two spaces: N% lands on line (N * 10 + 99) / 100.
+    const lineAfter = (from: number, typed: string) => {
+      const lines = Array.from({ length: 10 }, (_, i) => `  (${i + 1})`);
+      lines[from] = lines[from]!.replace('(', '|(');
+      return keys(lines.join('\n'), typed)
+        .split('\n')
+        .findIndex((line) => line.includes('|'));
+    };
+    expect(lineAfter(0, '50%')).toBe(4);
+    expect(lineAfter(0, '51%')).toBe(5);
+    expect(lineAfter(0, '100%')).toBe(9);
+    expect(lineAfter(0, '1%')).toBe(0);
+    expect(lineAfter(9, '11%')).toBe(1);
+    // Past 100 it fails: the cursor stays put.
+    expect(lineAfter(3, '101%')).toBe(3);
+    // It lands on the first non-blank, as G does.
+    expect(keys('|(ab)\n  cd', '100%')).toBe('(ab)\n  |cd');
   });
 });
 
