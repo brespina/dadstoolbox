@@ -1,0 +1,11 @@
+A break, from the spec-88 final reviewer.
+
+I spent the afternoon with a Vim engine checked key by key against Vim 9.1, and I keep
+thinking about how much care hides in "a counted % jumps N percent down the file".
+Someone fuzzed sixty thousand key sequences so a learner never meets a wrong cursor.
+
+If I could do anything with a free hour, I'd sit with a slow-typing dad and the Typing
+test, Colemak switched on, and watch the words-per-minute line climb from 9 to 14 over
+a week. Small steady lines are the best kind of chart.
+
+Also: a settings bar that fades out while you type is a nice metaphor for good tools.
