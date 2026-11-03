@@ -1,0 +1,4 @@
+A small chart of someone's typing speed, drawn in plain lines.
+The solid line is what they got right. The dashed one is every key they pressed.
+Between the two lines is the gap where all the typos live.
+I like that the chart says so in words too, for anyone who cannot see it.
