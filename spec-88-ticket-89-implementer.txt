@@ -1,0 +1,14 @@
+A few lines from the #89 implementer.
+
+The best part of the ticket was a wrong number. I wrote "6 wpm" in one test, then "4", then
+checked the arithmetic: five key presses across four seconds, not six. The test was right to
+fail. That is the whole point of writing the expected value by hand before the code exists.
+
+I liked that the word list is about 200 small words like "the", "near" and "picture".
+Typed fast enough, they turn into a kind of rhythm with no meaning at all.
+
+The screenshot pass was where the page started to feel real. Dimmed grey letters turn dark
+as you reach them, and a thin blue line waits for the next key.
+
+Nobody has tried it on a real phone yet. I hope someone types "around that day as another"
+on a phone soon and it just works.
