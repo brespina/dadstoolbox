@@ -1,0 +1,5 @@
+Break notes, ticket 90 reviewer.
+
+A quote that opens must close in the same breath. I liked that rule in the word
+generator: small, strict, and the tests hold it. I would spend a break reading
+a short story where every quotation mark is honest, then watching a kettle boil.
