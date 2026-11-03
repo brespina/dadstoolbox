@@ -70,3 +70,34 @@ test('Ctrl+Backspace clears the word, and a phone keyboard that sends only text 
   );
   await expect(page.getByText('10 words', { exact: true })).toBeVisible();
 });
+
+test('Punctuation and Numbers change the words of the next test, and can be combined', async ({
+  page,
+}) => {
+  await page.goto('typing-test/?seed=7');
+  await page.getByRole('radio', { name: tool.notes.words, exact: true }).check();
+  await page.getByRole('radio', { name: '50', exact: true }).check();
+  const shown = page.locator('.window');
+  const plain = wordStream(seededRandom(7))(50);
+  await expect(shown).toHaveText(plain.join(' '));
+
+  await page.getByRole('checkbox', { name: tool.notes.punctuation }).check();
+  const punctuated = wordStream(seededRandom(7), { punctuation: true })(50);
+  await expect(shown).toHaveText(punctuated.join(' '));
+  // Capitals after a full stop, and some commas, full stops or question marks.
+  await expect(shown).toHaveText(/[.?]"? "?[A-Z]/);
+  await expect(shown).toHaveText(/[,.?]/);
+
+  await page.getByRole('checkbox', { name: tool.notes.numbers }).check();
+  const both = wordStream(seededRandom(7), { punctuation: true, numbers: true })(50);
+  await expect(shown).toHaveText(both.join(' '));
+  await expect(shown).toHaveText(/\d/);
+
+  // The words can still be typed, punctuation and all.
+  await page.getByRole('radio', { name: '10', exact: true }).check();
+  const ten = wordStream(seededRandom(7), { punctuation: true, numbers: true })(10);
+  await page.keyboard.type(ten.join(' '));
+  await expect(page.getByRole('status')).toHaveText(
+    /^Test done\. \d+ words per minute\. 100% right\.$/,
+  );
+});

@@ -21,28 +21,113 @@ export const commonWords: readonly string[] = `
   .trim()
   .split(/\s+/);
 
-/**
- * Options for the words. Empty for now: the Punctuation and Numbers switches (#90) are
- * added here.
- */
-export type WordOptions = Record<never, never>;
+/** Contractions for Punctuation: an apostrophe is never a word on its own. */
+export const contractions: readonly string[] = [
+  "don't",
+  "it's",
+  "I'm",
+  "we're",
+  "can't",
+  "isn't",
+  "that's",
+  "they're",
+  "you're",
+  "didn't",
+  "won't",
+  "I'll",
+];
+
+/** Which extras the words carry. Both off gives only lowercase letters. */
+export interface WordOptions {
+  /** Capitals after a full stop, commas, full stops, question marks, apostrophes and quotes. */
+  punctuation?: boolean;
+  /** Short numbers in place of some words. */
+  numbers?: boolean;
+}
+
+// Chances per word.
+const numberChance = 0.1;
+const contractionChance = 0.05;
+const quoteChance = 0.05;
+const markChance = 0.18;
+
+/** Marks that can end a word: mostly commas. */
+const marks = [',', ',', ',', ',', '.', '.', '.', '?'] as const;
+
+/** A number of 1 to 4 digits, with no leading zero. Always takes five random numbers. */
+function numberWord(random: Random): string {
+  const pick = random();
+  const length = pick < 0.35 ? 1 : pick < 0.7 ? 2 : pick < 0.9 ? 3 : 4;
+  let digits = '';
+  for (let i = 0; i < 4; i++) {
+    const draw = random();
+    if (i >= length) continue;
+    digits += i === 0 && length > 1 ? 1 + Math.floor(draw * 9) : Math.floor(draw * 10);
+  }
+  return digits;
+}
 
 /**
  * A stream of common words drawn with `random`: each call gives the next `count` words.
  * A word never follows itself, even across calls, so a Time test can ask for more.
+ *
+ * With Punctuation the stream remembers, between calls, that the next word starts a
+ * sentence. A quote opened in a call is closed in the same call (within four words), so a
+ * call never ends with a quote open. Every word takes the same random numbers whatever
+ * is switched on.
  */
-export function wordStream(
-  random: Random,
-  _options: WordOptions = {},
-): (count: number) => string[] {
+export function wordStream(random: Random, options: WordOptions = {}): (count: number) => string[] {
+  const { punctuation = false, numbers = false } = options;
   let previous: string | undefined;
+  let capitalNext = true;
   return (count) => {
     const words: string[] = [];
-    while (words.length < count) {
-      const word = commonWords[Math.floor(random() * commonWords.length)]!;
-      if (word === previous) continue;
+    // The index of the word that closes the quote now open, and the quote mark to close it.
+    let closeAt = -1;
+    let closer = '';
+    for (let i = 0; i < count; i++) {
+      let base: string;
+      do {
+        base = commonWords[Math.floor(random() * commonWords.length)]!;
+      } while (base === previous);
+      previous = base;
+      const numberRoll = random();
+      const number = numberWord(random);
+      const contractionRoll = random();
+      const contraction = contractions[Math.floor(random() * contractions.length)]!;
+      const quoteRoll = random();
+      const quoteLength = Math.floor(random() * 4);
+      const quoteKind = random();
+      const markRoll = random();
+      const mark = marks[Math.floor(random() * marks.length)]!;
+
+      let word = base;
+      // After a full stop the next word stays a word, so it can take its capital.
+      if (numbers && numberRoll < numberChance && !(punctuation && capitalNext)) word = number;
+      else if (punctuation && contractionRoll < contractionChance) word = contraction;
+      if (!punctuation) {
+        words.push(word);
+        continue;
+      }
+
+      // The capital goes on before the quote does: "Hello, not Hello.
+      if (capitalNext && /^[a-z]/.test(word)) word = word[0]!.toUpperCase() + word.slice(1);
+      capitalNext = false;
+      if (closeAt < 0 && i < count - 1 && quoteRoll < quoteChance) {
+        closer = quoteKind < 0.8 ? '"' : "'";
+        word = closer + word;
+        closeAt = Math.min(i + quoteLength, count - 1);
+      }
+      if (markRoll < markChance) {
+        word += mark;
+        capitalNext = mark !== ',';
+      }
+      // The closing quote comes after the mark: `word,"`.
+      if (closeAt === i) {
+        word += closer;
+        closeAt = -1;
+      }
       words.push(word);
-      previous = word;
     }
     return words;
   };

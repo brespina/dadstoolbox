@@ -16,6 +16,8 @@ export const tool = definePracticeTool({
     time: 'Time',
     words: 'Words',
     seconds: 'Seconds',
+    punctuation: 'Punctuation',
+    numbers: 'Numbers',
     restart: 'Restart',
     restartHint: 'Or press Tab, then Enter.',
     // Read out when the test ends.

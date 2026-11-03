@@ -50,7 +50,10 @@
 
   /** A new test with new words. With `?seed=` in the address, the same words each time. */
   function restart() {
-    nextWords = wordStream(pageRandom(location.search));
+    nextWords = wordStream(pageRandom(location.search), {
+      punctuation: settings.punctuation,
+      numbers: settings.numbers,
+    });
     const length = testLength(settings);
     test = newTest(length, nextWords(length.kind === 'words' ? length.count : batch));
     result = undefined;
