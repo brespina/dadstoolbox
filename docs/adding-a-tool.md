@@ -195,12 +195,18 @@ Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage
   `WordOptions` is empty; the Punctuation and Numbers switches (#90) are added there.
 - `typing.ts`: the test as a pure reducer. `press(test, key)` takes one `KeyPress`: a
   `char` with the character already worked out (a space moves on), `backspace`,
-  `clearWord` or `tick` (time passing), each with a time in milliseconds. A Layout (#91)
-  maps the physical key to its character before calling `press`. `score(test)` gives wpm,
+  `clearWord` or `tick` (time passing), each with a time in milliseconds. The page
+  maps the physical key to its character (see `layouts.ts`) before calling `press`. `score(test)` gives wpm,
   raw wpm, accuracy and the letters right, wrong, extra and missed. The test keeps every
   character key press with its time (`presses`) and when each word was finished
   (`wordEnds`), which is enough to work out the speed at each second for a chart (#92).
   `wordLetters` gives each letter of a word as it shows.
+- `layouts.ts` and `Keyboard.svelte`: the Layouts. `resolve(layout, code, shift)` turns a
+  physical key (`KeyboardEvent.code`) and Shift into the character that Layout types there
+  (null for a key it leaves alone, or for "As my keyboard types"); `locate(layout, char)` is the
+  reverse, which the keyboard picture uses to light the next key. The picture is
+  `aria-hidden`. The Layout option shows only where `(any-pointer: fine)` matches, so a
+  touch-only device never sees it.
 - `settings.ts` and `SettingsBar.svelte`: the settings bar. A new setting is a new field
   of `TypingSettings` and a new `ChoiceGroup` in the bar; a changed setting (any field)
   starts a new test.

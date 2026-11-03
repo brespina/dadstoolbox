@@ -8,12 +8,7 @@ export type Layout = (typeof layouts)[number];
 
 /** The four rows of a US board, as codes, left to right. The space bar is apart. */
 export const keyRows: readonly (readonly string[])[] = [
-  [
-    'Backquote',
-    ...'1234567890'.split('').map((digit) => `Digit${digit}`),
-    'Minus',
-    'Equal',
-  ],
+  ['Backquote', ...'1234567890'.split('').map((digit) => `Digit${digit}`), 'Minus', 'Equal'],
   [
     ...'QWERTYUIOP'.split('').map((letter) => `Key${letter}`),
     'BracketLeft',
@@ -50,7 +45,7 @@ const dvorak: Rows = [
 // odd-then-even order 7 5 3 1 9 0 2 4 6 8.
 const programmerDvorak: Rows = [
   ['$&[{}(=*)+]!#', '~%7531902468`'],
-  [";,.pyfgcrl/@\\", ':<>PYFGCRL?^|'],
+  [';,.pyfgcrl/@\\', ':<>PYFGCRL?^|'],
   ['aoeuidhtns-', 'AOEUIDHTNS_'],
   ["'qjkxbmwvz", '"QJKXBMWVZ'],
 ];

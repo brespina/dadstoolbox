@@ -1,6 +1,6 @@
 // A typing test's state, changed one key press at a time, and its score. Pure: no page.
 // The page turns each key event into a KeyPress with the character already worked out
-// (so a Layout, #91, can map the physical key to its character before it gets here).
+// (so a Layout can map the physical key to its character before it gets here).
 
 /** How long a test lasts: a number of seconds, or a number of words. */
 export type TestLength = { kind: 'time'; seconds: number } | { kind: 'words'; count: number };

@@ -16,6 +16,11 @@ export const tool = definePracticeTool({
     time: 'Time',
     words: 'Words',
     seconds: 'Seconds',
+    layout: 'Layout',
+    layoutOwn: 'As my keyboard types',
+    layoutColemak: 'Colemak',
+    layoutDvorak: 'Dvorak',
+    layoutProgrammerDvorak: 'Programmer Dvorak',
     restart: 'Restart',
     restartHint: 'Or press Tab, then Enter.',
     // Read out when the test ends.
