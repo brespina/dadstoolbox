@@ -56,7 +56,7 @@ export interface VimState {
 export type Outcome = 'moved' | 'count' | 'cancelled' | 'ignored';
 
 /** Counts larger than this are read as this. */
-export const largestCount = 9999;
+const largestCount = 9999;
 
 export function startState(place: Place): VimState {
   return { cursor: { ...place, want: place.col } };
@@ -92,7 +92,7 @@ export function runMotion(text: Text, from: Cursor, motion: Motion, count?: numb
   return cursor;
 }
 
-export function samePlace(a: Place, b: Place): boolean {
+function samePlace(a: Place, b: Place): boolean {
   return a.line === b.line && a.col === b.col;
 }
 

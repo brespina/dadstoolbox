@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fewestKeys } from './fewest';
-import { motions, type Motions } from './vim';
+import { feed, motions, startState, type Motions, type VimState } from './vim';
 
 const { h, j, k, l, w, b, e, W, B, E, $ } = motions;
 const lesson1 = { h, j, k, l };
@@ -36,6 +36,26 @@ describe('fewestKeys', () => {
   it('leaves out places the motions cannot reach, and the start', () => {
     expect(fewest('foo bar', [0, 0], [0, 1], { w })).toBeUndefined();
     expect(fewest('foo bar', [0, 0], [0, 0], lesson1)).toBeUndefined();
+  });
+
+  it('agrees with typing every key sequence into the engine', () => {
+    // Every sequence of up to 4 keys (digits too), typed through `feed`: the shortest one
+    // to each place is the fewest keys the search must give.
+    const text = ['ab.c d', '', '  e(f) gh', 'ij'];
+    const alphabet = [...Object.keys(motions), ...'123456789'];
+    const typed = new Map<string, number>();
+    const start = startState({ line: 0, col: 2 });
+    const walk = (state: VimState, length: number) => {
+      const { cursor } = state;
+      const place = `${cursor.line}:${cursor.col}`;
+      if (length < (typed.get(place) ?? Infinity)) typed.set(place, length);
+      if (length === 4) return;
+      for (const key of alphabet) walk(feed(text, state, key, motions).state, length + 1);
+    };
+    walk(start, 0);
+    typed.delete('0:2');
+    const found = fewestKeys(text, start.cursor, motions, 4);
+    expect([...found].sort()).toEqual([...typed].sort());
   });
 
   it('stops looking after the most keys asked for', () => {

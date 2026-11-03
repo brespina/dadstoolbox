@@ -4,7 +4,7 @@
 import { runMotion, type Cursor, type Motions, type Place, type Text } from './vim';
 
 /** The search goes no further than this many key presses, which keeps it fast. */
-export const defaultMostKeys = 6;
+const defaultMostKeys = 6;
 
 /** A place as a map key: `line:col`. */
 export function placeKey(place: Place): string {

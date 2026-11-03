@@ -10,7 +10,7 @@
   import { pageRandom } from '../../practice/random';
   import ChoiceGroup from '../../practice/ChoiceGroup.svelte';
   import { tool } from './declaration';
-  import { lessons } from './lessons';
+  import { lessonKeys, lessons } from './lessons';
   import { drillsInRound, newRound, press, results, type Round } from './round';
 
   const { notes } = tool;
@@ -26,7 +26,7 @@
 
   const drill = $derived(round?.drills[round.current]);
   const score = $derived(round && results(round));
-  const allowedKeys = $derived(lessons.slice(0, lesson + 1).flatMap((l) => l.adds));
+  const allowedKeys = $derived(lessonKeys(lesson));
 
   /** A new round of Drills. With `?seed=` in the address, the same Drills each time. */
   function restart() {

@@ -10,11 +10,12 @@ describe('Lessons', () => {
     expect(Object.keys(lessonMotions(2)).sort()).toEqual([...'hjklwbeWBE', '0', '^', '$'].sort());
   });
 
-  it('have tidy texts: no tabs, no spaces at a line end, and short enough for a phone', () => {
+  it('have tidy texts: plain ASCII, no spaces at a line end, and short enough for a phone', () => {
     for (const lesson of lessons) {
       for (const text of lesson.texts) {
         for (const line of text) {
-          expect(line).not.toMatch(/\t| $/);
+          expect(line).toMatch(/^[\x20-\x7e]*$/);
+          expect(line).not.toMatch(/ $/);
           expect(line.length).toBeLessThanOrEqual(32);
         }
         expect(text[0]).not.toBe('');

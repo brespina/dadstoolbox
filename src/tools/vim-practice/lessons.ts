@@ -1,8 +1,9 @@
 // The Lessons of Vim practice, as data. Each Lesson adds a few motions and allows every
 // earlier Lesson's motions too, and has its own hand-written texts for its Drills.
 //
-// Rules for a Lesson's texts (checked in round.test.ts): no tabs, no spaces at the end of
-// a line, at most 32 characters a line (to fit a phone), and no empty first or last line.
+// Rules for a Lesson's texts (checked in round.test.ts): plain ASCII (the engine counts
+// characters as code units) with no tabs, no spaces at the end of a line, at most 32
+// characters a line (to fit a phone), and no empty first or last line.
 // Every character must be reachable from the first one within the search's bound.
 import { motions, type Motions, type Text } from './vim';
 
@@ -78,8 +79,12 @@ export const lessons: readonly Lesson[] = [
   },
 ];
 
-/** The motions allowed in the Lesson at `index`: its own and every earlier Lesson's. */
+/** The keys of the motions allowed in the Lesson at `index`: its own and every earlier Lesson's. */
+export function lessonKeys(index: number): (keyof typeof motions)[] {
+  return lessons.slice(0, index + 1).flatMap((lesson) => lesson.adds);
+}
+
+/** The motions allowed in the Lesson at `index`. */
 export function lessonMotions(index: number): Motions {
-  const keys = lessons.slice(0, index + 1).flatMap((lesson) => lesson.adds);
-  return Object.fromEntries(keys.map((key) => [key, motions[key]]));
+  return Object.fromEntries(lessonKeys(index).map((key) => [key, motions[key]]));
 }
