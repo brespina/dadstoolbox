@@ -214,6 +214,23 @@ export const motions = {
   W: wordMotion(nextWordStart, true),
   B: wordMotion(wordStartBefore, true),
   E: wordMotion(nextWordEnd, true),
+  '0': { count: 'none', move: (_text, from) => toCol(from, 0) },
+  '^': {
+    count: 'none',
+    // The first character that isn't a space; on a line of spaces, the last one.
+    move: (text, from) => toCol(from, Math.min(text[from.line]!.search(/[^ \t]|$/), lastCol(text, from.line))),
+  },
+  $: {
+    // `N$` goes N-1 lines down first, and fails (but still wants the line end) on the
+    // last line; past the last line it stops there, as j does.
+    count: 'own',
+    move: (text, from, count = 1) => {
+      const down = count - 1;
+      if (down > 0 && from.line === text.length - 1) return { ...from, want: Infinity };
+      const line = Math.min(text.length - 1, from.line + down);
+      return { ...from, line, col: lastCol(text, line), want: Infinity };
+    },
+  },
 } satisfies Motions;
 
 /**

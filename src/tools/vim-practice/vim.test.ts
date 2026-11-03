@@ -149,3 +149,30 @@ describe('w, b and e', () => {
     expect(keys('|foo bar\nabcdefgh', 'wj')).toBe('foo bar\nabcd|efgh');
   });
 });
+
+describe('0, ^ and $', () => {
+  it('0 goes to the first character, and is part of a count after a digit', () => {
+    expect(keys('abc|def', '0')).toBe('|abcdef');
+    expect(keys('|' + 'x'.repeat(12), '10l')).toBe('x'.repeat(10) + '|xx');
+  });
+
+  it('^ goes to the first character that is not a space, and ignores a count', () => {
+    expect(keys('  ab|c', '^')).toBe('  |abc');
+    expect(keys('|  abc', '^')).toBe('  |abc');
+    expect(keys('  ab|c', '3^')).toBe('  |abc');
+    expect(keys('|   ', '^')).toBe('  | ');
+  });
+
+  it('$ goes to the last character, and j then keeps to the end of each line', () => {
+    expect(keys('a|bc', '$')).toBe('ab|c');
+    expect(keys('a|bc\nabcdef', '$j')).toBe('abc\nabcde|f');
+    expect(keys('abc|def\nab\nabcd', '$jj')).toBe('abcdef\nab\nabc|d');
+    expect(keys('a|bc\n\nab', '$j')).toBe('abc\n|\nab');
+  });
+
+  it('a count before $ goes to the end of a line further down', () => {
+    expect(keys('a|bc\nabcdef', '2$')).toBe('abc\nabcde|f');
+    expect(keys('a|bc\nabcdef', '9$')).toBe('abc\nabcde|f');
+    expect(keys('abc\na|bcdef', '2$')).toBe('abc\na|bcdef');
+  });
+});
