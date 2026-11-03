@@ -128,8 +128,14 @@
     }
   }
 
-  // Text that still lands in the box, such as a word a phone's keyboard finished.
-  function oninput() {
+  // Text that still lands in the box, such as a word a phone's keyboard composed. It is
+  // read once the word is finished, not while the keyboard is still changing it.
+  function oninput(event: Event) {
+    if ((event as InputEvent).isComposing) return;
+    takeTyped();
+  }
+
+  function takeTyped() {
     const typed = input.value;
     input.value = '';
     if (phase === 'done') return;
@@ -262,6 +268,7 @@
     {onkeydown}
     {onbeforeinput}
     {oninput}
+    oncompositionend={takeTyped}
     onfocus={() => (focused = true)}
     onblur={() => (focused = false)}
   />
