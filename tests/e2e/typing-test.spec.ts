@@ -50,7 +50,7 @@ test('a Time test ends on the clock, counted from the first key press', async ({
   await expect(page.getByText('15 seconds', { exact: true })).toBeVisible();
 
   // The chart of speed through the test has a text alternative and a table of its numbers.
-  const chart = page.getByRole('img', { name: /Speed through the test.*second 1 to second 15/ });
+  const chart = page.getByRole('img', { name: tool.notes.chartTitle });
   await expect(chart).toBeVisible();
   await page.getByText(tool.notes.chartNumbers, { exact: true }).click();
   await expect(page.getByRole('table', { name: tool.notes.chartTitle })).toBeVisible();

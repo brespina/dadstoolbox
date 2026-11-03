@@ -2,7 +2,7 @@
   // The speed through a finished test, drawn as two lines in plain SVG: the words per
   // minute (solid) and the raw words per minute (dashed), so colour is not the only
   // difference between them. Colours come from the Site's tokens, so both themes work.
-  // The same numbers are in a table below, which is the text alternative in full.
+  // A test too short to have two points draws nothing. The same numbers are in a table below, which is the text alternative in full.
   import { fillText } from '../../text';
   import { tool } from './declaration';
   import type { Sample } from './samples';
@@ -49,14 +49,12 @@
   });
 </script>
 
-{#if samples.length < 2}
-  <p class="short">{notes.chartTooShort}</p>
-{:else}
+{#if samples.length >= 2}
   <figure class="chart">
     <figcaption>{notes.chartTitle}</figcaption>
     <ul class="legend">
-      <li><span class="swatch wpm"></span>{notes.chartWpm}</li>
-      <li><span class="swatch raw"></span>{notes.chartRaw}</li>
+      <li><span class="swatch wpm"></span>{notes.wpm}</li>
+      <li><span class="swatch raw"></span>{notes.rawWpm}</li>
     </ul>
     <svg viewBox="0 0 {width} {height}" role="img" aria-labelledby="{id}-title {id}-desc">
       <title id="{id}-title">{notes.chartTitle}</title>
@@ -71,7 +69,7 @@
         <text class="tick" x={x(mark)} y={height - bottom + 16} text-anchor="middle">{mark}</text>
       {/each}
       <text class="axis" x={(left + width - right) / 2} y={height - 6} text-anchor="middle">
-        {notes.chartSeconds}
+        {notes.seconds}
       </text>
       <polyline class="raw" points={line(samples.map((s) => s.raw))} />
       <polyline class="wpm" points={line(samples.map((s) => s.wpm))} />
@@ -83,8 +81,8 @@
         <thead>
           <tr>
             <th scope="col">{notes.chartSecond}</th>
-            <th scope="col">{notes.chartWpm}</th>
-            <th scope="col">{notes.chartRaw}</th>
+            <th scope="col">{notes.wpm}</th>
+            <th scope="col">{notes.rawWpm}</th>
           </tr>
         </thead>
         <tbody>
@@ -205,10 +203,5 @@
 
   tbody th {
     font-weight: 400;
-  }
-
-  .short {
-    margin: 1rem 0 0;
-    color: var(--muted);
   }
 </style>
