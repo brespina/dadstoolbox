@@ -25,6 +25,8 @@
   import { resolve } from './layouts';
   import Keyboard from './Keyboard.svelte';
   import SettingsBar from './SettingsBar.svelte';
+  import { samples } from './samples';
+  import WpmChart from './WpmChart.svelte';
 
   const { notes } = tool;
   // A Time test takes words in batches of this many, asking for more near the end.
@@ -72,7 +74,10 @@
 
   /** A new test with new words. With `?seed=` in the address, the same words each time. */
   function restart() {
-    nextWords = wordStream(pageRandom(location.search));
+    nextWords = wordStream(pageRandom(location.search), {
+      punctuation: settings.punctuation,
+      numbers: settings.numbers,
+    });
     const length = testLength(settings);
     test = newTest(length, nextWords(length.kind === 'words' ? length.count : batch));
     result = undefined;
@@ -275,6 +280,7 @@
         </div>
       </dl>
       <p class="raw-hint">{notes.rawHint}</p>
+      <WpmChart samples={samples(test)} />
     </div>
   {:else}
     <p class="counter">{counter}</p>

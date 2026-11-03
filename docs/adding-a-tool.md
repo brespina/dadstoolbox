@@ -180,7 +180,8 @@ Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage
   page test can type known words, and different every visit otherwise. `seededRandom`
   gives the same source to a Vitest or page test.
 - **Settings.** `src/practice/ChoiceGroup.svelte` is one labelled row of choices (radio
-  buttons, at least 44 × 44 px), for a settings bar.
+  buttons, at least 44 × 44 px), for a settings bar. `src/practice/Switch.svelte` is one
+  on/off setting (a checkbox, same size and look) beside it.
 - **Fixed-width text.** Use the `--mono` token from `src/styles/base.css`, the device's own
   fixed-width font.
 - **The Promise.** Keep nothing: no `localStorage`, no personal bests. Make no outside
@@ -192,14 +193,19 @@ Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage
 
 - `words.ts`: our own list of about 200 common words (`commonWords`), and `wordStream(random,
   options)`, which gives the next words on each call. A Time test asks for more as it goes.
-  `WordOptions` is empty; the Punctuation and Numbers switches (#90) are added there.
+  `WordOptions` holds the Punctuation and Numbers switches: Punctuation capitalises after a
+  full stop and adds commas, full stops, question marks, apostrophes and quotes (a quote
+  closes within the same call); Numbers swaps in numbers of 1 to 4 digits. A seed gives
+  the same base words whatever is on.
 - `typing.ts`: the test as a pure reducer. `press(test, key)` takes one `KeyPress`: a
   `char` with the character already worked out (a space moves on), `backspace`,
   `clearWord` or `tick` (time passing), each with a time in milliseconds. The page
   maps the physical key to its character (see `layouts.ts`) before calling `press`. `score(test)` gives wpm,
   raw wpm, accuracy and the letters right, wrong, extra and missed. The test keeps every
   character key press with its time (`presses`) and when each word was finished
-  (`wordEnds`), which is enough to work out the speed at each second for a chart (#92).
+  (`wordEnds`), which is enough to work out the speed at each second for the chart.
+  `rightWordCharacters(test, until?)` counts the characters of the words typed right
+  (with their spaces) finished by a time: what counts toward wpm.
   `wordLetters` gives each letter of a word as it shows.
 - `layouts.ts` and `Keyboard.svelte`: the Layouts. `resolve(layout, code, shift)` turns a
   physical key (`KeyboardEvent.code`) and Shift into the character that Layout types there
@@ -207,8 +213,12 @@ Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage
   reverse, which the keyboard picture uses to light the next key. The picture is
   `aria-hidden`. The Layout option shows only where `(any-pointer: fine)` matches, so a
   touch-only device never sees it.
+- `samples.ts` and `WpmChart.svelte`: `samples(test)` gives the wpm and raw wpm at each
+  second of a finished test (and at the end, if that falls between seconds), as `{ second,
+  wpm, raw }`. `WpmChart` draws them as inline SVG in the Site's tokens, with a text
+  alternative and a table of the numbers, and draws nothing for under two samples.
 - `settings.ts` and `SettingsBar.svelte`: the settings bar. A new setting is a new field
-  of `TypingSettings` and a new `ChoiceGroup` in the bar; a changed setting (any field)
+  of `TypingSettings` and a new `ChoiceGroup` or `Switch` in the bar; a changed setting (any field)
   starts a new test.
 - `Practice.svelte`: the page. Key presses land on an unseen text box over the words, so
   a phone opens its keyboard there. A key with a known character is read on keydown; a

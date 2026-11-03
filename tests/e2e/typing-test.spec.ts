@@ -4,6 +4,7 @@ import { test, expect } from './fixtures';
 import { seededRandom } from '../../src/practice/random';
 import { wordStream } from '../../src/tools/typing-test/words';
 import { tool } from '../../src/tools/typing-test/declaration';
+import { locate } from '../../src/tools/typing-test/layouts';
 
 test('type a 10-word test, see the results, and restart with Tab then Enter', async ({ page }) => {
   await page.goto('typing-test/?seed=7');
@@ -48,6 +49,13 @@ test('a Time test ends on the clock, counted from the first key press', async ({
     /^Test done\. \d+ words per minute\. 100% right\.$/,
   );
   await expect(page.getByText('15 seconds', { exact: true })).toBeVisible();
+
+  // The chart of speed through the test has a text alternative and a table of its numbers.
+  const chart = page.getByRole('img', { name: tool.notes.chartTitle });
+  await expect(chart).toBeVisible();
+  await page.getByText(tool.notes.chartNumbers, { exact: true }).click();
+  await expect(page.getByRole('table', { name: tool.notes.chartTitle })).toBeVisible();
+  await expect(page.getByRole('row')).toHaveCount(16);
 });
 
 test('Ctrl+Backspace clears the word, and a phone keyboard that sends only text works', async ({
@@ -130,6 +138,33 @@ test.describe('Layouts, on a computer with a mouse', () => {
     await page.getByLabel(tool.areaLabel, { exact: true }).click();
     await page.keyboard.press(keyFor(dvorak, first![0]!));
     await expect(lit).toHaveText(first![1] ?? '', { ignoreCase: true });
+    // The settings bar fades while typing; the contrast check waits for the fade to end.
+    await expect(page.locator('.settings')).toHaveCSS('opacity', '0');
+  });
+
+  test('capitals, punctuation and digits are typed with Shift where the Layout puts them', async ({
+    page,
+  }) => {
+    await page.goto('typing-test/?seed=7');
+    await page.getByRole('radio', { name: 'Programmer Dvorak', exact: true }).check();
+    await page.getByRole('checkbox', { name: tool.notes.punctuation }).check();
+    await page.getByRole('checkbox', { name: tool.notes.numbers }).check();
+    await page.getByRole('radio', { name: tool.notes.words, exact: true }).check();
+    await page.getByRole('radio', { name: '50', exact: true }).check();
+    const words = wordStream(seededRandom(7), { punctuation: true, numbers: true })(50).join(' ');
+    // The words have the characters that need Shift on this board.
+    expect(words).toMatch(/[A-Z]/);
+    expect(words).toMatch(/\d/);
+
+    await page.getByLabel(tool.areaLabel, { exact: true }).click();
+    for (const char of words) {
+      const key = locate('programmer-dvorak', char)!;
+      await page.keyboard.press(key.shift ? `Shift+${key.code}` : key.code);
+    }
+
+    await expect(page.getByRole('status')).toHaveText(
+      /^Test done\. \d+ words per minute\. 100% right\.$/,
+    );
   });
 });
 
@@ -138,4 +173,35 @@ test('a touch-only device offers no Layout and no keyboard picture', async ({ pa
   await expect(page.getByRole('radio', { name: tool.notes.words, exact: true })).toBeVisible();
   await expect(page.getByText(tool.notes.layout, { exact: true })).toHaveCount(0);
   await expect(page.locator('.keyboard')).toHaveCount(0);
+});
+
+test('Punctuation and Numbers change the words of the next test, and can be combined', async ({
+  page,
+}) => {
+  await page.goto('typing-test/?seed=7');
+  await page.getByRole('radio', { name: tool.notes.words, exact: true }).check();
+  await page.getByRole('radio', { name: '50', exact: true }).check();
+  const shown = page.locator('.window');
+  const plain = wordStream(seededRandom(7))(50);
+  await expect(shown).toHaveText(plain.join(' '));
+
+  await page.getByRole('checkbox', { name: tool.notes.punctuation }).check();
+  const punctuated = wordStream(seededRandom(7), { punctuation: true })(50);
+  await expect(shown).toHaveText(punctuated.join(' '));
+  // Capitals after a full stop, and some commas, full stops or question marks.
+  await expect(shown).toHaveText(/[.?]"? "?[A-Z]/);
+  await expect(shown).toHaveText(/[,.?]/);
+
+  await page.getByRole('checkbox', { name: tool.notes.numbers }).check();
+  const both = wordStream(seededRandom(7), { punctuation: true, numbers: true })(50);
+  await expect(shown).toHaveText(both.join(' '));
+  await expect(shown).toHaveText(/\d/);
+
+  // The words can still be typed, punctuation and all.
+  await page.getByRole('radio', { name: '10', exact: true }).check();
+  const ten = wordStream(seededRandom(7), { punctuation: true, numbers: true })(10);
+  await page.keyboard.type(ten.join(' '));
+  await expect(page.getByRole('status')).toHaveText(
+    /^Test done\. \d+ words per minute\. 100% right\.$/,
+  );
 });

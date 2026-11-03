@@ -133,6 +133,23 @@ export interface Score {
   characters: { correct: number; wrong: number; extra: number; missed: number };
 }
 
+/**
+ * Characters of the words typed right, with the spaces after them, finished by `until`
+ * milliseconds (any time, by default): what counts toward wpm.
+ */
+export function rightWordCharacters(test: TypingTest, until = Infinity): number {
+  let total = 0;
+  test.typed.forEach((typed, i) => {
+    const target = test.words[i] ?? '';
+    const finishedAt = test.wordEnds[i];
+    if (finishedAt === undefined || finishedAt > until || typed !== target) return;
+    // The space after it counts too, unless it ended the test.
+    const space = finishedAt === test.endedAt && test.typed.length === i + 1 ? 0 : 1;
+    total += target.length + space;
+  });
+  return total;
+}
+
 export function score(test: TypingTest): Score {
   const startedAt = test.startedAt ?? 0;
   const endedAt = test.endedAt ?? test.presses.at(-1)?.at ?? startedAt;
@@ -141,7 +158,6 @@ export function score(test: TypingTest): Score {
     seconds > 0 ? Math.round(characters / 5 / (seconds / 60)) : 0;
 
   const characters = { correct: 0, wrong: 0, extra: 0, missed: 0 };
-  let rightWordCharacters = 0;
   test.typed.forEach((typed, i) => {
     const target = test.words[i] ?? '';
     const finished = i < test.wordEnds.length;
@@ -151,16 +167,11 @@ export function score(test: TypingTest): Score {
       else characters.wrong++;
     }
     if (finished) characters.missed += Math.max(0, target.length - typed.length);
-    if (finished && typed === target) {
-      // The space after it counts too, unless it ended the test.
-      const space = test.wordEnds[i] === test.endedAt && test.typed.length === i + 1 ? 0 : 1;
-      rightWordCharacters += target.length + space;
-    }
   });
 
   const right = test.presses.filter((p) => p.correct).length;
   return {
-    wpm: perMinute(rightWordCharacters),
+    wpm: perMinute(rightWordCharacters(test)),
     rawWpm: perMinute(test.presses.length),
     accuracy: test.presses.length > 0 ? Math.round((right / test.presses.length) * 100) : 0,
     seconds,

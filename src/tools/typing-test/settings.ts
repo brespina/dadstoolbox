@@ -1,5 +1,5 @@
 // The typing test's settings bar: what the visitor can choose before a test.
-// Later switches (Punctuation and Numbers, #90) are new fields here.
+// A new setting is a new field here.
 
 import type { Layout } from './layouts';
 import type { TestLength } from './typing';
@@ -14,6 +14,10 @@ export interface TypingSettings {
   words: (typeof wordChoices)[number];
   /** Which Layout the keys are read as; 'own' is whatever the visitor's keyboard types. */
   layout: Layout;
+  /** Capitals and punctuation in the words. */
+  punctuation: boolean;
+  /** Numbers among the words. */
+  numbers: boolean;
 }
 
 export const defaultSettings: TypingSettings = {
@@ -21,6 +25,8 @@ export const defaultSettings: TypingSettings = {
   seconds: 30,
   words: 25,
   layout: 'own',
+  punctuation: false,
+  numbers: false,
 };
 
 export function testLength(settings: TypingSettings): TestLength {
