@@ -48,6 +48,13 @@ test('a Time test ends on the clock, counted from the first key press', async ({
     /^Test done\. \d+ words per minute\. 100% right\.$/,
   );
   await expect(page.getByText('15 seconds', { exact: true })).toBeVisible();
+
+  // The chart of speed through the test has a text alternative and a table of its numbers.
+  const chart = page.getByRole('img', { name: tool.notes.chartTitle });
+  await expect(chart).toBeVisible();
+  await page.getByText(tool.notes.chartNumbers, { exact: true }).click();
+  await expect(page.getByRole('table', { name: tool.notes.chartTitle })).toBeVisible();
+  await expect(page.getByRole('row')).toHaveCount(16);
 });
 
 test('Ctrl+Backspace clears the word, and a phone keyboard that sends only text works', async ({

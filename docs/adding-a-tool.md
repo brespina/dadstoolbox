@@ -203,8 +203,14 @@ Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage
   maps the physical key to its character before calling `press`. `score(test)` gives wpm,
   raw wpm, accuracy and the letters right, wrong, extra and missed. The test keeps every
   character key press with its time (`presses`) and when each word was finished
-  (`wordEnds`), which is enough to work out the speed at each second for a chart (#92).
+  (`wordEnds`), which is enough to work out the speed at each second for the chart.
+  `rightWordCharacters(test, until?)` counts the characters of the words typed right
+  (with their spaces) finished by a time: what counts toward wpm.
   `wordLetters` gives each letter of a word as it shows.
+- `samples.ts` and `WpmChart.svelte`: `samples(test)` gives the wpm and raw wpm at each
+  second of a finished test (and at the end, if that falls between seconds), as `{ second,
+  wpm, raw }`. `WpmChart` draws them as inline SVG in the Site's tokens, with a text
+  alternative and a table of the numbers, and draws nothing for under two samples.
 - `settings.ts` and `SettingsBar.svelte`: the settings bar. A new setting is a new field
   of `TypingSettings` and a new `ChoiceGroup` or `Switch` in the bar; a changed setting (any field)
   starts a new test.

@@ -23,6 +23,8 @@
   } from './typing';
   import { defaultSettings, testLength, type TypingSettings } from './settings';
   import SettingsBar from './SettingsBar.svelte';
+  import { samples } from './samples';
+  import WpmChart from './WpmChart.svelte';
 
   const { notes } = tool;
   // A Time test takes words in batches of this many, asking for more near the end.
@@ -243,6 +245,7 @@
         </div>
       </dl>
       <p class="raw-hint">{notes.rawHint}</p>
+      <WpmChart samples={samples(test)} />
     </div>
   {:else}
     <p class="counter">{counter}</p>
