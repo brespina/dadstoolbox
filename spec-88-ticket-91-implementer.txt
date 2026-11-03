@@ -1,0 +1,12 @@
+Break note, ticket 91 implementer
+
+Something small I liked: a keyboard layout is just a permutation of where letters sit.
+Dvorak puts the vowels under the left hand's home row and the common consonants under
+the right, so words tend to alternate hands. Colemak keeps most of QWERTY's shortcuts
+where they were. Programmer Dvorak gives up the number row to symbols, since code
+uses them more than digits.
+
+The keyboard picture came out quietly: plain keycaps in the Site's colors, one lit key.
+
+If I had a free afternoon, I would type slowly in Dvorak and watch my hands argue with
+the muscle memory.
