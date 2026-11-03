@@ -110,3 +110,21 @@ test('play a round of Drills in Lesson 4 with f, t and ;', async ({ page }) => {
   );
   await expect(page.getByText(/^Drill 1: \d+ keys, 3 more than the fewest$/)).toBeVisible();
 });
+
+test('play a round of Drills in Lesson 7 (Mixed) with every motion', async ({ page }) => {
+  await page.goto('vim-practice/?seed=4');
+  await page.getByRole('radio', { name: 'Mixed', exact: true }).check();
+  const { drills } = newRound(6, seededRandom(4));
+  await page.getByLabel(tool.areaLabel, { exact: true }).focus();
+
+  for (const [i, drill] of drills.entries()) {
+    await expect(page.getByText(`${i + 1}/10`, { exact: true })).toBeVisible();
+    for (const key of shortest(drill, 6)) await page.keyboard.press(key);
+  }
+
+  const fewest = drills.reduce((sum, drill) => sum + drill.fewest, 0);
+  await expect(page.getByRole('status')).toHaveText(
+    new RegExp(`with ${fewest} key presses\\. The fewest possible was ${fewest}\\.$`),
+  );
+  await expect(page.getByText(tool.notes.noExtra)).toBeVisible();
+});

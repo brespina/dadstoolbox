@@ -227,7 +227,7 @@ Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage
 ### Vim practice
 
 `src/tools/vim-practice/` holds the second Practice Tool. Its parts, for the work that adds
-motions and Lessons (#95 adds Lessons 6 and 7):
+motions and Lessons:
 
 - `vim.ts`: the engine. `motions` is a table of every motion, keyed by the keys that type
   it (`w`, or `gg` for two keys). Each `Motion` says what a count does (`repeat`: the
@@ -243,6 +243,18 @@ motions and Lessons (#95 adds Lessons 6 and 7):
   that no allowed motion continues is ignored. A motion with `takesChar` (f, F, t, T)
   takes the next single character as its last argument, whatever it is. `repeatsFind`
   marks the motions that read `lastFind` (`;` and `,`).
+  `{` and `}` follow Vim's `findpar` and `%` its `findmatchlimit`, for the texts the
+  Lessons use: a paragraph boundary is an empty line (a line of spaces is not one); `}`
+  onto the last line lands on its last character, even from that line; a count that runs
+  out of paragraphs before its last step fails, and any failed `{` or `}` still makes the
+  cursor's own column the one wanted. `%` jumps from the bracket under the cursor, or the
+  next one on the line, to its match among brackets of the same kind; with a
+  count it is Vim's `N%` instead, N percent down the text at the first non-blank, which
+  the search doesn't try because `G` is never more keys (`round.test.ts` checks that).
+  Vim also treats a line starting with `.` or a form feed as
+  a paragraph boundary, skips brackets in double quotes, comments and after a backslash,
+  and reads `#` lines: Lessons 6 and 7 keep their texts free of all of these, and
+  `round.test.ts` checks that.
 - `fewest.ts`: `fewestKeys(text, cursor, allowed)` searches outward by key presses with
   the engine's own motions and gives the fewest keys to every place within 6 presses (a
   count's digits included, Shift not counted). It tells cursors apart by place, wanted
@@ -255,12 +267,17 @@ motions and Lessons (#95 adds Lessons 6 and 7):
   through both; Vim's `:normal` stops at the first failed motion, so type each motion
   as its own `:normal!`.
 - `lessons.ts`: the Lessons as data. Each lists the motions it `adds` and its own
-  `texts`; `lessonMotions(i)` allows a Lesson's motions and every earlier one's. The rules
-  for texts are at the top of the file and checked in `round.test.ts`, which also checks
-  every character of every text can be reached.
+  `texts`; `lessonMotions(i)` allows a Lesson's motions and every earlier one's. The radio
+  button's name is the motions it adds, or its `label` (Mixed, the last Lesson, adds none
+  and so has one: it allows every motion, on longer texts). The rules for texts are at the
+  top of the file and checked in `round.test.ts`, which also checks every character of
+  every text can be reached.
 - `round.ts`: a round of 10 Drills (`newRound`, `press`, `results`). A Drill's target is
   drawn among places the Lesson's motions reach in 2 keys or more, preferring places
-  where the Lesson's own motions save keys over the earlier Lessons'.
+  where the Lesson's own motions save keys over the earlier Lessons' (a Lesson that adds
+  none skips that second search). A round of Mixed, with every motion, draws in about
+  0.15 s on a laptop; `round.test.ts` guards it. A new motion with state of its own must
+  follow the search's rule for `lastFind`, or Mixed gets slow.
 
 ## The `run` contract
 

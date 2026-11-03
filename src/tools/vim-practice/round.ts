@@ -55,7 +55,10 @@ function newDrill(lesson: number, random: Random): Drill {
   const start = pick(random, nonBlankPlaces(text));
   const cursor = { ...start, want: start.col };
   const reach = fewestKeys(text, cursor, lessonMotions(lesson));
-  const before = lesson > 0 ? fewestKeys(text, cursor, lessonMotions(lesson - 1)) : undefined;
+  // A Lesson that adds no motions (Mixed) has nothing to prefer, so skips the second search.
+  const adds = lessons[lesson]!.adds.length > 0;
+  const before =
+    adds && lesson > 0 ? fewestKeys(text, cursor, lessonMotions(lesson - 1)) : undefined;
   const targets = nonBlankPlaces(text).filter(
     (place) => (reach.get(placeKey(place)) ?? 0) >= fewestForADrill,
   );

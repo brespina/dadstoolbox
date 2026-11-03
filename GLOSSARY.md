@@ -41,7 +41,7 @@ Which letter each key of a keyboard types, such as QWERTY, Colemak or Dvorak. Th
 _Avoid_: Keymap, keyboard setting
 
 **Lesson**:
-One step of Vim practice: a set of Vim motions to learn, which also allows the motions of the Lessons before it.
+One step of Vim practice: a set of Vim motions to learn, which also allows the motions of the Lessons before it. The last Lesson, Mixed, adds none and allows every motion.
 _Avoid_: Level, chapter, unit
 
 **Drill**:

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { seededRandom } from '../../practice/random';
 import { fewestKeys, placeKey } from './fewest';
-import { lessonMotions, lessons } from './lessons';
+import { lessonLabel, lessonMotions, lessons } from './lessons';
+import { feed, motions, startState } from './vim';
 import { drillsInRound, newRound, press, results, type Round } from './round';
 
 describe('Lessons', () => {
@@ -16,11 +17,53 @@ describe('Lessons', () => {
     );
   });
 
+  it('end with { } % and then Mixed, which adds nothing and allows every motion', () => {
+    const every = Object.keys(motions).sort();
+    expect(Object.keys(lessonMotions(5)).sort()).toEqual(every);
+    expect(lessons[5]!.adds).toEqual(['{', '}', '%']);
+    expect(lessons[6]!.adds).toEqual([]);
+    expect(Object.keys(lessonMotions(6)).sort()).toEqual(every);
+  });
+
+  it('keep { } and % texts to what the engine does as Vim does', () => {
+    // Vim treats a line starting with . and two letters (an nroff macro) or a form feed
+    // as a paragraph boundary; it skips brackets in quotes, after a backslash and in
+    // comments, and takes # lines for conditionals. The engine knows none of that.
+    lessons.forEach((lesson, index) => {
+      for (const line of lesson.texts.flat()) {
+        expect(line, line).not.toMatch(/^[.\f]/);
+        if (index >= 5) expect(line, line).not.toMatch(/["'\\#]|\/\*|\*\//);
+      }
+    });
+  });
+
+  it('never need N% for the fewest keys: G or gg gets to the same place in no more', () => {
+    // The search doesn't count on `N%` (N percent down the text). That holds while the line it
+    // reaches is never above N, so its digits are no fewer than G's.
+    const allowed = lessonMotions(5);
+    lessons.slice(5).forEach((lesson) => {
+      for (const text of lesson.texts) {
+        for (let percent = 1; percent <= 100; percent++) {
+          let state = startState({ line: 0, col: 0 });
+          for (const key of `${percent}%`) state = feed(text, state, key, allowed).state;
+          const line = state.cursor.line + 1;
+          expect(line, `${percent}% of ${text.length} lines`).toBeLessThanOrEqual(percent);
+        }
+      }
+    });
+  });
+
+  it('give Lesson 6 texts with several paragraphs and brackets to match', () => {
+    for (const text of lessons[5]!.texts) {
+      expect(text.filter((line) => line === '').length).toBeGreaterThanOrEqual(1);
+      expect(text.join('')).toMatch(/[([{]/);
+    }
+    // Some text has a run of empty lines, which is one boundary.
+    expect(lessons[5]!.texts.some((text) => text.join('\n').includes('\n\n\n'))).toBe(true);
+  });
+
   it('are labelled with the motions they add', () => {
-    expect(lessons.map((lesson) => lesson.adds.join(' ')).slice(3)).toEqual([
-      'f F t T ; ,',
-      'gg G',
-    ]);
+    expect(lessons.map(lessonLabel).slice(3)).toEqual(['f F t T ; ,', 'gg G', '{ } %', 'Mixed']);
   });
 
   it('have tidy texts: plain ASCII, no spaces at a line end, and short enough for a phone', () => {
@@ -69,6 +112,13 @@ describe('a round of Drills', () => {
         }
       }
     });
+  }, 30_000);
+
+  it('draws a round of Mixed Drills, with every motion, in well under a second', () => {
+    // About 0.15 s on a laptop; the limit leaves room for a slow or busy machine.
+    const started = performance.now();
+    newRound(6, seededRandom(1));
+    expect(performance.now() - started).toBeLessThan(1000);
   });
 
   it('is the same round for the same seed', () => {

@@ -10,8 +10,15 @@ import { motions, type Motions, type Text } from './vim';
 export interface Lesson {
   /** The motions this Lesson adds, as keys of the engine's `motions`. */
   adds: readonly (keyof typeof motions)[];
+  /** The name on its radio button, when the motions it adds aren't a good one. */
+  label?: string;
   /** The texts its Drills are drawn from. */
   texts: readonly Text[];
+}
+
+/** The name on a Lesson's radio button: its `label`, else the motions it adds. */
+export function lessonLabel(lesson: Lesson): string {
+  return lesson.label ?? lesson.adds.join(' ');
 }
 
 export const lessons: readonly Lesson[] = [
@@ -138,6 +145,103 @@ export const lessons: readonly Lesson[] = [
         'Line eight is one more.',
         'Line nine is the last but one.',
         'Line ten is the end.',
+      ],
+    ],
+  },
+  {
+    // Paragraphs split by empty lines (some by two) for { and }, and brackets for %.
+    // No quotes, backslashes, # or comments: Vim's % treats those specially.
+    adds: ['{', '}', '%'],
+    texts: [
+      [
+        'Eggs, milk and flour.',
+        'Mix them well (not too long).',
+        '',
+        'Pour the batter in.',
+        'Wait for the edges',
+        'to turn brown.',
+        '',
+        '',
+        'Flip it over once.',
+        'Serve it hot.',
+        '',
+        'Wash up (then rest).',
+      ],
+      [
+        'function area(w, h) {',
+        '  return w * h;',
+        '}',
+        '',
+        'function double(n) {',
+        '  return (n + n);',
+        '}',
+        '',
+        'console.log(area(2, double(4)));',
+      ],
+      [
+        'total = (price * (n + 1)) / 2;',
+        'list = [first, [second, third]];',
+        'item = {a: [1, 2], b: (3 + 4)};',
+        '',
+        'if (x > (y + 1)) {',
+        '  run(a, (b + c));',
+        '}',
+      ],
+      [
+        'const config = {',
+        '  size: [10, 20],',
+        '  scale: (1 + 2) * 3,',
+        '};',
+        '',
+        '',
+        'const sum = (a, b) => {',
+        '  return a + b;',
+        '};',
+      ],
+    ],
+  },
+  {
+    // Every motion, on longer texts that mix prose and code.
+    adds: [],
+    label: 'Mixed',
+    texts: [
+      [
+        'Shopping list (for Saturday)',
+        'eggs, milk, butter, flour',
+        '',
+        'Chores [do before noon]',
+        'sweep the porch',
+        'water the plants, then rest',
+        '',
+        'Call Mum (she is out until 5).',
+      ],
+      [
+        'function pick(list, n) {',
+        '  const out = [];',
+        '  for (let i = 0; i < n; i++) {',
+        '    out.push(list[i]);',
+        '  }',
+        '  return out;',
+        '}',
+        '',
+        'pick([4, 8, 15, 16, 23, 42], 3);',
+      ],
+      [
+        'Dear Sam,',
+        '',
+        'Thanks for the book (the red',
+        'one). I read it in two days,',
+        'end to end.',
+        '',
+        'See you soon, Dad',
+      ],
+      [
+        'let grid = [[1, 2], [3, 4]];',
+        'sum = (grid[0][0] + grid[1][1]);',
+        '',
+        'if (sum > 4) {',
+        '  show(sum, (sum * 2));',
+        '}',
       ],
     ],
   },
