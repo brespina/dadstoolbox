@@ -1,5 +1,5 @@
 // The typing test's settings bar: what the visitor can choose before a test.
-// Later switches (Punctuation and Numbers, #90; Layout, #91) are new fields here.
+// Later switches (Punctuation and Numbers, #90) are new fields here.
 
 import type { Layout } from './layouts';
 import type { TestLength } from './typing';

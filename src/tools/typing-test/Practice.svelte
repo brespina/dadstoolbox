@@ -120,6 +120,16 @@
     return String(Math.max(0, Math.ceil(left / 1000)));
   });
 
+  /** The character a key press types: from the Layout's map, else the key's own name. */
+  function typedChar(event: KeyboardEvent): string {
+    const mapped = resolve(layout, event.code, event.shiftKey);
+    if (mapped === null) return event.key.length === 1 ? event.key : '';
+    // Caps Lock turns a letter's case round, as it does on a real keyboard.
+    const letter = mapped.toLowerCase() !== mapped.toUpperCase();
+    if (!letter || !event.getModifierState('CapsLock')) return mapped;
+    return mapped === mapped.toLowerCase() ? mapped.toUpperCase() : mapped.toLowerCase();
+  }
+
   function onkeydown(event: KeyboardEvent) {
     // Tab moves to Restart as usual; shortcuts such as Ctrl+R stay the browser's.
     if (event.key === 'Tab' || event.isComposing || event.metaKey) return;
@@ -131,8 +141,7 @@
       send({ type: event.ctrlKey || event.altKey ? 'clearWord' : 'backspace', at });
     } else if (!event.ctrlKey) {
       // With a Layout, the key's place on the board says what it types, not its name.
-      const char =
-        resolve(layout, event.code, event.shiftKey) ?? (event.key.length === 1 ? event.key : '');
+      const char = typedChar(event);
       if (!char) return;
       event.preventDefault();
       now = at;
