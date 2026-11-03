@@ -28,3 +28,24 @@ test('type a 10-word test, see the results, and restart with Tab then Enter', as
   await expect(page.getByText(tool.notes.accuracy, { exact: true })).toHaveCount(0);
   await expect(page.getByLabel(tool.areaLabel, { exact: true })).toBeFocused();
 });
+
+test('a Time test ends on the clock, counted from the first key press', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('typing-test/?seed=7');
+  await page.getByRole('radio', { name: '15', exact: true }).check();
+  await page.getByLabel(tool.areaLabel, { exact: true }).click();
+  // Time before the first key press doesn't count.
+  await page.clock.runFor(20_000);
+  await expect(page.getByRole('status')).toHaveText('');
+
+  const words = wordStream(seededRandom(7))(3);
+  await page.keyboard.type(`${words.join(' ')} `);
+  await page.clock.runFor(13_000);
+  await expect(page.getByRole('status')).toHaveText('');
+  await page.clock.runFor(2_500);
+
+  await expect(page.getByRole('status')).toHaveText(
+    /^Test done\. \d+ words per minute\. 100% right\.$/,
+  );
+  await expect(page.getByText('15 seconds', { exact: true })).toBeVisible();
+});

@@ -218,7 +218,7 @@
         </div>
         <div>
           <dt>{notes.test}</dt>
-          <dd>
+          <dd class="in-words">
             {test.length.kind === 'time'
               ? fillText(notes.testTime, { seconds: test.length.seconds })
               : fillText(notes.testWords, { count: test.length.count })}
@@ -233,7 +233,7 @@
       <div class="lines" bind:this={lines} style:transform={`translateY(${-scrolled}px)`}>
         {#each test.words as target, i (i)}
           {@const typed = test.typed[i] ?? ''}
-          <span class="word" class:missed={i < current && typed !== target}>
+          <span class="word" class:wrong-word={i < current && typed !== target}>
             {#each wordLetters(target, typed) as letter, l (l)}
               <span class="letter {letter.kind}">{letter.char}</span>
             {/each}
@@ -327,7 +327,8 @@
     display: inline-block;
   }
 
-  .word.missed {
+  /* A word moved on from with a mistake in it. */
+  .word.wrong-word {
     text-decoration: underline var(--problem) 2px;
     text-underline-offset: 0.3em;
   }
@@ -429,7 +430,7 @@
     border-top: 1px solid var(--line);
   }
 
-  .details dd {
+  .details dd:not(.in-words) {
     font-family: var(--mono);
     font-variant-numeric: tabular-nums;
   }

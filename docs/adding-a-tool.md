@@ -13,6 +13,9 @@ be added.
 
 ## The steps
 
+These steps are for a Tool that makes something to save. A Practice Tool, where the
+visitor practises on the page, is built differently: see [Practice Tools](#practice-tools).
+
 1. **Copy the template.** Copy `src/tools/_template/` to `src/tools/<address>/`, where
    `<address>` is the Tool's address in plain words, such as `change-image-type`. Drop the
    leading `_`: folders starting with `_` are skipped everywhere, which is why the
@@ -75,11 +78,11 @@ field is required.
 | `address`          | The Tool's flat address in plain words, such as `split-pdf`. The page is `…/dadstoolbox/<address>/`. Categories are not part of it.                                                                                                                                                                |
 | `name`             | The Tool's name, written as a task: "Split a PDF", "Change image file type". The page heading and home page row.                                                                                                                                                                                   |
 | `blurb`            | One line in everyday words that names the visitor's problem: "iPhone photo won't open or upload?".                                                                                                                                                                                                 |
-| `category`         | One of the fixed Categories, in order: `Photos`, `PDFs`, `Video`, `Other`.                                                                                                                                                                                                                         |
+| `category`         | One of the fixed Categories, in order: `Photos`, `PDFs`, `Video`, `Practice`, `Other`.                                                                                                                                                                                                                      |
 | `position`         | Order within the Category, lowest first. Keep it unique within the Category.                                                                                                                                                                                                                       |
 | `noun`             | What the Tool takes, as `{ one, many }`, such as `{ one: 'PDF', many: 'PDFs' }`. Used in the privacy line, the Choose button ("Choose PDFs") and Batch labels ("3 PDFs").                                                                                                                         |
 | `accept`           | File types for the Choose button: types such as `application/pdf` and endings such as `.pdf`. List both, because phones are not consistent.                                                                                                                                                        |
-| `input`            | The input mode: `each`, `together` or `none`. See [Input modes](#input-modes).                                                                                                                                                                                                                     |
+| `input`            | The input mode: `each`, `together` or `none`. See [Input modes](#input-modes). (`practice` is set by `definePracticeTool`; see [Practice Tools](#practice-tools).)                                                                                                                                                                                                                     |
 | `needs`            | Browser features `run` needs: `webcodecs` (reading video) and `makeVideo` (making video). They are checked when the page runs. Where one is missing, the home page row and the Tool page say "Doesn't work on this browser yet" and Choose is greyed out. Add a new feature to the `BrowserFeature` type in `types.ts` if it is missing. |
 | `largeFileLimit`   | A size in bytes. A file bigger than this gets a note on its Ready row warning it may be slow or stop partway on a phone. It does not stop the file. Set it from what a phone can really handle.                                                                                                    |
 | `largeFileNote`    | Optional. That note. Defaults to "This {noun} is big for a phone. It may take a few minutes or stop partway." with the Tool's noun (one) swapped in.                                                                                                                                          |
@@ -146,6 +149,64 @@ them as one vector path. A logo (`style.logo`, a `File`) sits on a patch with no
 (`logoPlace` in `shapes.ts`), and the code then uses the strongest error correction (H).
 Its pixels come from the browser's canvas (`src/qr/paint-logo.ts`); `drawQr` takes that
 step as its third argument, so tests pass a stand-in.
+
+## Practice Tools
+
+A **Practice Tool** (see the glossary) lets the visitor practise a skill on the page,
+such as the Typing test. It makes nothing to save, so it has no `run`, options component
+or sample file ([ADR-0005](adr/0005-practice-tools-are-their-own-page.md)). Its folder
+holds two files, plus its own plain TypeScript and tests:
+
+| File               | What it holds                                                                                                                                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `declaration.ts`   | The declaration, made with `definePracticeTool` (plain data, as for every Tool): `address`, `name`, `blurb`, `category` (usually `Practice`), `position`, `privacyLine`, `areaLabel`, `notes`, and optionally `needs`.                   |
+| `Practice.svelte`  | The whole interactive page, shown under the shared back link, heading, blurb and privacy line. It takes no props: it imports its own declaration.                                                                                     |
+
+Add the thin page at `src/pages/<address>.astro` as for any Tool. The input mode is
+`practice`; `definePracticeTool` sets it and leaves the fields for files and results
+(noun, accept, start button and the rest) empty. The run loader skips the Tool, and the
+Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage.svelte`.
+
+- **`areaLabel`** names the practice area, the part that takes the visitor's key
+  presses. Give that element this label (`aria-label`); the generated page test finds the
+  area by it and checks it takes focus.
+- **`notes`** holds every word the page shows, by key, so the banned-words scan reads
+  them. `definePracticeTool` keeps the keys' types, so `tool.notes.restart` is checked.
+- **Logic in plain TypeScript.** Keep what the Tool does (the words, the key presses, the
+  score) in pure modules next to the page, tested with Vitest, and keep the page to
+  turning events into calls and showing the state.
+- **Random, but repeatable.** Draw with `pageRandom(location.search)` from
+  `src/practice/random.ts`: it is seeded by `?seed=<number>` in the page's address, so a
+  page test can type known words, and different every visit otherwise. `seededRandom`
+  gives the same source to a Vitest or page test.
+- **Settings.** `src/practice/ChoiceGroup.svelte` is one labelled row of choices (radio
+  buttons, at least 44 × 44 px), for a settings bar.
+- **Fixed-width text.** Use the `--mono` token from `src/styles/base.css`, the device's own
+  fixed-width font.
+- **The Promise.** Keep nothing: no `localStorage`, no personal bests. Make no outside
+  requests.
+
+### The Typing test
+
+`src/tools/typing-test/` is the worked example. Its parts, for the work that builds on it:
+
+- `words.ts`: our own list of about 200 common words (`commonWords`), and `wordStream(random,
+  options)`, which gives the next words on each call. A Time test asks for more as it goes.
+  `WordOptions` is empty; the Punctuation and Numbers switches (#90) are added there.
+- `typing.ts`: the test as a pure reducer. `press(test, key)` takes one `KeyPress`: a
+  `char` with the character already worked out (a space moves on), `backspace`,
+  `clearWord` or `tick` (time passing), each with a time in milliseconds. A Layout (#91)
+  maps the physical key to its character before calling `press`. `score(test)` gives wpm,
+  raw wpm, accuracy and the letters right, wrong, extra and missed. The test keeps every
+  character key press with its time (`presses`) and when each word was finished
+  (`wordEnds`), which is enough to work out the speed at each second for a chart (#92).
+  `wordLetters` gives each letter of a word as it shows.
+- `settings.ts` and `SettingsBar.svelte`: the settings bar. A new setting is a new field
+  of `TypingSettings` and a new `ChoiceGroup` in the bar; a changed setting starts a new
+  test.
+- `Practice.svelte`: the page. Key presses land on an unseen text box over the words, so
+  a phone opens its keyboard there. A key with a known character is read on keydown; a
+  phone keyboard that names no key is read from the text it would type.
 
 ## The `run` contract
 
@@ -347,7 +408,10 @@ Options must work for phones and keyboards: every tappable thing at least 44 × 
   on the home page under its Category, then opens the page, chooses `sample.<ext>`,
   presses start and waits for Save and the "All done" message. A Tool in input mode
   `none` types `sample.txt` instead, or, with no type box, fills each field named in
-  `sample.json`, then waits for the picture and saves it. Each page test also runs
+  `sample.json`, then waits for the picture and saves it. A Practice Tool's test opens
+  the page and checks the heading, the privacy line, the back link and that the area
+  named by `areaLabel` takes focus; what the Tool does is tested in its own page test,
+  such as `tests/e2e/typing-test.spec.ts`. Each page test also runs
   an accessibility check in both themes and fails on any request that leaves the Site.
 
 Ports, WebKit on this machine, and slow tests: see `docs/agents/testing.md`.
