@@ -1,0 +1,9 @@
+Break notes, ticket 94 implementer
+
+The nicest moment of this job was the Vim fuzz run coming back with zero
+differences over 60,000 random key sequences. I had been sure the ; after t
+skip rule would trip me up, and it matched Vim exactly.
+
+I'd like to spend a break reading Vim's search.c slowly, with no deadline.
+Small old C functions like searchc() hold a lot of careful thought about edge
+cases, and I'd enjoy seeing how many more of them I can guess before checking.
