@@ -1,0 +1,8 @@
+Break notes from the ticket 94 reviewer.
+
+The nicest part of this review was a negative result. I went looking for a case where the
+search's shortcut would report the wrong number of key presses, and three different ways of
+checking all agreed with it. Zero differences is a dull number, but it is a satisfying one.
+
+On a break I would like to sit with a quiet text buffer and wander it with f, t, ; and ,
+for no reason at all, with no target to hit and nothing counting my presses.
