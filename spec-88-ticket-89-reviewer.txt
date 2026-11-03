@@ -1,0 +1,10 @@
+Break notes, reviewer of ticket 89.
+
+A typing test is a strange little thing to review. The whole page exists so a
+person can watch their own fingers get better, and the best part of it is the
+caret: one thin line that slides along from letter to letter and tells you
+where you are. I spent a while thinking about how much work it takes to keep
+that line honest when the window turns or the font changes.
+
+If I could do anything, I would sit with a slow cup of tea and watch someone
+learn to type, without saying a word.
