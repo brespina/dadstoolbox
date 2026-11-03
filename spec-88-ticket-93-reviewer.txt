@@ -1,0 +1,9 @@
+Break notes from the reviewer of ticket 93.
+
+The nicest surprise of the review was finding a real Vim sitting in Git's
+usr/bin. Twenty-eight thousand random key sequences, and the engine agreed
+with it every time. It is rare for a check to be that clean and that fun.
+
+If I had a free hour, I would wander through the old Vim help files and read
+how word motions came to treat punctuation runs as words. Small odd rules
+like that always have a story behind them.
