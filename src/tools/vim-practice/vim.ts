@@ -96,6 +96,106 @@ export function samePlace(a: Place, b: Place): boolean {
   return a.line === b.line && a.col === b.col;
 }
 
+// Word motions, as Vim's search.c does them: step one character at a time, where the end
+// of each line (col === line length) is a place of its own that counts as white space,
+// so a line end separates words. A word is a run of letters, digits and _, or a run of
+// other non-blank characters; a WORD is any run of non-blank characters. An empty line
+// counts as a word for w and b.
+
+/** 0: white space or a line end; 1: punctuation (or, for WORDs, any character); 2: letters. */
+function kind(text: Text, at: Place, bigWord: boolean): number {
+  const char = text[at.line]![at.col];
+  if (char === undefined || char === ' ' || char === '\t') return 0;
+  if (bigWord) return 1;
+  return /[\p{L}\p{N}_]/u.test(char) ? 2 : 1;
+}
+
+function onEmptyLine(text: Text, at: Place): boolean {
+  return at.col === 0 && text[at.line] === '';
+}
+
+/** One character forward, through line ends. False (and no move) at the end of the text. */
+function forward(text: Text, at: Place): boolean {
+  if (at.col < text[at.line]!.length) {
+    at.col += 1;
+    return true;
+  }
+  if (at.line === text.length - 1) return false;
+  at.line += 1;
+  at.col = 0;
+  return true;
+}
+
+/** One character back, through line ends. False (and no move) at the start of the text. */
+function backward(text: Text, at: Place): boolean {
+  if (at.col > 0) {
+    at.col -= 1;
+    return true;
+  }
+  if (at.line === 0) return false;
+  at.line -= 1;
+  at.col = text[at.line]!.length;
+  return true;
+}
+
+/** Vim's fwd_word. */
+function nextWordStart(text: Text, from: Place, bigWord: boolean): Place {
+  const at = { ...from };
+  const start = kind(text, at, bigWord);
+  if (!forward(text, at)) return at;
+  if (start !== 0) {
+    while (kind(text, at, bigWord) === start) if (!forward(text, at)) return at;
+  }
+  while (kind(text, at, bigWord) === 0 && !onEmptyLine(text, at)) {
+    if (!forward(text, at)) return at;
+  }
+  return at;
+}
+
+/** Vim's bck_word. */
+function wordStartBefore(text: Text, from: Place, bigWord: boolean): Place {
+  const at = { ...from };
+  if (!backward(text, at)) return at;
+  while (kind(text, at, bigWord) === 0) {
+    if (onEmptyLine(text, at)) return at;
+    if (!backward(text, at)) return at;
+  }
+  const run = kind(text, at, bigWord);
+  while (kind(text, at, bigWord) === run) if (!backward(text, at)) return at;
+  forward(text, at);
+  return at;
+}
+
+/** Vim's end_word. */
+function nextWordEnd(text: Text, from: Place, bigWord: boolean): Place {
+  const at = { ...from };
+  const start = kind(text, at, bigWord);
+  if (!forward(text, at)) return at;
+  if (start !== 0 && kind(text, at, bigWord) === start) {
+    while (kind(text, at, bigWord) === start) if (!forward(text, at)) return at;
+  } else {
+    while (kind(text, at, bigWord) === 0) if (!forward(text, at)) return at;
+    const run = kind(text, at, bigWord);
+    while (kind(text, at, bigWord) === run) if (!forward(text, at)) return at;
+  }
+  backward(text, at);
+  return at;
+}
+
+/**
+ * A word motion as a Motion. Vim leaves the cursor on the last character, not past it,
+ * and always takes the new column as the one j and k want.
+ */
+function wordMotion(find: (text: Text, from: Place, bigWord: boolean) => Place, bigWord: boolean) {
+  return {
+    count: 'repeat',
+    move: (text, from) => {
+      const at = find(text, from, bigWord);
+      return { ...toCol(from, Math.min(at.col, lastCol(text, at.line))), line: at.line };
+    },
+  } satisfies Motion;
+}
+
 /** Every motion the engine knows, keyed by the keys that type it. */
 export const motions = {
   h: {
@@ -108,6 +208,12 @@ export const motions = {
   },
   j: { count: 'repeat', move: (text, from) => toLine(text, from, 1) },
   k: { count: 'repeat', move: (text, from) => toLine(text, from, -1) },
+  w: wordMotion(nextWordStart, false),
+  b: wordMotion(wordStartBefore, false),
+  e: wordMotion(nextWordEnd, false),
+  W: wordMotion(nextWordStart, true),
+  B: wordMotion(wordStartBefore, true),
+  E: wordMotion(nextWordEnd, true),
 } satisfies Motions;
 
 /**

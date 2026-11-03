@@ -89,3 +89,63 @@ describe('counts and Escape', () => {
     expect(outcomes).toEqual(['count', 'moved', 'cancelled', 'cancelled', 'ignored']);
   });
 });
+
+describe('w, b and e', () => {
+  it('w moves to the start of the next word, where letters and punctuation are separate words', () => {
+    expect(keys('|foo.bar baz', 'w')).toBe('foo|.bar baz');
+    expect(keys('|foo.bar baz', 'ww')).toBe('foo.|bar baz');
+    expect(keys('|foo.bar baz', '3w')).toBe('foo.bar |baz');
+    expect(keys('|foo-bar()', '3w')).toBe('foo-bar|()');
+  });
+
+  it('w crosses lines, stops on an empty line, and skips a line of spaces', () => {
+    expect(keys('foo |bar\n  baz', 'w')).toBe('foo bar\n  |baz');
+    expect(keys('foo |bar\n\nbaz', 'w')).toBe('foo bar\n|\nbaz');
+    expect(keys('foo |bar\n\nbaz', 'ww')).toBe('foo bar\n\n|baz');
+    expect(keys('foo |bar\n   \nbaz', 'w')).toBe('foo bar\n   \n|baz');
+  });
+
+  it('w on the last word goes to the last character, and no further', () => {
+    expect(keys('foo |bar', 'w')).toBe('foo ba|r');
+    expect(keys('foo |bar', 'ww')).toBe('foo ba|r');
+    expect(keys('|a b c d', '9w')).toBe('a b c |d');
+  });
+
+  it('e moves to the end of the word, or of the next word when already at the end', () => {
+    expect(keys('|foo.bar', 'e')).toBe('fo|o.bar');
+    expect(keys('|foo.bar', 'ee')).toBe('foo|.bar');
+    expect(keys('|foo.bar', '3e')).toBe('foo.ba|r');
+    expect(keys('|a b', 'e')).toBe('a |b');
+  });
+
+  it('e crosses lines without stopping on empty ones, and stops at the end of the text', () => {
+    expect(keys('fo|o\n\nbar', 'e')).toBe('foo\n\nba|r');
+    expect(keys('fo|o', 'e')).toBe('fo|o');
+  });
+
+  it('b moves to the start of the word, or of the word before', () => {
+    expect(keys('foo ba|r', 'b')).toBe('foo |bar');
+    expect(keys('foo.bar |baz', 'b')).toBe('foo.|bar baz');
+    expect(keys('foo.bar |baz', '2b')).toBe('foo|.bar baz');
+    expect(keys('foo bar\n|baz', 'b')).toBe('foo |bar\nbaz');
+    expect(keys('  |foo', 'b')).toBe('|  foo');
+  });
+
+  it('b stops on an empty line and at the start of the text', () => {
+    expect(keys('foo\n\n|bar', 'b')).toBe('foo\n|\nbar');
+    expect(keys('foo\n\n|bar', 'bb')).toBe('|foo\n\nbar');
+    expect(keys('|foo', 'b')).toBe('|foo');
+  });
+
+  it('W, B and E count only spaces between words', () => {
+    expect(keys('|foo.bar baz', 'W')).toBe('foo.bar |baz');
+    expect(keys('|foo.bar baz', 'E')).toBe('foo.ba|r baz');
+    expect(keys('foo.bar ba|z', 'B')).toBe('foo.bar |baz');
+    expect(keys('foo.bar ba|z', '2B')).toBe('|foo.bar baz');
+    expect(keys('|a.b c.d\n\ne.f', '2W')).toBe('a.b c.d\n|\ne.f');
+  });
+
+  it('j wants the column a word motion moved to', () => {
+    expect(keys('|foo bar\nabcdefgh', 'wj')).toBe('foo bar\nabcd|efgh');
+  });
+});
