@@ -40,7 +40,9 @@ export function fewestKeys(
   // 0 for no find yet, else one number for each kind of find and character.
   const findIndex = (cursor: Cursor) =>
     cursor.lastFind
-      ? 1 + findKinds.indexOf(cursor.lastFind.kind) * chars.length + chars.indexOf(cursor.lastFind.char)
+      ? 1 +
+        findKinds.indexOf(cursor.lastFind.kind) * chars.length +
+        chars.indexOf(cursor.lastFind.char)
       : 0;
   const cursorKey = (cursor: Cursor) =>
     ((cursor.line * width + cursor.col) * width + Math.min(cursor.want, width - 1)) *
@@ -63,6 +65,7 @@ export function fewestKeys(
   const seen = new Map<number, number>([[cursorKey(from), 0]]);
   // Cursors waiting to be looked at, by the keys it took to reach them.
   const waiting: Cursor[][] = [[from]];
+  const plainLooked = new Set<number>();
   const reached = (next: Cursor, total: number) => {
     const place = placeKey(next);
     if ((fewest.get(place) ?? Infinity) > total) fewest.set(place, total);
@@ -76,29 +79,53 @@ export function fewestKeys(
 
   for (let keys = 0; keys < mostKeys; keys++) {
     for (const cursor of waiting[keys] ?? []) {
-      if (seen.get(cursorKey(cursor))! < keys) continue;
+      const key = cursorKey(cursor);
+      if (seen.get(key)! < keys) continue;
       const budget = mostKeys - keys;
+      // Every motion but ; and , acts the same whatever the last find was, so cursors
+      // that differ only in it share one look (the first, which is the cheapest).
+      const plainKey = key - findIndex(cursor);
+      const plain = !plainLooked.has(plainKey);
+      plainLooked.add(plainKey);
       for (const { motion, keys: motionKeys, steps } of motionList) {
         if (motionKeys > budget) continue;
+        if (motion.repeatsFind ? !cursor.lastFind : !plain) continue;
+        // The last find only matters to a ; or , typed right after it (or after another
+        // ; or ,): a find, then other keys, then ; is never cheaper than those keys, then
+        // the find. So any other motion forgets it, and a find that goes nowhere (which
+        // only sets it) is left out. This keeps the cursors the search looks at few.
+        const arrive = (next: Cursor, total: number) => {
+          if (motion.takesChar) {
+            const stayed = next.line === cursor.line && next.col === cursor.col;
+            if (!stayed || next.want !== cursor.want) reached(next, total);
+          } else if (motion.repeatsFind || !next.lastFind) reached(next, total);
+          else reached({ ...next, lastFind: undefined }, total);
+        };
         // The characters this motion is tried with: none, or each one on this line.
         const typedChars = motion.takesChar ? lineChars[cursor.line]! : [undefined];
         for (const char of typedChars) {
           if (motion.count === 'none') {
-            reached(runMotion(text, cursor, motion, undefined, char), keys + motionKeys);
+            arrive(runMotion(text, cursor, motion, undefined, char), keys + motionKeys);
           } else if (motion.count === 'own') {
-            reached(runMotion(text, cursor, motion, undefined, char), keys + motionKeys);
-            // Counts go on until two in a row give the same cursor: after that, every
-            // larger count does too, as a count past the last line or last match does.
-            // (Not tested from 1 to 2: `;` after t skips a match that a count of 2 doesn't.)
+            arrive(runMotion(text, cursor, motion, undefined, char), keys + motionKeys);
+            // Counts go on until the cursor stops changing: after that, every larger count
+            // gives the same, as a count past the last line does. For a find, a count that
+            // finds too few matches leaves the cursor where it was, and so does every
+            // larger count; a count of 1 is the same as none.
+            const isFind = motion.takesChar || motion.repeatsFind;
             let last = -1;
-            for (let count = 1; count <= mostCount; count++) {
+            for (let count = isFind ? 2 : 1; count <= mostCount; count++) {
               const cost = motionKeys + countKeys(count);
               if (cost > budget) break;
               const next = runMotion(text, cursor, motion, count, char);
               const nextKey = cursorKey(next);
-              if (count > 2 && nextKey === last) break;
+              if (
+                isFind ? next.line === cursor.line && next.col === cursor.col : nextKey === last
+              ) {
+                break;
+              }
               last = nextKey;
-              reached(next, keys + cost);
+              arrive(next, keys + cost);
             }
           } else {
             // Each count is one more step from the last, until the motion goes no further.
@@ -111,7 +138,7 @@ export function fewestKeys(
               if (!next) steps.set(atKey, (next = motion.move(text, at)));
               if (cursorKey(next) === atKey) break;
               at = next;
-              reached(at, keys + cost);
+              arrive(at, keys + cost);
             }
           }
         }

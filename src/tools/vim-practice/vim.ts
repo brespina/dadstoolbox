@@ -41,11 +41,14 @@ export interface Find {
  * `takesChar` marks a motion that waits for one more character after its keys (`f,`):
  * `move` gets that character as its last argument.
  *
+ * `repeatsFind` marks a motion that reads the cursor's `lastFind` (`;` and `,`).
+ *
  * `move` returns the cursor unchanged when the motion can't go anywhere.
  */
 export interface Motion {
   count: 'repeat' | 'own' | 'none';
   takesChar?: true;
+  repeatsFind?: true;
   move(text: Text, from: Cursor, count?: number, char?: string): Cursor;
 }
 
@@ -279,6 +282,7 @@ function findMotion(kind: Find['kind']) {
 function repeatFind(reverse: boolean) {
   return {
     count: 'own',
+    repeatsFind: true,
     move: (text, from, count = 1) => {
       const last = from.lastFind;
       if (!last) return from;

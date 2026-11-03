@@ -234,16 +234,26 @@ motions and Lessons (#94, #95):
   motion runs that many times, stopping where it can go no further; `own`: `move` reads
   the count; `none`: the count is dropped) and has `move(text, cursor, count?)`, which
   returns the cursor unchanged when it can't move. The cursor keeps the column j and k
-  want (`want`, `Infinity` after `$`); a motion that changes the cursor spreads the old
-  one, so a field added later (such as the last f or t) carries over. `feed(text, state,
-  key, allowed)` takes one key as `KeyboardEvent.key`: digits make a count (a `0` with no
-  count is the `0` motion), Escape drops it, and a key that isn't in `allowed` is
-  ignored. Motions that need a second key (`gg`, `f{char}`) are #94's: it adds a
-  waiting step to `feed`.
+  want (`want`, `Infinity` after `$`) and the last find (`lastFind`, which `;` and `,`
+  repeat); a motion that changes the cursor spreads the old one, so such a field carries
+  over. `feed(text, state, key, allowed)` takes one key as `KeyboardEvent.key`: digits
+  make a count (a `0` with no count is the `0` motion), Escape drops it, and a key that
+  isn't in `allowed` is ignored. A motion typed with several keys (`gg`) waits: `feed`
+  returns the outcome `pending` and keeps the keys so far in `VimState.keys`, and any key
+  that no allowed motion continues is ignored. A motion with `takesChar` (f, F, t, T)
+  takes the next single character as its last argument, whatever it is. `repeatsFind`
+  marks the motions that read `lastFind` (`;` and `,`).
 - `fewest.ts`: `fewestKeys(text, cursor, allowed)` searches outward by key presses with
   the engine's own motions and gives the fewest keys to every place within 6 presses (a
-  count's digits included, Shift not counted). It tells cursors apart by place and
-  wanted column: a cursor field added later goes into its `cursorKey` too.
+  count's digits included, Shift not counted). It tells cursors apart by place, wanted
+  column and last find: a cursor field added later goes into its `cursorKey` too. A
+  `takesChar` motion is tried with each character on the cursor's line and costs a key
+  more. To stay fast it keeps the last find only for a `repeatsFind` motion typed right
+  after a find (any other motion forgets it), which gives the same fewest keys.
+  `fewest.test.ts` types every short key sequence through `feed` and compares the two. To
+  check the engine against real Vim (9.1 with `-N -u NONE`), run random key sequences
+  through both; Vim's `:normal` stops at the first failed motion, so type each motion
+  as its own `:normal!`.
 - `lessons.ts`: the Lessons as data. Each lists the motions it `adds` and its own
   `texts`; `lessonMotions(i)` allows a Lesson's motions and every earlier one's. The rules
   for texts are at the top of the file and checked in `round.test.ts`, which also checks
