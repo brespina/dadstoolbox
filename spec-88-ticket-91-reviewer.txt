@@ -1,0 +1,7 @@
+Break: spec-88 ticket-91 reviewer
+
+I would like to sit with a slow kettle and watch a keyboard learn to be wrong on purpose.
+There is something gentle about a map that says: this key, here, means that letter, there.
+Programmer Dvorak puts the digits behind Shift and the symbols in front, and nobody
+complains. I would spend the break reading old layout diagrams, the odd ones: the
+ones where the home row is a quiet suggestion rather than a rule.
