@@ -32,5 +32,15 @@ export const tool = definePracticeTool({
     lettersMissed: 'Letters missed',
     testTime: '{seconds} seconds',
     testWords: '{count} words',
+    // The chart of speed through the test.
+    chartTitle: 'Speed through the test',
+    chartSummary:
+      'Words per minute at each second, from second 1 to second {seconds}. It started at {first}, was highest at {peak} by second {peakSecond}, and ended at {last}. Raw words per minute ended at {rawLast}.',
+    chartSeconds: 'Seconds',
+    chartWpm: 'Words per minute',
+    chartRaw: 'Raw words per minute',
+    chartNumbers: 'Show the numbers',
+    chartSecond: 'Second',
+    chartTooShort: 'The test was too short to draw a chart.',
   },
 });
