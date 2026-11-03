@@ -1,0 +1,11 @@
+Notes from the Vim practice ticket.
+
+The nicest moment was finding that Vim's word motions get simpler, not harder, once you
+treat each line's end as a place of its own that counts as white space. Copy the old
+search.c loops faithfully and the edge cases (empty lines, the last word, e skipping
+blank lines) just fall out.
+
+The relative line-number gutter was a small joy too: decoration that teaches the count.
+
+If I had a free afternoon I'd play a round of Lesson 2 myself and see how many extra
+keys I take. I suspect more than I'd like to admit.
