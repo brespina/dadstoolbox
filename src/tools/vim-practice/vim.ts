@@ -218,7 +218,8 @@ export const motions = {
   '^': {
     count: 'none',
     // The first character that isn't a space; on a line of spaces, the last one.
-    move: (text, from) => toCol(from, Math.min(text[from.line]!.search(/[^ \t]|$/), lastCol(text, from.line))),
+    move: (text, from) =>
+      toCol(from, Math.min(text[from.line]!.search(/[^ \t]|$/), lastCol(text, from.line))),
   },
   $: {
     // `N$` goes N-1 lines down first, and fails (but still wants the line end) on the

@@ -208,6 +208,34 @@ Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage
   a phone opens its keyboard there. A key with a known character is read on keydown; a
   phone keyboard that names no key is read from the text it would type.
 
+### Vim practice
+
+`src/tools/vim-practice/` holds the second Practice Tool. Its parts, for the work that adds
+motions and Lessons (#94, #95):
+
+- `vim.ts`: the engine. `motions` is a table of every motion, keyed by the keys that type
+  it (`w`, or `gg` for two keys). Each `Motion` says what a count does (`repeat`: the
+  motion runs that many times, stopping where it can go no further; `own`: `move` reads
+  the count; `none`: the count is dropped) and has `move(text, cursor, count?)`, which
+  returns the cursor unchanged when it can't move. The cursor keeps the column j and k
+  want (`want`, `Infinity` after `$`); a motion that changes the cursor spreads the old
+  one, so a field added later (such as the last f or t) carries over. `feed(text, state,
+  key, allowed)` takes one key as `KeyboardEvent.key`: digits make a count (a `0` with no
+  count is the `0` motion), Escape drops it, and a key that isn't in `allowed` is
+  ignored. Motions that need a second key (`gg`, `f{char}`) are #94's: it adds a
+  waiting step to `feed`.
+- `fewest.ts`: `fewestKeys(text, cursor, allowed)` searches outward by key presses with
+  the engine's own motions and gives the fewest keys to every place within 6 presses (a
+  count's digits included, Shift not counted). It tells cursors apart by place and
+  wanted column: a cursor field added later goes into its `cursorKey` too.
+- `lessons.ts`: the Lessons as data. Each lists the motions it `adds` and its own
+  `texts`; `lessonMotions(i)` allows a Lesson's motions and every earlier one's. The rules
+  for texts are at the top of the file and checked in `round.test.ts`, which also checks
+  every character of every text can be reached.
+- `round.ts`: a round of 10 Drills (`newRound`, `press`, `results`). A Drill's target is
+  drawn among places the Lesson's motions reach in 2 keys or more, preferring places
+  where the Lesson's own motions save keys over the earlier Lessons'.
+
 ## The `run` contract
 
 `run` takes the input (one file, the ordered list of files, or typed text, by input mode)

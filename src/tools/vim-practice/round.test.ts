@@ -7,9 +7,7 @@ import { drillsInRound, newRound, press, results, type Round } from './round';
 describe('Lessons', () => {
   it('each allow their own motions and the earlier Lessons’ motions', () => {
     expect(Object.keys(lessonMotions(0)).sort()).toEqual(['h', 'j', 'k', 'l']);
-    expect(Object.keys(lessonMotions(2)).sort()).toEqual(
-      [...'hjklwbeWBE', '0', '^', '$'].sort(),
-    );
+    expect(Object.keys(lessonMotions(2)).sort()).toEqual([...'hjklwbeWBE', '0', '^', '$'].sort());
   });
 
   it('have tidy texts: no tabs, no spaces at a line end, and short enough for a phone', () => {
@@ -47,7 +45,11 @@ describe('a round of Drills', () => {
         expect(round.drills).toHaveLength(drillsInRound);
         for (const drill of round.drills) {
           expect(drill.target).not.toEqual(drill.start);
-          const reach = fewestKeys(drill.text, { ...drill.start, want: drill.start.col }, lessonMotions(index));
+          const reach = fewestKeys(
+            drill.text,
+            { ...drill.start, want: drill.start.col },
+            lessonMotions(index),
+          );
           expect(reach.get(placeKey(drill.target))).toBe(drill.fewest);
           expect(drill.text[drill.target.line]![drill.target.col]).toMatch(/\S/);
         }
@@ -66,7 +68,10 @@ describe('a round of Drills', () => {
     const down = drill.target.line - drill.start.line;
     keys.push(...Array<string>(Math.abs(down)).fill(down > 0 ? 'j' : 'k'));
     // j and k keep the start's column where the line is long enough.
-    const landed = Math.min(drill.start.col, Math.max(0, drill.text[drill.target.line]!.length - 1));
+    const landed = Math.min(
+      drill.start.col,
+      Math.max(0, drill.text[drill.target.line]!.length - 1),
+    );
     const across = drill.target.col - landed;
     keys.push(...Array<string>(Math.abs(across)).fill(across > 0 ? 'l' : 'h'));
     for (const key of keys) round = press(round, key, at);

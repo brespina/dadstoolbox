@@ -17,26 +17,62 @@ export const lessons: readonly Lesson[] = [
   {
     adds: ['h', 'j', 'k', 'l'],
     texts: [
-      ['The quick brown fox', 'jumps over the lazy dog.', 'Pack my box with five', 'dozen liquor jugs.'],
+      [
+        'The quick brown fox',
+        'jumps over the lazy dog.',
+        'Pack my box with five',
+        'dozen liquor jugs.',
+      ],
       ['let total = 0;', 'for (const n of list) {', '  total += n;', '}', 'return total;'],
-      ['h moves left, l moves right.', 'j goes down a line, k goes up.', '', 'Type 3j to go down three.'],
+      [
+        'h moves left, l moves right.',
+        'j goes down a line, k goes up.',
+        '',
+        'Type 3j to go down three.',
+      ],
       ['Tea for two,', 'and two for tea.', 'Me for you,', 'and you for me.'],
     ],
   },
   {
     adds: ['w', 'b', 'e', 'W', 'B', 'E'],
     texts: [
-      ['const name = user.first_name;', "const mail = user?.email ?? '';", 'if (!name) return null;'],
-      ['Words, words, words: that is', 'what w, b and e are for. A', 'WORD skips punctuation, so W', 'jumps "e.g." in one go.'],
-      ['import { readFile } from "fs";', '', 'const text = readFile(path);', 'console.log(text.length);'],
+      [
+        'const name = user.first_name;',
+        "const mail = user?.email ?? '';",
+        'if (!name) return null;',
+      ],
+      [
+        'Words, words, words: that is',
+        'what w, b and e are for. A',
+        'WORD skips punctuation, so W',
+        'jumps "e.g." in one go.',
+      ],
+      [
+        'import { readFile } from "fs";',
+        '',
+        'const text = readFile(path);',
+        'console.log(text.length);',
+      ],
       ['The rain in Spain stays', 'mainly in the plain; the', 'hills (and hollows) stay dry.'],
     ],
   },
   {
     adds: ['0', '^', '$'],
     texts: [
-      ['function greet(name) {', '  if (name) {', "    return 'Hi, ' + name;", '  }', "  return 'Hello!';", '}'],
-      ['  Lines that start with spaces', '    are where ^ helps most,', '  and $ goes to the end.', '0 is the very first column.'],
+      [
+        'function greet(name) {',
+        '  if (name) {',
+        "    return 'Hi, ' + name;",
+        '  }',
+        "  return 'Hello!';",
+        '}',
+      ],
+      [
+        '  Lines that start with spaces',
+        '    are where ^ helps most,',
+        '  and $ goes to the end.',
+        '0 is the very first column.',
+      ],
       ['<ul>', '  <li>Milk</li>', '  <li>Bread and butter</li>', '  <li>Eggs</li>', '</ul>'],
     ],
   },
