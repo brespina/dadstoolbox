@@ -1,7 +1,7 @@
 <script lang="ts">
   // The typing test's settings bar. It fades while the visitor types (`quiet`), and comes
-  // back on hover, focus or when the mouse moves. A new setting is a new ChoiceGroup here
-  // and a new field of TypingSettings.
+  // back on hover, focus or when the mouse moves. A new setting is a new ChoiceGroup or
+  // Switch here and a new field of TypingSettings.
   import ChoiceGroup from '../../practice/ChoiceGroup.svelte';
   import Switch from '../../practice/Switch.svelte';
   import { tool } from './declaration';
