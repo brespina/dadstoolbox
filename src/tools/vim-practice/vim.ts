@@ -17,6 +17,14 @@ export interface Place {
  */
 export interface Cursor extends Place {
   want: number;
+  /** The last f, F, t or T typed, which ; and , repeat. Kept even if the find failed. */
+  lastFind?: Find;
+}
+
+/** A find on a line: `f`, `F`, `t` or `T`, and the character looked for. */
+export interface Find {
+  kind: 'f' | 'F' | 't' | 'T';
+  char: string;
 }
 
 /**
@@ -30,30 +38,37 @@ export interface Cursor extends Place {
  *   none was typed.
  * - `none`: the count is dropped (`3^` is `^`).
  *
+ * `takesChar` marks a motion that waits for one more character after its keys (`f,`):
+ * `move` gets that character as its last argument.
+ *
  * `move` returns the cursor unchanged when the motion can't go anywhere.
  */
 export interface Motion {
   count: 'repeat' | 'own' | 'none';
-  move(text: Text, from: Cursor, count?: number): Cursor;
+  takesChar?: true;
+  move(text: Text, from: Cursor, count?: number, char?: string): Cursor;
 }
 
 export type Motions = Readonly<Record<string, Motion>>;
 
-/** The engine's whole state: the cursor, and a count typed so far. */
+/** The engine's whole state: the cursor, and a count or keys typed so far. */
 export interface VimState {
   cursor: Cursor;
   /** A count typed but not yet used by a motion. */
   count?: number;
+  /** Keys typed of a motion that needs more: `g` of `gg`, or `f` before its character. */
+  keys?: string;
 }
 
 /**
  * What a key did:
  * - `moved`: a motion ran (the cursor may have stayed put, as `l` does on the last character)
  * - `count`: a digit of a count
- * - `cancelled`: Escape, which drops a half-typed count
- * - `ignored`: not one of the allowed motions; any half-typed count is dropped too
+ * - `pending`: the start of a motion that needs more keys (`g`, or `f` before its character)
+ * - `cancelled`: Escape, which drops a half-typed count or motion
+ * - `ignored`: not one of the allowed motions; any half-typed count or motion is dropped too
  */
-export type Outcome = 'moved' | 'count' | 'cancelled' | 'ignored';
+export type Outcome = 'moved' | 'count' | 'pending' | 'cancelled' | 'ignored';
 
 /** Counts larger than this are read as this. */
 const largestCount = 9999;
@@ -80,8 +95,14 @@ function toLine(text: Text, from: Cursor, by: number): Cursor {
 }
 
 /** Runs a motion with the count typed before it (if any). */
-export function runMotion(text: Text, from: Cursor, motion: Motion, count?: number): Cursor {
-  if (motion.count === 'own') return motion.move(text, from, count);
+export function runMotion(
+  text: Text,
+  from: Cursor,
+  motion: Motion,
+  count?: number,
+  char?: string,
+): Cursor {
+  if (motion.count === 'own') return motion.move(text, from, count, char);
   if (motion.count === 'none') return motion.move(text, from);
   let cursor = from;
   for (let i = 0; i < (count ?? 1); i++) {
@@ -196,6 +217,77 @@ function wordMotion(find: (text: Text, from: Place, bigWord: boolean) => Place, 
   } satisfies Motion;
 }
 
+/** The column of the first character that isn't a space; the last one on a line of spaces. */
+function firstNonBlank(text: Text, line: number): number {
+  return Math.min(text[line]!.search(/[^ \t]|$/), lastCol(text, line));
+}
+
+/** The cursor on a line (clamped to the text), at its first non-blank: Vim's 'startofline'. */
+function toLineNumber(text: Text, from: Cursor, line: number): Cursor {
+  const clamped = Math.min(text.length - 1, Math.max(0, line));
+  return toCol({ ...from, line: clamped }, firstNonBlank(text, clamped));
+}
+
+/**
+ * Vim's searchc: the `count`-th `char` along the line from the cursor, to the right for
+ * f and t, to the left for F and T. A failed find leaves the cursor where it is. t and T
+ * stop one character short. A repeat of t or T (`;` or `,`) with a count of 1 skips a
+ * match right next to the cursor, so it always moves (Vim's default 'cpoptions' has no
+ * `;`). Every find, failed ones too, becomes `remembered`, the find `;` and `,` repeat.
+ */
+function find(
+  text: Text,
+  from: Cursor,
+  { kind, char }: Find,
+  count: number,
+  repeated: boolean,
+  remembered: Find,
+): Cursor {
+  const line = text[from.line]!;
+  const step = kind === 'f' || kind === 't' ? 1 : -1;
+  const till = kind === 't' || kind === 'T';
+  let skipNext = repeated && till && count === 1;
+  let col = from.col;
+  for (let found = 0; found < count; found++) {
+    for (;;) {
+      col += step;
+      if (col < 0 || col >= line.length) return { ...from, lastFind: remembered };
+      if (line[col] === char && !skipNext) break;
+      skipNext = false;
+    }
+  }
+  if (till) col -= step;
+  return { ...toCol(from, col), lastFind: remembered };
+}
+
+const opposite = { f: 'F', F: 'f', t: 'T', T: 't' } as const;
+
+/** A find typed as a motion: f, F, t or T, then the character. */
+function findMotion(kind: Find['kind']) {
+  return {
+    count: 'own',
+    takesChar: true,
+    move: (text, from, count = 1, char) => {
+      if (char === undefined) return from;
+      const typed = { kind, char };
+      return find(text, from, typed, count, false, typed);
+    },
+  } satisfies Motion;
+}
+
+/** `;` and `,`: the last find again, the same way or the other way round. */
+function repeatFind(reverse: boolean) {
+  return {
+    count: 'own',
+    move: (text, from, count = 1) => {
+      const last = from.lastFind;
+      if (!last) return from;
+      const kind = reverse ? opposite[last.kind] : last.kind;
+      return find(text, from, { kind, char: last.char }, count, true, last);
+    },
+  } satisfies Motion;
+}
+
 /** Every motion the engine knows, keyed by the keys that type it. */
 export const motions = {
   h: {
@@ -218,8 +310,7 @@ export const motions = {
   '^': {
     count: 'none',
     // The first character that isn't a space; on a line of spaces, the last one.
-    move: (text, from) =>
-      toCol(from, Math.min(text[from.line]!.search(/[^ \t]|$/), lastCol(text, from.line))),
+    move: (text, from) => toCol(from, firstNonBlank(text, from.line)),
   },
   $: {
     // `N$` goes N-1 lines down first, and fails (but still wants the line end) on the
@@ -231,6 +322,21 @@ export const motions = {
       const line = Math.min(text.length - 1, from.line + down);
       return { ...from, line, col: lastCol(text, line), want: Infinity };
     },
+  },
+  f: findMotion('f'),
+  F: findMotion('F'),
+  t: findMotion('t'),
+  T: findMotion('T'),
+  ';': repeatFind(false),
+  ',': repeatFind(true),
+  // A count is the line to go to; with none, G is the last line and gg the first.
+  G: {
+    count: 'own',
+    move: (text, from, count) => toLineNumber(text, from, (count ?? text.length) - 1),
+  },
+  gg: {
+    count: 'own',
+    move: (text, from, count) => toLineNumber(text, from, (count ?? 1) - 1),
   },
 } satisfies Motions;
 
@@ -244,14 +350,30 @@ export function feed(
   key: string,
   allowed: Motions,
 ): { state: VimState; outcome: Outcome } {
-  const { cursor, count } = state;
+  const { cursor, count, keys } = state;
+  const motionNamed = (name: string) => (Object.hasOwn(allowed, name) ? allowed[name] : undefined);
   if (key === 'Escape') return { state: { cursor }, outcome: 'cancelled' };
-  // A 0 with no count yet is the `0` motion; after a digit it is part of the count.
-  if (/^[1-9]$/.test(key) || (key === '0' && count !== undefined)) {
+  // After f, F, t or T, the next key is the character looked for, whatever it is.
+  const waiting = keys === undefined ? undefined : motionNamed(keys);
+  if (waiting?.takesChar) {
+    if (key.length !== 1) return { state: { cursor }, outcome: 'ignored' };
+    return { state: { cursor: runMotion(text, cursor, waiting, count, key) }, outcome: 'moved' };
+  }
+  // A 0 with no count yet is the `0` motion; after a digit it is part of the count. After
+  // the start of a motion such as g, a digit is not a count.
+  if (keys === undefined && (/^[1-9]$/.test(key) || (key === '0' && count !== undefined))) {
     const typed = Math.min(largestCount, (count ?? 0) * 10 + Number(key));
     return { state: { cursor, count: typed }, outcome: 'count' };
   }
-  const motion = Object.hasOwn(allowed, key) ? allowed[key] : undefined;
-  if (!motion) return { state: { cursor }, outcome: 'ignored' };
-  return { state: { cursor: runMotion(text, cursor, motion, count) }, outcome: 'moved' };
+  const typed = (keys ?? '') + key;
+  const motion = motionNamed(typed);
+  if (motion?.takesChar) return { state: { cursor, count, keys: typed }, outcome: 'pending' };
+  if (motion) {
+    return { state: { cursor: runMotion(text, cursor, motion, count) }, outcome: 'moved' };
+  }
+  // Some allowed motion starts with these keys (the g of gg): wait for the rest.
+  if (Object.keys(allowed).some((name) => name.startsWith(typed))) {
+    return { state: { cursor, count, keys: typed }, outcome: 'pending' };
+  }
+  return { state: { cursor }, outcome: 'ignored' };
 }
