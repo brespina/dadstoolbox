@@ -292,6 +292,76 @@ function repeatFind(reverse: boolean) {
   } satisfies Motion;
 }
 
+/**
+ * Vim's findpar, for } (`step` 1) and { (-1). A paragraph boundary is an empty line (a
+ * line of spaces is not one; Vim also stops at a form feed or an nroff macro such as
+ * `.PP` at the start of a line, which the Lessons' texts leave out). Each paragraph moves
+ * to the first boundary after a non-empty line; a run of empty lines is one boundary. The
+ * cursor lands in the first column, except that } onto the last line goes to its last
+ * character. With no boundary left, the last paragraph asked for goes to the end of the
+ * text (the first line for {, the last character of the last line for }, and that even
+ * when already there), but an earlier one that runs out makes the motion fail.
+ */
+function paragraphMotion(step: 1 | -1) {
+  return {
+    count: 'own',
+    move: (text, from, count = 1) => {
+      let line = from.line;
+      for (let left = count; left > 0; left--) {
+        let skipped = false;
+        for (let first = true; ; first = false) {
+          const empty = text[line] === '';
+          if (!empty) skipped = true;
+          if (!first && skipped && empty) break;
+          const next = line + step;
+          if (next < 0 || next >= text.length) {
+            // Even a failed } or { takes the column it is on as the one wanted.
+            if (left > 1) return { ...from, want: from.col };
+            break;
+          }
+          line = next;
+        }
+      }
+      const col = step === 1 && line === text.length - 1 ? lastCol(text, line) : 0;
+      return { ...from, line, col, want: col };
+    },
+  } satisfies Motion;
+}
+
+/** The brackets `%` matches (Vim's 'matchpairs'): each one, and the bracket it pairs with. */
+const bracketPairs: Readonly<Record<string, string>> = {
+  '(': ')',
+  ')': '(',
+  '[': ']',
+  ']': '[',
+  '{': '}',
+  '}': '{',
+};
+
+/**
+ * Vim's findmatchlimit, for `%` in the cases the Lessons' texts keep to: from the bracket
+ * under the cursor, or else the first one after it on the line, to its match, which is
+ * found by counting only brackets of the same kind, over any number of lines. Fails (stays
+ * put) with no bracket on the rest of the line, or no match. Vim also skips brackets in
+ * double quotes and in C comments, and takes a backslash before one as escaping it; the
+ * Lessons' texts have none of those, so the engine doesn't either.
+ */
+function matchingBracket(text: Text, from: Cursor): Cursor {
+  const start = text[from.line]!.slice(from.col).search(/[()[\]{}]/);
+  if (start < 0) return from;
+  const open = text[from.line]![from.col + start]!;
+  const close = bracketPairs[open]!;
+  const forwards = '([{'.includes(open);
+  const at = { line: from.line, col: from.col + start };
+  let depth = 0;
+  while (forwards ? forward(text, at) : backward(text, at)) {
+    const char = text[at.line]![at.col];
+    if (char === open) depth++;
+    else if (char === close && depth-- === 0) return { ...toCol(from, at.col), line: at.line };
+  }
+  return from;
+}
+
 /** Every motion the engine knows, keyed by the keys that type it. */
 export const motions = {
   h: {
@@ -342,6 +412,10 @@ export const motions = {
     count: 'own',
     move: (text, from, count) => toLineNumber(text, from, (count ?? 1) - 1),
   },
+  // Vim's `N%` goes N percent down the text; the Lessons don't teach it, so a count is dropped.
+  '%': { count: 'none', move: matchingBracket },
+  '}': paragraphMotion(1),
+  '{': paragraphMotion(-1),
 } satisfies Motions;
 
 /**
