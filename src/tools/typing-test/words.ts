@@ -76,10 +76,7 @@ function numberWord(random: Random): string {
  * call never ends with a quote open. Every word takes the same random numbers whatever
  * is switched on.
  */
-export function wordStream(
-  random: Random,
-  options: WordOptions = {},
-): (count: number) => string[] {
+export function wordStream(random: Random, options: WordOptions = {}): (count: number) => string[] {
   const { punctuation = false, numbers = false } = options;
   let previous: string | undefined;
   let capitalNext = true;

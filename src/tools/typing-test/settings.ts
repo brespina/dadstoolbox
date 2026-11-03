@@ -11,9 +11,19 @@ export interface TypingSettings {
   test: 'time' | 'words';
   seconds: (typeof secondsChoices)[number];
   words: (typeof wordChoices)[number];
+  /** Capitals and punctuation in the words. */
+  punctuation: boolean;
+  /** Numbers among the words. */
+  numbers: boolean;
 }
 
-export const defaultSettings: TypingSettings = { test: 'time', seconds: 30, words: 25 };
+export const defaultSettings: TypingSettings = {
+  test: 'time',
+  seconds: 30,
+  words: 25,
+  punctuation: false,
+  numbers: false,
+};
 
 export function testLength(settings: TypingSettings): TestLength {
   return settings.test === 'time'
