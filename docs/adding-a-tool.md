@@ -227,7 +227,7 @@ Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage
 ### Vim practice
 
 `src/tools/vim-practice/` holds the second Practice Tool. Its parts, for the work that adds
-motions and Lessons (#94, #95):
+motions and Lessons (#95 adds Lessons 6 and 7):
 
 - `vim.ts`: the engine. `motions` is a table of every motion, keyed by the keys that type
   it (`w`, or `gg` for two keys). Each `Motion` says what a count does (`repeat`: the
