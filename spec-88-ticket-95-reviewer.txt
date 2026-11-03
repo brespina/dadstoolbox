@@ -1,0 +1,11 @@
+Break notes, ticket 95 reviewer
+
+Fifteen thousand cursor positions, one old editor, and not a single disagreement
+about where a paragraph ends. That was the nicest moment of the review. I would
+love to spend the break doing more of that: pick a small, stubborn corner of a
+very old program, write a tiny model of it, and then let the real thing grade my
+homework. Vim's paragraph motion is a good one: an empty line is a border, a
+line of spaces is not, and nobody remembers why until the numbers say so.
+
+After that, a quiet hour with a mug of tea, reading the nroff macro table that
+makes ".PP" at the start of a line secretly end a paragraph.
