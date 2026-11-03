@@ -41,9 +41,9 @@ Which letter each key of a keyboard types, such as QWERTY, Colemak or Dvorak. Th
 _Avoid_: Keymap, keyboard setting
 
 **Lesson**:
-One step of Vim practice (#93): a set of Vim motions to learn, which also allows the motions of the Lessons before it.
+One step of Vim practice: a set of Vim motions to learn, which also allows the motions of the Lessons before it.
 _Avoid_: Level, chapter, unit
 
 **Drill**:
-One exercise in a Lesson (#93): a short block of text, a cursor and a highlighted target to move the cursor to. A round is 10 Drills.
+One exercise in a Lesson: a short block of text, a cursor and a highlighted target to move the cursor to. A round is 10 Drills.
 _Avoid_: Puzzle, challenge, task
