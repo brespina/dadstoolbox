@@ -6,12 +6,14 @@
 // - sample.<ext>: the file the generated page test chooses (sample.txt: the text it
 //   types, for input mode "none"; sample.json: each field's value by its label, for a
 //   Tool with no type box)
+// A Practice Tool (input mode "practice", made with definePracticeTool) holds only
+// declaration.ts and Practice.svelte, its whole interactive page (ADR-0005).
 // Folders starting with "_" are skipped by discovery.
 
 import { fillText, text } from '../text';
 
 /** The fixed, ordered list of Categories. */
-export const categories = ['Photos', 'PDFs', 'Video', 'Other'] as const;
+export const categories = ['Photos', 'PDFs', 'Video', 'Practice', 'Other'] as const;
 export type Category = (typeof categories)[number];
 
 /**
@@ -19,8 +21,9 @@ export type Category = (typeof categories)[number];
  * - each: each file on its own, one run per file
  * - together: all files together, one run over the ordered list
  * - none: no file; the person types instead
+ * - practice: a Practice Tool; its own Practice.svelte is the page, with no `run`
  */
-export type InputMode = 'each' | 'together' | 'none';
+export type InputMode = 'each' | 'together' | 'none' | 'practice';
 
 /** Browser features a Tool may need, checked when the page runs. */
 /**
@@ -68,6 +71,11 @@ export interface ToolDeclarationInput<Options extends object> {
    * result is made again whenever the options change.
    */
   typeBox?: boolean;
+  /**
+   * Practice Tools only: the label on the practice area, the part that takes the
+   * visitor's key presses. The generated page test finds the area by it.
+   */
+  areaLabel?: string;
   needs: readonly BrowserFeature[];
   /** Files bigger than this (in bytes) get a note on their Ready row. */
   largeFileLimit: number;
@@ -134,11 +142,61 @@ export function defineTool<Options extends object>(
     textFor: () => ({}),
     typeLabel: text.tool.typed.label,
     typeBox: true,
+    areaLabel: '',
     notes: {},
     fileOptions: [],
     optionsProblem: () => undefined,
     ...input,
     reasons: (input.reasons ?? {}) as Readonly<Record<string, Reason>>,
+  };
+}
+
+/** A Practice Tool's declaration: the visitor practises on the page, and nothing is made. */
+export interface PracticeToolDeclarationInput<Notes extends Readonly<Record<string, string>>> {
+  /** Flat address name in plain words, such as "typing-test". */
+  address: string;
+  /** The Tool's name. */
+  name: string;
+  /** One line in everyday words. */
+  blurb: string;
+  category: Category;
+  /** Position within the Category, lowest first. */
+  position: number;
+  /** What the Promise means here, such as "What you type stays on your device." */
+  privacyLine: string;
+  /** The label on the practice area, the part that takes the visitor's key presses. */
+  areaLabel: string;
+  /** Browser features the page needs. Defaults to none. */
+  needs?: readonly BrowserFeature[];
+  /** Every word the page shows, by key, so the banned-words scan reads them. */
+  notes: Notes;
+}
+
+/**
+ * Fills a Practice Tool's declaration. The fields for files and results (noun, accept,
+ * start button and the rest) are left empty: nothing reads them for a Practice Tool.
+ */
+export function definePracticeTool<const Notes extends Readonly<Record<string, string>>>(
+  input: PracticeToolDeclarationInput<Notes>,
+): ToolDeclaration & { notes: Notes } {
+  return {
+    ...defineTool({
+      ...input,
+      input: 'practice',
+      noun: { one: '', many: '' },
+      accept: [],
+      needs: input.needs ?? [],
+      largeFileLimit: 0,
+      largeFileNote: '',
+      startButton: '',
+      allDone: '',
+      typeLabel: '',
+      typeBox: false,
+      worker: false,
+      outsideAddresses: [],
+      defaultOptions: {},
+    }),
+    notes: input.notes,
   };
 }
 
@@ -165,9 +223,11 @@ export function declarationText(tool: ToolDeclaration): string[] {
     tool.largeFileNote,
     ...Object.values(tool.textFor(tool.defaultOptions)),
     tool.typeLabel,
+    tool.areaLabel,
     ...Object.values(tool.reasons),
     ...Object.values(tool.notes),
-  ];
+    // A Practice Tool leaves the fields for files and results empty.
+  ].filter((line) => line !== '');
 }
 
 /**

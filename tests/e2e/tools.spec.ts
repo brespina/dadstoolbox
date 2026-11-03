@@ -1,7 +1,8 @@
 // A smoke test for every declared Tool, made from its declaration: open its page,
 // choose its sample file, press start, and a Save button appears. A Tool with no file
 // (input mode "none") types the text in its sample.txt instead, or, with no type box,
-// fills the fields in its sample.json, and a result appears.
+// fills the fields in its sample.json, and a result appears. A Practice Tool's page
+// opens with its practice area ready to focus.
 // Adding a Tool adds its test; nothing here is written per Tool.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -20,6 +21,22 @@ for (const { tool, folder } of tools) {
       await category.getByRole('link', { name: tool.name }).click();
       await expect(page).toHaveURL(new RegExp(`/${tool.address}/$`));
     });
+
+    if (tool.input === 'practice') {
+      test('opens with its practice area ready to focus', async ({ page }) => {
+        await page.goto(`${tool.address}/`);
+        await expect(page.getByRole('heading', { level: 1 })).toHaveText(tool.name);
+        await expect(page.getByText(tool.privacyLine)).toBeVisible();
+        await expect(page.getByRole('link', { name: text.tool.backLink })).toBeVisible();
+        // A Practice Tool makes nothing: no Choose, start or Save.
+        await expect(page.getByRole('button', { name: /^(Choose|Save)/ })).toHaveCount(0);
+
+        const area = page.getByLabel(tool.areaLabel, { exact: true });
+        await area.focus();
+        await expect(area).toBeFocused();
+      });
+      return;
+    }
 
     if (tool.input === 'none') {
       test('type the sample, a result appears, and Save saves it', async ({ page }) => {

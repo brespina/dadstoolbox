@@ -21,6 +21,7 @@ export const text = {
     Photos: 'Photos',
     PDFs: 'PDFs',
     Video: 'Video',
+    Practice: 'Practice',
     Other: 'Other',
   },
   promisePage: {
