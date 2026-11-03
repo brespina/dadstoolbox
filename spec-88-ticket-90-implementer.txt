@@ -1,0 +1,8 @@
+Break notes, ticket 90.
+
+A quote that opens must close. That small rule shaped the whole generator:
+open only when there is room to close, close after the mark, and never
+leave one hanging at the end of a batch. Typing "word," and then the
+closing quote feels right in a way a rule list does not.
+
+Numbers swap in for words rather than being added. Counts stay exact.
