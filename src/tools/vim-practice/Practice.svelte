@@ -10,11 +10,11 @@
   import { pageRandom } from '../../practice/random';
   import ChoiceGroup from '../../practice/ChoiceGroup.svelte';
   import { tool } from './declaration';
-  import { lessonKeys, lessons } from './lessons';
+  import { lessonKeys, lessonLabel, lessons } from './lessons';
   import { drillsInRound, newRound, press, results, type Round } from './round';
 
   const { notes } = tool;
-  const lessonChoices = lessons.map((lesson, i) => ({ value: i, label: lesson.adds.join(' ') }));
+  const lessonChoices = lessons.map((lesson, i) => ({ value: i, label: lessonLabel(lesson) }));
 
   let lesson = $state(0);
   let round: Round | undefined = $state.raw();
