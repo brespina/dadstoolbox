@@ -3,6 +3,7 @@
 import { test, expect } from './fixtures';
 import { seededRandom } from '../../src/practice/random';
 import { wordStream } from '../../src/tools/typing-test/words';
+import { text } from '../../src/text';
 import { tool } from '../../src/tools/typing-test/declaration';
 import { locate } from '../../src/tools/typing-test/layouts';
 
@@ -10,7 +11,7 @@ test('type a 10-word test, see the results, and restart with Tab then Enter', as
   await page.goto('typing-test/?seed=7');
   await page.getByRole('radio', { name: tool.notes.words, exact: true }).check();
   await page.getByRole('radio', { name: '10', exact: true }).check();
-  await expect(page.getByText(tool.notes.start)).toBeVisible();
+  await expect(page.getByText(text.practice.start)).toBeVisible();
 
   // No click first: the first key press starts the test.
   const words = wordStream(seededRandom(7))(10);
@@ -138,8 +139,6 @@ test.describe('Layouts, on a computer with a mouse', () => {
     await page.getByLabel(tool.areaLabel, { exact: true }).click();
     await page.keyboard.press(keyFor(dvorak, first![0]!));
     await expect(lit).toHaveText(first![1] ?? '', { ignoreCase: true });
-    // The settings bar fades while typing; the contrast check waits for the fade to end.
-    await expect(page.locator('.settings')).toHaveCSS('opacity', '0');
   });
 
   test('capitals, punctuation and digits are typed with Shift where the Layout puts them', async ({
@@ -166,6 +165,24 @@ test.describe('Layouts, on a computer with a mouse', () => {
       /^Test done\. \d+ words per minute\. 100% right\.$/,
     );
   });
+});
+
+test('the settings bar fades while typing, stands still, and comes back on focus', async ({
+  page,
+}) => {
+  await page.goto('typing-test/?seed=7');
+  const settings = page.locator('.settings');
+  await expect(page.getByText(text.practice.start)).toBeVisible();
+  // Page tests run with reduced motion (fixtures.ts): no fade and no blinking caret.
+  await expect(settings).toHaveCSS('transition-duration', '0s');
+  await expect(page.locator('.caret')).toHaveCSS('animation-name', 'none');
+
+  await page.getByLabel(tool.areaLabel, { exact: true }).focus();
+  await page.keyboard.press('x');
+  await expect(settings).toHaveCSS('opacity', '0');
+  // A keyboard user can still reach the settings, and they show again.
+  await page.getByRole('checkbox', { name: tool.notes.numbers }).focus();
+  await expect(settings).toHaveCSS('opacity', '1');
 });
 
 test('a touch-only device offers no Layout and no keyboard picture', async ({ page }) => {

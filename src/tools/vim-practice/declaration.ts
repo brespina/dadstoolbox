@@ -11,7 +11,8 @@ export const tool = definePracticeTool({
   areaLabel: 'Move the cursor with Vim keys',
   notes: {
     lesson: 'Lesson',
-    start: 'Click or press any key to start',
+    // The last Lesson's name, which adds no motions of its own.
+    mixed: 'Mixed',
     goal: 'Move the cursor to the marked character.',
     // Shown when a key isn't one of the Lesson's motions.
     ignored: '{key} isn’t a motion in this Lesson.',
@@ -34,6 +35,5 @@ export const tool = definePracticeTool({
     drillExtra: 'Drill {number}: {presses} keys, {extra} more than the fewest',
     noExtra: 'You used the fewest keys in every Drill.',
     newRound: 'New round',
-    restartHint: 'Or press Tab, then Enter.',
   },
 });

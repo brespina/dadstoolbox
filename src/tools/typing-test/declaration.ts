@@ -10,7 +10,6 @@ export const tool = definePracticeTool({
   privacyLine: 'What you type stays on your device. Nothing is kept.',
   areaLabel: 'Type the words',
   notes: {
-    start: 'Click or press any key to start',
     // The settings bar.
     test: 'Test',
     time: 'Time',
@@ -24,7 +23,6 @@ export const tool = definePracticeTool({
     punctuation: 'Punctuation',
     numbers: 'Numbers',
     restart: 'Restart',
-    restartHint: 'Or press Tab, then Enter.',
     // Read out when the test ends.
     done: 'Test done. {wpm} words per minute. {accuracy}% right.',
     // The results.

@@ -1,10 +1,11 @@
-// Vim practice: a round of Drills in Lesson 1, played with h j k l, and one in Lesson 4,
-// played with f, t and the like. `?seed=` in the address makes the page draw the same
-// Drills as `newRound` does here.
+// Vim practice: a round of Drills in Lesson 1, played with h j k l, one in Lesson 4,
+// played with f, t and the like, and one in Lesson 7 (Mixed), played with every motion.
+// `?seed=` in the address makes the page draw the same Drills as `newRound` does here.
 import { test, expect } from './fixtures';
 import { seededRandom } from '../../src/practice/random';
 import { lessonMotions } from '../../src/tools/vim-practice/lessons';
 import { newRound, type Drill } from '../../src/tools/vim-practice/round';
+import { text } from '../../src/text';
 import { tool } from '../../src/tools/vim-practice/declaration';
 import { feed, startState, type VimState } from '../../src/tools/vim-practice/vim';
 
@@ -23,7 +24,7 @@ function solve(drill: Drill): string[] {
 test('play a round of Drills in Lesson 1 and see the results', async ({ page }) => {
   await page.goto('vim-practice/?seed=4');
   await expect(page.getByRole('radio', { name: 'h j k l', exact: true })).toBeChecked();
-  await expect(page.getByText(tool.notes.start)).toBeVisible();
+  await expect(page.getByText(text.practice.start)).toBeVisible();
   const { drills } = newRound(0, seededRandom(4));
 
   // No click first: the first key press starts. A key outside the Lesson is noted.
@@ -127,4 +128,22 @@ test('play a round of Drills in Lesson 7 (Mixed) with every motion', async ({ pa
     new RegExp(`with ${fewest} key presses\\. The fewest possible was ${fewest}\\.$`),
   );
   await expect(page.getByText(tool.notes.noExtra)).toBeVisible();
+});
+
+test('a touch-only phone is told that Vim practice needs a keyboard', async ({ page }) => {
+  await page.goto('vim-practice/');
+  await expect(page.getByText(tool.notes.needsKeyboard)).toBeVisible();
+  // The area stays, for a phone with a keyboard plugged in.
+  await expect(page.getByLabel(tool.areaLabel, { exact: true })).toBeVisible();
+});
+
+test.describe('on a computer with a mouse', () => {
+  test.use({ isMobile: false, hasTouch: false, viewport: { width: 1000, height: 800 } });
+
+  test('there is no note about needing a keyboard', async ({ page }) => {
+    await page.goto('vim-practice/');
+    // The start hint shows once the page runs, after the pointer check.
+    await expect(page.getByText(text.practice.start)).toBeVisible();
+    await expect(page.getByText(tool.notes.needsKeyboard)).toHaveCount(0);
+  });
 });

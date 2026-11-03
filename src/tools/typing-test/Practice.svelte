@@ -8,6 +8,10 @@
   import { onMount, untrack } from 'svelte';
   import { fillText } from '../../text';
   import { pageRandom } from '../../practice/random';
+  import { isShortcut, startsPractice, watchTouchOnly } from '../../practice/keys';
+  import Headline from '../../practice/Headline.svelte';
+  import Restart from '../../practice/Restart.svelte';
+  import StartHint from '../../practice/StartHint.svelte';
   import { tool } from './declaration';
   import { wordStream } from './words';
   import {
@@ -29,8 +33,8 @@
   import WpmChart from './WpmChart.svelte';
 
   const { notes } = tool;
-  // A Time test takes words in batches of this many, asking for more near the end.
-  const batch = 50;
+  // A Time test takes this many words at a time, asking for more near the end.
+  const wordsPerAsk = 50;
 
   let settings: TypingSettings = $state({ ...defaultSettings });
   let test: TypingTest = $state.raw(newTest(testLength(defaultSettings), []));
@@ -49,16 +53,9 @@
   // Turning the phone or resizing the window moves the lines, so the caret is placed again.
   let width = $state(0);
 
-  // A Layout is for a physical keyboard, so a touch-only device (no mouse or trackpad) does
-  // not offer it. The browser can't be asked about a keyboard; a mouse is the nearest sign.
+  // A Layout is for a physical keyboard, so a touch-only device does not offer it.
   let canChooseLayout = $state(false);
-  onMount(() => {
-    const finePointer = matchMedia('(any-pointer: fine)');
-    canChooseLayout = finePointer.matches;
-    const changed = (event: MediaQueryListEvent) => (canChooseLayout = event.matches);
-    finePointer.addEventListener('change', changed);
-    return () => finePointer.removeEventListener('change', changed);
-  });
+  onMount(() => watchTouchOnly((touchOnly) => (canChooseLayout = !touchOnly)));
   const layout = $derived(canChooseLayout ? settings.layout : 'own');
 
   const phase = $derived(status(test));
@@ -79,7 +76,7 @@
       numbers: settings.numbers,
     });
     const length = testLength(settings);
-    test = newTest(length, nextWords(length.kind === 'words' ? length.count : batch));
+    test = newTest(length, nextWords(length.kind === 'words' ? length.count : wordsPerAsk));
     result = undefined;
     announcement = '';
     quiet = false;
@@ -96,7 +93,7 @@
     const before = status(test);
     let next = press(test, key);
     if (next.length.kind === 'time' && next.typed.length > next.words.length - 20) {
-      next = addWords(next, nextWords(batch));
+      next = addWords(next, nextWords(wordsPerAsk));
     }
     test = next;
     const after = status(next);
@@ -136,7 +133,8 @@
   }
 
   function onkeydown(event: KeyboardEvent) {
-    // Tab moves to Restart as usual; shortcuts such as Ctrl+R stay the browser's.
+    // Tab moves to Restart as usual; shortcuts such as Ctrl+R stay the browser's, but
+    // Ctrl+Backspace and Alt+Backspace clear the word.
     if (event.key === 'Tab' || event.isComposing || event.metaKey) return;
     if (phase === 'done') return;
     const at = performance.now();
@@ -144,7 +142,7 @@
       event.preventDefault();
       now = at;
       send({ type: event.ctrlKey || event.altKey ? 'clearWord' : 'backspace', at });
-    } else if (!event.ctrlKey) {
+    } else if (!isShortcut(event)) {
       // With a Layout, the key's place on the board says what it types, not its name.
       const char = typedChar(event);
       if (!char) return;
@@ -188,16 +186,7 @@
 
   // "Press any key to start": a letter typed anywhere else on the page starts typing.
   function onWindowKeydown(event: KeyboardEvent) {
-    if (focused || event.defaultPrevented || phase === 'done') return;
-    if (event.key.length !== 1 || event.key === ' ') return;
-    if (event.ctrlKey || event.metaKey || event.altKey) return;
-    const active = document.activeElement;
-    const typingElsewhere =
-      active instanceof HTMLTextAreaElement ||
-      active instanceof HTMLSelectElement ||
-      (active instanceof HTMLInputElement && !['radio', 'checkbox'].includes(active.type)) ||
-      (active instanceof HTMLElement && active.isContentEditable);
-    if (typingElsewhere) return;
+    if (focused || phase === 'done' || !startsPractice(event)) return;
     input.focus();
     onkeydown(event);
   }
@@ -239,16 +228,12 @@
 <div class="area" class:focused class:done={phase === 'done'}>
   {#if result}
     <div class="results">
-      <dl class="headline">
-        <div>
-          <dt>{notes.wpm}</dt>
-          <dd>{result.wpm}</dd>
-        </div>
-        <div>
-          <dt>{notes.accuracy}</dt>
-          <dd>{fillText(notes.percent, { accuracy: result.accuracy })}</dd>
-        </div>
-      </dl>
+      <Headline
+        items={[
+          { label: notes.wpm, value: result.wpm },
+          { label: notes.accuracy, value: fillText(notes.percent, { accuracy: result.accuracy }) },
+        ]}
+      />
       <dl class="details">
         <div>
           <dt>{notes.rawWpm}</dt>
@@ -303,7 +288,7 @@
       </div>
     </div>
     {#if !focused}
-      <p class="start">{notes.start}</p>
+      <StartHint />
     {/if}
   {/if}
   <input
@@ -328,10 +313,7 @@
   <Keyboard {layout} next={nextChar} />
 {/if}
 
-<div class="restart">
-  <button type="button" onclick={restartFromButton}>{notes.restart}</button>
-  <span class="muted">{notes.restartHint}</span>
-</div>
+<Restart label={notes.restart} onclick={restartFromButton} />
 
 <p class="visually-hidden" role="status">{announcement}</p>
 
@@ -431,18 +413,6 @@
     }
   }
 
-  .start {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0;
-    padding: 1rem;
-    font-weight: 600;
-    text-align: center;
-  }
-
   /* The unseen box that takes the key presses covers the area, so a click or tap
      anywhere on it starts typing. 16 px text keeps iPhones from zooming in. */
   .keys {
@@ -460,32 +430,12 @@
     pointer-events: none;
   }
 
-  dl {
+  .details {
     margin: 0;
   }
 
-  dd {
+  .details dd {
     margin: 0;
-  }
-
-  .headline {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 2.5rem;
-    margin-bottom: 1rem;
-  }
-
-  .headline dt {
-    color: var(--muted);
-  }
-
-  .headline dd {
-    color: var(--action);
-    font-family: var(--mono);
-    font-size: 3rem;
-    font-weight: 700;
-    line-height: 1.1;
-    font-variant-numeric: tabular-nums;
   }
 
   .details div {
@@ -505,25 +455,5 @@
     margin: 0.5rem 0 0;
     color: var(--muted);
     font-size: 0.9rem;
-  }
-
-  .restart {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 1rem;
-    margin-top: 1.25rem;
-  }
-
-  button {
-    min-height: 2.75rem;
-    padding: 0 1.25rem;
-    border: 0;
-    border-radius: 0.5rem;
-    background: var(--action);
-    color: var(--action-text);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
   }
 </style>
