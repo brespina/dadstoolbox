@@ -138,6 +138,8 @@ test.describe('with the video features', () => {
     browserName,
   }) => {
     test.skip(browserName !== 'chromium', 'Only Chromium here cannot make AAC sound');
+    // Chromium on Windows makes AAC through the system's encoder, so this only holds on Linux (CI).
+    test.skip(process.platform === 'win32', 'Chromium on Windows can make AAC sound');
     await make(page, `${folder}opus.mp4`);
     await expect(failedWith(page, tool.reasons.cantKeepSound!)).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole('button', { name: /^Save / })).toHaveCount(0);
