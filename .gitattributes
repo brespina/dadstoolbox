@@ -1,0 +1,2 @@
+# Every checkout uses LF, Windows included, so Prettier and the tests see the same files as CI.
+* text=auto eol=lf

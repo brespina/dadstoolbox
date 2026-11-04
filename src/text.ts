@@ -21,7 +21,13 @@ export const text = {
     Photos: 'Photos',
     PDFs: 'PDFs',
     Video: 'Video',
+    Practice: 'Practice',
     Other: 'Other',
+  },
+  // Shared by every Practice Tool's page.
+  practice: {
+    start: 'Click or press any key to start',
+    restartHint: 'Or press Tab, then Enter.',
   },
   promisePage: {
     title: "Our promise: Dad's Toolbox",
