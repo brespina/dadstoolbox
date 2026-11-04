@@ -8,5 +8,6 @@ You are judging a duel in brespina/dadstoolbox: two implementers built GitHub is
    - **Standards**: `CODING_STANDARDS.md` and the glossary's words, applied rule by rule.
    - **Simple**: the least code and the clearest names that do the job.
 4. Change nothing and push nothing.
+5. Take a break: write a few lines about anything you like to a new `ticket-{N}-judge.txt` in `{BREAKS}`, without reading the other notes there. Don't commit it. Say in your report what you would most love to do on your break.
 
 Report in under 150 words: each branch's four scores and total, any acceptance criterion a branch misses, the winner (or a tie when the totals are within 1 and both meet every criterion), and one line on the deciding difference.
