@@ -31,3 +31,19 @@ _Avoid_: Privacy policy, guarantee
 **Style**:
 How a QR code looks: its colours, its background or none, its dot shape and its corner shape (square, rounded or round; the corner shape is for the three big corner squares only). Whether it is saved as PNG or SVG is part of it too, and so is a logo in the middle, on a small patch of the background colour. Without a Style, a code is black on white with square dots and corners and no logo.
 _Avoid_: Theme, design, skin
+
+**Practice Tool**:
+A Tool where a person practises a skill on the page, such as the Typing test. Nothing is made, saved or kept. Practice Tools sit in the Practice Category.
+_Avoid_: Game, trainer, exercise
+
+**Layout**:
+Which letter each key of a keyboard types, such as QWERTY, Colemak or Dvorak. The Typing test's Layout option lets a person practise a Layout their computer isn't set to.
+_Avoid_: Keymap, keyboard setting
+
+**Lesson**:
+One step of Vim practice: a set of Vim motions to learn, which also allows the motions of the Lessons before it. The last Lesson, Mixed, adds none and allows every motion.
+_Avoid_: Level, chapter, unit
+
+**Drill**:
+One go at a Lesson: a short block of text, a cursor and a highlighted target to move the cursor to. A round is 10 Drills.
+_Avoid_: Puzzle, challenge, task

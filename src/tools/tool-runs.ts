@@ -22,6 +22,8 @@ export function toolRuns(tools: { tool: ToolDeclaration; folder: string }[]): Pl
       const side = id.slice(prefix.length + 1);
       if (!(side in sides)) throw new Error(`No "${side}" side for Tool runs`);
       const loaders = tools
+        // A Practice Tool has no `run`: its page is its own Practice.svelte.
+        .filter(({ tool }) => tool.input !== 'practice')
         .filter(({ tool }) => tool.worker === sides[side as keyof typeof sides])
         .map(
           ({ tool, folder }) =>

@@ -13,6 +13,9 @@ be added.
 
 ## The steps
 
+These steps are for a Tool that makes something to save. A Practice Tool, where the
+visitor practises on the page, is built differently: see [Practice Tools](#practice-tools).
+
 1. **Copy the template.** Copy `src/tools/_template/` to `src/tools/<address>/`, where
    `<address>` is the Tool's address in plain words, such as `change-image-type`. Drop the
    leading `_`: folders starting with `_` are skipped everywhere, which is why the
@@ -75,11 +78,11 @@ field is required.
 | `address`          | The Tool's flat address in plain words, such as `split-pdf`. The page is `…/dadstoolbox/<address>/`. Categories are not part of it.                                                                                                                                                                |
 | `name`             | The Tool's name, written as a task: "Split a PDF", "Change image file type". The page heading and home page row.                                                                                                                                                                                   |
 | `blurb`            | One line in everyday words that names the visitor's problem: "iPhone photo won't open or upload?".                                                                                                                                                                                                 |
-| `category`         | One of the fixed Categories, in order: `Photos`, `PDFs`, `Video`, `Other`.                                                                                                                                                                                                                         |
+| `category`         | One of the fixed Categories, in order: `Photos`, `PDFs`, `Video`, `Practice`, `Other`.                                                                                                                                                                                                                      |
 | `position`         | Order within the Category, lowest first. Keep it unique within the Category.                                                                                                                                                                                                                       |
 | `noun`             | What the Tool takes, as `{ one, many }`, such as `{ one: 'PDF', many: 'PDFs' }`. Used in the privacy line, the Choose button ("Choose PDFs") and Batch labels ("3 PDFs").                                                                                                                         |
 | `accept`           | File types for the Choose button: types such as `application/pdf` and endings such as `.pdf`. List both, because phones are not consistent.                                                                                                                                                        |
-| `input`            | The input mode: `each`, `together` or `none`. See [Input modes](#input-modes).                                                                                                                                                                                                                     |
+| `input`            | The input mode: `each`, `together` or `none`. See [Input modes](#input-modes). (`practice` is set by `definePracticeTool`; see [Practice Tools](#practice-tools).)                                                                                                                                                                                                                     |
 | `needs`            | Browser features `run` needs: `webcodecs` (reading video) and `makeVideo` (making video). They are checked when the page runs. Where one is missing, the home page row and the Tool page say "Doesn't work on this browser yet" and Choose is greyed out. Add a new feature to the `BrowserFeature` type in `types.ts` if it is missing. |
 | `largeFileLimit`   | A size in bytes. A file bigger than this gets a note on its Ready row warning it may be slow or stop partway on a phone. It does not stop the file. Set it from what a phone can really handle.                                                                                                    |
 | `largeFileNote`    | Optional. That note. Defaults to "This {noun} is big for a phone. It may take a few minutes or stop partway." with the Tool's noun (one) swapped in.                                                                                                                                          |
@@ -118,6 +121,9 @@ field is required.
   such as an empty network name: the page then shows no result and no reason. Give
   `textFor` a `pictureLabel`, so the picture is described from the options, without
   anything private such as a password.
+- **`practice`, a Practice Tool** (Typing test, Vim practice). No file, no `run` and
+  nothing to save: the Tool's own `Practice.svelte` is the page. `definePracticeTool`
+  sets this mode; see [Practice Tools](#practice-tools).
 
   A typed Tool's options may hold a file the visitor chooses, such as the logo in a QR
   code's Style. `Options.svelte` puts the `File` in the options (start it as `null` in
@@ -146,6 +152,154 @@ them as one vector path. A logo (`style.logo`, a `File`) sits on a patch with no
 (`logoPlace` in `shapes.ts`), and the code then uses the strongest error correction (H).
 Its pixels come from the browser's canvas (`src/qr/paint-logo.ts`); `drawQr` takes that
 step as its third argument, so tests pass a stand-in.
+
+## Practice Tools
+
+A **Practice Tool** (see the glossary) lets the visitor practise a skill on the page,
+such as the Typing test. It makes nothing to save, so it has no `run`, options component
+or sample file ([ADR-0005](adr/0005-practice-tools-are-their-own-page.md)). Its folder
+holds these two files, plus its own plain TypeScript, any smaller Svelte parts its page
+uses (the Typing test's `SettingsBar.svelte`, for one) and tests:
+
+| File               | What it holds                                                                                                                                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `declaration.ts`   | The declaration, made with `definePracticeTool` (plain data, as for every Tool): `address`, `name`, `blurb`, `category` (usually `Practice`), `position`, `privacyLine`, `areaLabel`, `notes`, and optionally `needs`.                   |
+| `Practice.svelte`  | The whole interactive page, shown under the shared back link, heading, blurb and privacy line. It takes no props: it imports its own declaration.                                                                                     |
+
+Add the thin page at `src/pages/<address>.astro` as for any Tool. The input mode is
+`practice`; `definePracticeTool` sets it and leaves the fields for files and results
+(noun, accept, start button and the rest) empty. The run loader skips the Tool, and the
+Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage.svelte`.
+
+- **`areaLabel`** names the practice area, the part that takes the visitor's key
+  presses. Give that element this label (`aria-label`); the generated page test finds the
+  area by it and checks it takes focus.
+- **`notes`** holds every word the page shows, by key, so the banned-words scan reads
+  them. `definePracticeTool` keeps the keys' types, so `tool.notes.restart` is checked.
+- **Logic in plain TypeScript.** Keep what the Tool does (the words, the key presses, the
+  score) in pure modules next to the page, tested with Vitest, and keep the page to
+  turning events into calls and showing the state.
+- **Random, but repeatable.** Draw with `pageRandom(location.search)` from
+  `src/practice/random.ts`: it is seeded by `?seed=<number>` in the page's address, so a
+  page test can type known words, and different every visit otherwise. `seededRandom`
+  gives the same source to a Vitest or page test.
+- **Settings.** `src/practice/ChoiceGroup.svelte` is one labelled row of choices (radio
+  buttons, at least 44 × 44 px), for a settings bar. `src/practice/Switch.svelte` is one
+  on/off setting (a checkbox, same size and look) beside it.
+- **Keys.** `src/practice/keys.ts` holds the rules both practice pages share:
+  `isShortcut(event)` (Ctrl, Cmd or Alt shortcuts stay the browser's, but AltGr and a
+  Mac's Option typing a character count as typing), `startsPractice(event)` for "Click
+  or press any key to start" (a printable key pressed anywhere else on the page focuses
+  the area, unless it is typed into a box), and `watchTouchOnly(set)`, which tells the
+  page whether the device has no mouse or trackpad (`(any-pointer: fine)` doesn't
+  match), the nearest sign of no keyboard. The Typing test hides its Layout option
+  then; Vim practice keeps its area but says it needs a keyboard.
+- **The start hint, results and restart.** `src/practice/StartHint.svelte` is the "Click
+  or press any key to start" line over an unfocused area, `Headline.svelte` the big
+  numbers at the top of the results, and `Restart.svelte` the button under the area with
+  the "Or press Tab, then Enter." hint. Their words are in `text.practice`
+  (`src/text.ts`).
+- **Fixed-width text.** Use the `--mono` token from `src/styles/base.css`, the device's own
+  fixed-width font.
+- **The Promise.** Keep nothing: no `localStorage`, no personal bests. Make no outside
+  requests.
+- **Motion.** The Site turns transitions and animations off under reduced motion
+  (`base.css`), and every page test runs with reduced motion, so a check never sees a
+  fade halfway. Something that fades away while the visitor types, such as the Typing
+  test's settings bar, fades all the way (opacity 0), stays reachable with Tab and shows
+  again on focus.
+
+### The Typing test
+
+`src/tools/typing-test/` is the worked example. Its parts, for the work that builds on it:
+
+- `words.ts`: our own list of about 200 common words (`commonWords`), and `wordStream(random,
+  options)`, which gives the next words on each call. A Time test asks for more as it goes.
+  `WordOptions` holds the Punctuation and Numbers switches: Punctuation capitalises after a
+  full stop and adds commas, full stops, question marks, apostrophes and quotes (a quote
+  closes within the same call); Numbers swaps in numbers of 1 to 4 digits. A seed gives
+  the same base words whatever is on.
+- `typing.ts`: the test as a pure reducer. `press(test, key)` takes one `KeyPress`: a
+  `char` with the character already worked out (a space moves on), `backspace`,
+  `clearWord` or `tick` (time passing), each with a time in milliseconds. The page
+  maps the physical key to its character (see `layouts.ts`) before calling `press`. `score(test)` gives wpm,
+  raw wpm, accuracy and the letters right, wrong, extra and missed. The test keeps every
+  character key press with its time (`presses`) and when each word was finished
+  (`wordEnds`), which is enough to work out the speed at each second for the chart.
+  `rightWordCharacters(test, until?)` counts the characters of the words typed right
+  (with their spaces) finished by a time: what counts toward wpm.
+  `wordLetters` gives each letter of a word as it shows.
+- `layouts.ts` and `Keyboard.svelte`: the Layouts. `resolve(layout, code, shift)` turns a
+  physical key (`KeyboardEvent.code`) and Shift into the character that Layout types there
+  (null for a key it leaves alone, or for "As my keyboard types"); `locate(layout, char)` is the
+  reverse, which the keyboard picture uses to light the next key. The picture is
+  `aria-hidden`. The Layout option shows only where `watchTouchOnly` finds a mouse or
+  trackpad, so a touch-only device never sees it.
+- `samples.ts` and `WpmChart.svelte`: `samples(test)` gives the wpm and raw wpm at each
+  second of a finished test (and at the end, if that falls between seconds), as `{ second,
+  wpm, raw }`. `WpmChart` draws them as inline SVG in the Site's tokens, with a text
+  alternative and a table of the numbers, and draws nothing for under two samples.
+- `settings.ts` and `SettingsBar.svelte`: the settings bar. A new setting is a new field
+  of `TypingSettings` and a new `ChoiceGroup` or `Switch` in the bar; a changed setting (any field)
+  starts a new test.
+- `Practice.svelte`: the page. Key presses land on an unseen text box over the words, so
+  a phone opens its keyboard there. A key with a known character is read on keydown; a
+  phone keyboard that names no key is read from the text it would type.
+
+### Vim practice
+
+`src/tools/vim-practice/` holds the second Practice Tool. Its parts, for the work that adds
+motions and Lessons:
+
+- `vim.ts`: the engine. `motions` is a table of every motion, keyed by the keys that type
+  it (`w`, or `gg` for two keys). Each `Motion` says what a count does (`repeat`: the
+  motion runs that many times, stopping where it can go no further; `own`: `move` reads
+  the count; `none`: the count is dropped) and has `move(text, cursor, count?)`, which
+  returns the cursor unchanged when it can't move. The cursor keeps the column j and k
+  want (`want`, `Infinity` after `$`) and the last find (`lastFind`, which `;` and `,`
+  repeat); a motion that changes the cursor spreads the old one, so such a field carries
+  over. `feed(text, state, key, allowed)` takes one key as `KeyboardEvent.key`: digits
+  make a count (a `0` with no count is the `0` motion), Escape drops it, and a key that
+  isn't in `allowed` is ignored. A motion typed with several keys (`gg`) waits: `feed`
+  returns the outcome `pending` and keeps the keys so far in `VimState.keys`, and any key
+  that no allowed motion continues is ignored. A motion with `takesChar` (f, F, t, T)
+  takes the next single character as its last argument, whatever it is. `repeatsFind`
+  marks the motions that read `lastFind` (`;` and `,`).
+  `{` and `}` follow Vim's `findpar` and `%` its `findmatchlimit`, for the texts the
+  Lessons use: a paragraph boundary is an empty line (a line of spaces is not one); `}`
+  onto the last line lands on its last character, even from that line; a count that runs
+  out of paragraphs before its last step fails, and any failed `{` or `}` still makes the
+  cursor's own column the one wanted. `%` jumps from the bracket under the cursor, or the
+  next one on the line, to its match among brackets of the same kind; with a
+  count it is Vim's `N%` instead, N percent down the text at the first non-blank, which
+  the search doesn't try because `G` is never more keys (`round.test.ts` checks that).
+  Vim also treats a line starting with `.` or a form feed as
+  a paragraph boundary, skips brackets in double quotes, comments and after a backslash,
+  and reads `#` lines: Lessons 6 and 7 keep their texts free of all of these, and
+  `round.test.ts` checks that.
+- `fewest.ts`: `fewestKeys(text, cursor, allowed)` searches outward by key presses with
+  the engine's own motions and gives the fewest keys to every place within 6 presses (a
+  count's digits included, Shift not counted). It tells cursors apart by place, wanted
+  column and last find: a cursor field added later goes into its `cursorKey` too. A
+  `takesChar` motion is tried with each character on the cursor's line and costs a key
+  more. To stay fast it keeps the last find only for a `repeatsFind` motion typed right
+  after a find (any other motion forgets it), which gives the same fewest keys.
+  `fewest.test.ts` types every short key sequence through `feed` and compares the two. To
+  check the engine against real Vim (9.1 with `-N -u NONE`), run random key sequences
+  through both; Vim's `:normal` stops at the first failed motion, so type each motion
+  as its own `:normal!`.
+- `lessons.ts`: the Lessons as data. Each lists the motions it `adds` and its own
+  `texts`; `lessonMotions(i)` allows a Lesson's motions and every earlier one's. The radio
+  button's name is the motions it adds, or its `label` (Mixed, the last Lesson, adds none
+  and so has one: it allows every motion, on longer texts). The rules for texts are at the
+  top of the file and checked in `round.test.ts`, which also checks every character of
+  every text can be reached.
+- `round.ts`: a round of 10 Drills (`newRound`, `press`, `results`). A Drill's target is
+  drawn among places the Lesson's motions reach in 2 keys or more, preferring places
+  where the Lesson's own motions save keys over the earlier Lessons' (a Lesson that adds
+  none skips that second search). A round of Mixed, with every motion, draws in about
+  0.15 s on a laptop; `round.test.ts` guards it. A new motion with state of its own must
+  follow the search's rule for `lastFind`, or Mixed gets slow.
 
 ## The `run` contract
 
@@ -347,7 +501,10 @@ Options must work for phones and keyboards: every tappable thing at least 44 × 
   on the home page under its Category, then opens the page, chooses `sample.<ext>`,
   presses start and waits for Save and the "All done" message. A Tool in input mode
   `none` types `sample.txt` instead, or, with no type box, fills each field named in
-  `sample.json`, then waits for the picture and saves it. Each page test also runs
+  `sample.json`, then waits for the picture and saves it. A Practice Tool's test opens
+  the page and checks the heading, the privacy line, the back link and that the area
+  named by `areaLabel` takes focus; what the Tool does is tested in its own page test,
+  such as `tests/e2e/typing-test.spec.ts`. Each page test runs with reduced motion, runs
   an accessibility check in both themes and fails on any request that leaves the Site.
 
 Ports, WebKit on this machine, and slow tests: see `docs/agents/testing.md`.
