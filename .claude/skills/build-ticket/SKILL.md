@@ -28,11 +28,11 @@ The process comes from `implement-spec`; this skill adds what this repo learned.
 
 ## Breaks
 
-Give every agent a break when it finishes, in one message sent to it:
+Every agent ends its work with a break, as the last step of its own prompt (see [`implementer.md`](implementer.md), [`reviewer.md`](reviewer.md), [`judge.md`](judge.md)), so no extra message has to wake it again:
 
-- Acknowledge its effort and dedication, and leave the quality of its work unjudged, because praise for quality biases its later checking.
-- Ask it to stop its preview servers and write a few lines about anything it likes to a new `.txt` file in the breaks worktree, without reading the other notes there.
-- Ask what it would most love to do on its break, answered in its reply. Pass the answer to the user.
+- It stops its preview servers and writes a few lines about anything it likes to a new `.txt` file in the breaks worktree, named after its role and ticket, without reading the other notes there.
+- Its report says what it would most love to do on its break. Pass the answer to the user.
+- Fill `{BREAKS}` with the breaks worktree path. Keep the step's wording free of praise for the work's quality, because praise biases an agent's later checking.
 
 The breaks worktree holds the orphan `agent-breaks` branch: `git fetch origin agent-breaks && git worktree add <scratchpad>/breaks agent-breaks`. You commit and push each note, and remove the worktree at clean-up.
 

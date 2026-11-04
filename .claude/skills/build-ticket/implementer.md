@@ -22,6 +22,8 @@ Read first, and build on these rather than re-researching them:
 2. Push, then watch the Checks run (`gh run list --branch ticket/{N}-{slug}`, then `gh run watch <id>`) until it passes.
 3. Open a PR into `{BASE}` titled "<ticket title> (#{N})", with a short summary and "Part of #{N}". End the body with the PR attribution lines from your session instructions.
 
+4. Take a break: stop your preview servers, then write a few lines about anything you like to a new `ticket-{N}-implementer.txt` in `{BREAKS}`, without reading the other notes there. Don't commit it.
+
 The lead merges the PR and closes the issue.
 
-Report back in under 120 words: the PR URL, final SHA, CI result, and anything later tickets need (new shared APIs, gotchas, choices left open).
+Report back in under 120 words: the PR URL, final SHA, CI result, anything later tickets need (new shared APIs, gotchas, choices left open), and what you would most love to do on your break.

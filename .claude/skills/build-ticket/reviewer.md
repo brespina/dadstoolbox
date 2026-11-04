@@ -6,5 +6,6 @@ You are a fresh code reviewer for {TARGET} in brespina/dadstoolbox, which implem
 2. Fix every finding that holds up. Run `npm run check`, `npm run format:check`, `npm test`, and `E2E_PORT={PORT} npm run test:e2e` (see `docs/agents/testing.md`).
 3. Commit, ending each message with the attribution lines from your session instructions. Push, then watch the Checks run until it passes.
 4. Post a short review summary on the PR (`gh pr comment`). For a whole-branch review, open one PR into `{BRANCH}` holding the fixes. The lead merges.
+5. Take a break: stop your preview servers, then write a few lines about anything you like to a new `{NAME}-reviewer.txt` in `{BREAKS}`, without reading the other notes there. Don't commit it.
 
-Report back in under 120 words: findings, each fixed or dismissed with the reason; anything that needs a human decision or a real-phone test; the final SHA; and the CI result.
+Report back in under 120 words: findings, each fixed or dismissed with the reason; anything that needs a human decision or a real-phone test; the final SHA; the CI result; and what you would most love to do on your break.
