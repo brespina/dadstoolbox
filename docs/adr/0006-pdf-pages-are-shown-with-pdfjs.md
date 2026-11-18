@@ -9,3 +9,5 @@ Sign a PDF has to show a PDF's pages so a person can tap where a Mark goes. We c
 - Its worker and any data files it needs are bundled and served from the Site, so the lock's `worker-src 'self' blob:` and `font-src 'self'` hold. It runs without WebAssembly, using its own plain-script decoders.
 - Which pdf.js build (modern or legacy) is used is chosen by what runs on iPhone Safari under the lock.
 - It is credited on the credits page like every library.
+
+Planned in spec #108 (Sign a PDF), built from #109.

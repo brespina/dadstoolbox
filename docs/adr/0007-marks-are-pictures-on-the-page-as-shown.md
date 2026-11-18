@@ -10,3 +10,5 @@ A Mark's place is stored as `{ page, x, y, width }`, each of `x`, `y` and `width
 - Painting needs the page's canvas, so the Tool runs with `worker: false`, and `run` takes the painting step as an argument so Vitest can pass a stand-in.
 - Saving rewrites the whole file, which would break a digital signature already in it. So a PDF with a signature field that holds a value is refused with a plain reason, in the page editor and in `run`, through one shared check. An empty signature field is fine.
 - `run` never calls pdf-lib's `getForm()` (it drops XFA data) and saves with `updateFieldAppearances: false`, so filled form fields stay exactly as they were.
+
+Planned in spec #108 (Sign a PDF), built from #109.
