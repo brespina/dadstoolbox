@@ -127,7 +127,12 @@
     align-items: center;
     justify-content: center;
     padding: 0;
-    border: 2px dashed transparent;
+    /* No border: WebKit counts a button's border outside its aspect ratio, which would
+       make the Mark taller than its picture's shape gives. Edges are drawn as outlines,
+       inside the Mark, so the page's edge doesn't clip them. */
+    border: 0;
+    outline: 2px dashed transparent;
+    outline-offset: -2px;
     background: transparent;
     cursor: grab;
     /* A finger that starts on a Mark drags it instead of scrolling the pages. Only here:
@@ -150,7 +155,7 @@
 
   /* Before a Signature is drawn: its name in a dashed box, dark on the white page. */
   .mark.blank {
-    border-color: #555;
+    outline-color: #555;
     color: #222;
     font: inherit;
     font-size: 0.875rem;
@@ -160,11 +165,12 @@
 
   /* The pages stay white in both themes, so the chosen Mark's edge is a fixed dark blue. */
   .mark.chosen {
-    border: 2px solid #0b57d0;
+    outline: 2px solid #0b57d0;
   }
 
+  /* Thicker, for the keyboard; the same blue, since the page behind is white. */
   .mark:focus-visible {
-    outline: 3px solid var(--focus);
-    outline-offset: 2px;
+    outline: 4px solid #0b57d0;
+    outline-offset: -4px;
   }
 </style>
