@@ -243,6 +243,24 @@ export interface OptionsProps<Options extends object> {
   fileTypes?: readonly string[];
 }
 
+/**
+ * What the page gives a Tool's `FileOptions.svelte`, the editor on one chosen file's
+ * Ready row (see `fileOptions`).
+ */
+export interface FileOptionsProps<Options extends object> {
+  /** The chosen file. */
+  file: File;
+  /** That file's own values, the options named in `fileOptions`. */
+  options: Options;
+  /** Sets some of the file's own values. Pass plain values: a worker Tool gets a copy. */
+  change: (values: Partial<Options>) => void;
+  /**
+   * The page's options, such as Sign a PDF's Signature: a read-only copy, given again
+   * whenever they change. An editor that doesn't need them ignores the prop.
+   */
+  pageOptions?: Readonly<Options>;
+}
+
 /** One file a Tool made. */
 export interface ToolResult {
   /** The file's bytes. Its type, such as "application/pdf", sets the file extension. */
