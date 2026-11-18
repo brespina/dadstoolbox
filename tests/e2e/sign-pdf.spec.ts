@@ -124,26 +124,321 @@ test('start waits for a Mark and a Signature, with the words for each', async ({
   await expect(start(page)).toBeDisabled();
 });
 
+/** A page's Signature Mark, by its label. */
+const markOn = (page: Page, number: number) =>
+  page.getByRole('button', { name: `Signature on page ${number}`, exact: true });
+
+const addTo = (page: Page, number: number) =>
+  page.getByRole('button', { name: `Add to page ${number}`, exact: true });
+
+/** Where a Mark sits on page 1, as fractions of the page as shown. */
+async function placeOnPageOne(page: Page, mark: ReturnType<typeof markOn>) {
+  const sheet = (await pageOne(page).boundingBox())!;
+  const box = (await mark.boundingBox())!;
+  return {
+    x: (box.x - sheet.x) / sheet.width,
+    y: (box.y - sheet.y) / sheet.height,
+    width: box.width / sheet.width,
+    height: box.height / sheet.height,
+  };
+}
+
+/** Starts, saves and opens the PDF, to read where its pictures landed. */
+async function savedPdf(page: Page) {
+  await start(page).click();
+  const saved = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save sample_dtb_signed.pdf' }).click();
+  return PDFDocument.load(await readFile((await (await saved).path())!));
+}
+
+/** Checks that a saved picture is where the page showed the Mark (sample.pdf is 300 × 200). */
+function expectSavedAt(
+  picture: ReturnType<typeof picturesOn>[number],
+  shown: { x: number; y: number; width: number; height: number },
+) {
+  // Within 2 points: the page is shown at whole CSS pixels.
+  const near = (value: number, expected: number) =>
+    expect(Math.abs(value - expected)).toBeLessThan(2);
+  near(picture.x, shown.x * 300);
+  near(picture.width, shown.width * 300);
+  near(picture.y + picture.height, 200 - shown.y * 200);
+}
+
 test('Remove takes a Mark away', async ({ page }) => {
   await page.goto('sign-pdf/');
   await drawSignature(page);
   await choose(page, [sample]);
   await tapPageOne(page, 0.3, 0.3);
-  // A new Mark is chosen, so its buttons show; a tap on it lets it go and chooses it again.
-  const mark = page.getByRole('button', { name: 'Signature on page 1', exact: true });
+  // A new Mark is chosen, so its buttons show.
+  const mark = markOn(page, 1);
   await expect(mark).toHaveAttribute('aria-pressed', 'true');
-  await mark.click();
-  await expect(mark).toHaveAttribute('aria-pressed', 'false');
-  await mark.click();
-  await expect(mark).toHaveAttribute('aria-pressed', 'true');
-  const remove = page.getByRole('button', { name: 'Remove the signature on page 1' });
-  const box = (await remove.boundingBox())!;
-  expect(box.width).toBeGreaterThanOrEqual(44);
-  expect(box.height).toBeGreaterThanOrEqual(44);
-  await remove.click();
+  await page.getByRole('button', { name: 'Remove: Signature on page 1', exact: true }).click();
   await expect(mark).toHaveCount(0);
   await expect(page.getByText(tool.notes.nothingPlaced!, { exact: true })).toBeVisible();
   await expect(start(page)).toBeDisabled();
+});
+
+test('the keyboard places, moves, resizes and removes a Mark', async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+
+  // Add, with its kind chosen above the pages.
+  await expect(page.getByRole('radio', { name: 'Signature', exact: true })).toBeChecked();
+  await addTo(page, 1).click();
+  const mark = markOn(page, 1);
+  await expect(mark).toBeFocused();
+  await expect(mark).toHaveAttribute('aria-label', 'Signature on page 1');
+  const first = await placeOnPageOne(page, mark);
+  // The lower middle of the page, a third wide.
+  expect(first.x + first.width / 2).toBeCloseTo(0.5, 1);
+  expect(first.y + first.height / 2).toBeCloseTo(0.8, 1);
+  expect(first.width).toBeCloseTo(1 / 3, 1);
+
+  // Three steps right, 1% of the page each.
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight');
+  const right = await placeOnPageOne(page, mark);
+  expect(right.x - first.x).toBeCloseTo(0.03, 2);
+  expect(right.y).toBeCloseTo(first.y, 3);
+  // Shift: 10% up.
+  await page.keyboard.press('Shift+ArrowUp');
+  const up = await placeOnPageOne(page, mark);
+  expect(first.y - up.y).toBeCloseTo(0.1, 2);
+  // Plus: a tenth bigger, about its centre.
+  await page.keyboard.press('+');
+  const bigger = await placeOnPageOne(page, mark);
+  expect(bigger.width / up.width).toBeCloseTo(1.1, 1);
+  expect(bigger.x + bigger.width / 2).toBeCloseTo(up.x + up.width / 2, 2);
+  // The keys didn't scroll the page sideways.
+  expect(await page.evaluate(() => window.scrollX)).toBe(0);
+
+  // The saved PDF has it where the page showed it.
+  const signed = await savedPdf(page);
+  const [picture, ...more] = picturesOn(signed.getPage(0));
+  expect(more).toEqual([]);
+  expectSavedAt(picture!, bigger);
+});
+
+test('Delete and Backspace remove a Mark, and focus goes to its page', async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  await addTo(page, 1).click();
+  const mark = markOn(page, 1);
+  await expect(mark).toBeFocused();
+  await page.keyboard.press('Delete');
+  await expect(mark).toHaveCount(0);
+  await expect(addTo(page, 1)).toBeFocused();
+
+  // Marks stack: any number to a page and a PDF.
+  await addTo(page, 1).click();
+  await addTo(page, 1).click();
+  await expect(markOn(page, 1)).toHaveCount(2);
+  await addTo(page, 3).click();
+  await expect(markOn(page, 3)).toBeFocused();
+  await page.keyboard.press('Backspace');
+  await expect(markOn(page, 3)).toHaveCount(0);
+  await expect(addTo(page, 3)).toBeFocused();
+  await expect(markOn(page, 1)).toHaveCount(2);
+});
+
+test('removing a middle Mark leaves the others where they were, and keys go to the right one', async ({
+  page,
+}) => {
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  const marks = markOn(page, 1);
+  // Three Marks on one page, each moved somewhere of its own (each Add focuses the new one).
+  await addTo(page, 1).click();
+  await page.keyboard.press('Shift+ArrowLeft');
+  await addTo(page, 1).click();
+  await page.keyboard.press('Shift+ArrowUp');
+  await addTo(page, 1).click();
+  await page.keyboard.press('Shift+ArrowRight');
+  await expect(marks).toHaveCount(3);
+  const first = await placeOnPageOne(page, marks.nth(0));
+  const last = await placeOnPageOne(page, marks.nth(2));
+  expect(first.x).not.toBeCloseTo(last.x, 2);
+
+  // Take the middle one away with its key: focus goes to the page's Add button.
+  await marks.nth(1).focus();
+  await page.keyboard.press('Delete');
+  await expect(marks).toHaveCount(2);
+  await expect(addTo(page, 1)).toBeFocused();
+  const after = [
+    await placeOnPageOne(page, marks.nth(0)),
+    await placeOnPageOne(page, marks.nth(1)),
+  ];
+  expect(after[0]!.x).toBeCloseTo(first.x, 3);
+  expect(after[0]!.y).toBeCloseTo(first.y, 3);
+  expect(after[1]!.x).toBeCloseTo(last.x, 3);
+  expect(after[1]!.y).toBeCloseTo(last.y, 3);
+
+  // The key goes to the Mark that has focus, and only to it. Only it is chosen.
+  await marks.nth(1).focus();
+  await page.keyboard.press('ArrowDown');
+  const moved = await placeOnPageOne(page, marks.nth(1));
+  expect(moved.y - last.y).toBeCloseTo(0.01, 2);
+  expect((await placeOnPageOne(page, marks.nth(0))).y).toBeCloseTo(first.y, 3);
+  await expect(marks.nth(0)).toHaveAttribute('aria-pressed', 'false');
+  await expect(marks.nth(1)).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('a Mark stays inside the page, and its size has a smallest and a largest', async ({
+  page,
+}) => {
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  await addTo(page, 1).click();
+  const mark = markOn(page, 1);
+  await expect(mark).toBeFocused();
+
+  // Far past every edge with Shift steps: it touches each and goes no further.
+  for (let i = 0; i < 12; i++) await page.keyboard.press('Shift+ArrowLeft');
+  expect((await placeOnPageOne(page, mark)).x).toBeCloseTo(0, 3);
+  for (let i = 0; i < 12; i++) await page.keyboard.press('Shift+ArrowRight');
+  const right = await placeOnPageOne(page, mark);
+  expect(right.x + right.width).toBeCloseTo(1, 2);
+  for (let i = 0; i < 12; i++) await page.keyboard.press('Shift+ArrowUp');
+  expect((await placeOnPageOne(page, mark)).y).toBeCloseTo(0, 3);
+  for (let i = 0; i < 12; i++) await page.keyboard.press('Shift+ArrowDown');
+  const bottom = await placeOnPageOne(page, mark);
+  expect(bottom.y + bottom.height).toBeCloseTo(1, 2);
+
+  // Growing in a corner pulls it back in, and it stops at the page's width.
+  for (let i = 0; i < 30; i++) await page.keyboard.press('+');
+  const largest = await placeOnPageOne(page, mark);
+  expect(largest.width).toBeLessThanOrEqual(1.001);
+  expect(largest.x).toBeGreaterThanOrEqual(-0.001);
+  expect(largest.y).toBeGreaterThanOrEqual(-0.001);
+  expect(largest.y + largest.height).toBeLessThanOrEqual(1.001);
+  for (let i = 0; i < 60; i++) await page.keyboard.press('-');
+  const smallest = await placeOnPageOne(page, mark);
+  expect(smallest.width).toBeCloseTo(0.05, 2);
+});
+
+test('Smaller, Bigger and Remove are at least 44 px, and named for their Mark', async ({
+  page,
+}) => {
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  await addTo(page, 2).click();
+  const mark = markOn(page, 2);
+  await expect(mark).toBeFocused();
+  const width = async () => (await mark.boundingBox())!.width;
+  const before = await width();
+
+  for (const [words, name] of [
+    ['Bigger', 'Bigger: Signature on page 2'],
+    ['Smaller', 'Smaller: Signature on page 2'],
+    ['Remove', 'Remove: Signature on page 2'],
+    ['Add to page 2', 'Add to page 2'],
+  ] as const) {
+    const button = page.getByRole('button', { name, exact: true });
+    await expect(button).toHaveText(words);
+    const box = (await button.boundingBox())!;
+    expect(box.width, `${words} wide`).toBeGreaterThanOrEqual(44);
+    expect(box.height, `${words} high`).toBeGreaterThanOrEqual(44);
+  }
+  await page.getByRole('button', { name: 'Bigger: Signature on page 2' }).click();
+  expect(await width()).toBeGreaterThan(before * 1.05);
+  await page.getByRole('button', { name: 'Smaller: Signature on page 2' }).click();
+  expect(await width()).toBeCloseTo(before, 0);
+  await page.getByRole('button', { name: 'Remove: Signature on page 2' }).click();
+  await expect(mark).toHaveCount(0);
+  // Only a chosen Mark has buttons.
+  await expect(page.getByRole('button', { name: /^Bigger:/ })).toHaveCount(0);
+  await expect(addTo(page, 2)).toBeFocused();
+});
+
+test('dragging a Mark with the mouse moves it, and the saved PDF has it there', async ({
+  page,
+}) => {
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await choose(page, [sample]);
+  await tapPageOne(page, 0.3, 0.3);
+  const mark = markOn(page, 1);
+  await expect(mark).toBeVisible();
+  // A finger on a Mark drags it; a finger anywhere else on the page still scrolls.
+  await expect(mark).toHaveCSS('touch-action', 'none');
+  await expect(pageOne(page)).toHaveCSS('touch-action', 'auto');
+
+  const before = await placeOnPageOne(page, mark);
+  const box = (await mark.boundingBox())!;
+  const sheet = (await pageOne(page).boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 40, { steps: 8 });
+  await page.mouse.up();
+
+  const after = await placeOnPageOne(page, mark);
+  expect(after.x - before.x).toBeCloseTo(60 / sheet.width, 2);
+  expect(after.y - before.y).toBeCloseTo(40 / sheet.height, 2);
+  expect(after.width).toBeCloseTo(before.width, 3);
+  // Dropping it on the page did not place a second Mark.
+  await expect(markOn(page, 1)).toHaveCount(1);
+
+  const signed = await savedPdf(page);
+  const [picture, ...more] = picturesOn(signed.getPage(0));
+  expect(more).toEqual([]);
+  expectSavedAt(picture!, after);
+  expect(await page.evaluate(() => (window as unknown as { blocked: string[] }).blocked)).toEqual(
+    [],
+  );
+});
+
+test('a drag that leaves the page stops at its edge', async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await choose(page, [sample]);
+  await tapPageOne(page, 0.5, 0.5);
+  const mark = markOn(page, 1);
+  const box = (await mark.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 2000, box.y + box.height / 2 - 2000, {
+    steps: 8,
+  });
+  await page.mouse.up();
+  const after = await placeOnPageOne(page, mark);
+  expect(after.x + after.width).toBeCloseTo(1, 2);
+  expect(after.y).toBeCloseTo(0, 2);
+});
+
+test('at 375 px wide nothing scrolls sideways, with a Mark chosen', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 700 });
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  const sideways = () =>
+    page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(await sideways()).toBeLessThanOrEqual(0);
+  for (const number of [1, 2, 3]) {
+    await addTo(page, number).click();
+    await page.getByRole('button', { name: `Bigger: Signature on page ${number}` }).waitFor();
+    expect(await sideways()).toBeLessThanOrEqual(0);
+  }
+  // Every button, in the page tools and in the chosen Mark's row, fits and is 44 px.
+  for (const name of [/^Add to page/, /^Smaller:/, /^Bigger:/, /^Remove:/]) {
+    for (const button of await page.getByRole('button', { name }).all()) {
+      const box = (await button.boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(box.x + box.width).toBeLessThanOrEqual(375);
+    }
+  }
+  // Ends with a Mark chosen: the checks after the test cover both themes.
+  await expect(markOn(page, 3)).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('the pad draws instead of scrolling, and nothing is kept', async ({ page }) => {

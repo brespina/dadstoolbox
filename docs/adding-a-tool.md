@@ -455,6 +455,20 @@ that builds on it:
   and `x`, `y` (its top-left corner, `y` down from the top) and `width` are fractions of the
   page as shown. It has no stored height: its height always follows from its picture's
   shape.
+- **Moving and resizing Marks** (`marks.ts`). The rules are plain functions, unit-tested in
+  `marks.test.ts`: `nudge` (arrow keys: 1% of the page, 10% with Shift), `resize` (Smaller
+  and Bigger: a tenth, about the centre, from `smallest` to the page's width), `dragTo`,
+  `placeCentred` (a tap) and `placeLowerMiddle` ("Add to page"), and `actionFor`, which turns
+  a key press into an action (or nothing, so shortcuts stay the browser's). Each takes a
+  `Fit`, the picture's shape and the page's shape, because a Mark's height is never stored;
+  every result is kept inside the page. They change only `x`, `y` and `width`.
+  `PlacedMark.svelte` is a Mark on its page for any kind: a focusable button that drags by
+  pointer (with `touch-action: none` on Marks only, so a finger elsewhere still scrolls the
+  pages) and takes the keys, and draws the kind's picture from its `children`.
+  `MarkControls.svelte` is the chosen Mark's Smaller, Bigger and Remove buttons, and
+  takes a kind's own controls as `children`. A new kind adds its name to `notes`, its
+  starting width to `startingWidth`, and its picture to the `PlacedMark` in
+  `FileOptions.svelte`.
 - **The painter seam** (`paint.ts`). `PaintMark` gives a Mark's picture from the Mark and
   the page's options: its `shape` (width ÷ height) and `paint(width, height)`, a
   see-through PNG. `run` (`makeRun(paint)`) works out the place and paints at 300 dots an

@@ -74,14 +74,24 @@ export const tool = defineTool({
     padLabel: 'Signature pad',
     clear: 'Clear',
     // On each chosen PDF's Ready row, over its pages.
-    howToPlace: 'Tap a page where your signature goes.',
+    howToPlace:
+      'Choose what to add, then tap a page to put it there, or use Add to page. Drag it to move it. On a keyboard, arrows move it (Shift for bigger steps), plus and minus resize it, and Delete removes it.',
+    // The choice of what to add. #112 adds Text and Today's date.
+    addLegend: 'Add',
     // {page} is the page number and {name} the PDF's file name.
     pageLabel: 'Page {page} of {name}',
-    markLabel: 'Signature on page {page}',
-    // The placeholder on a Signature Mark before a Signature is drawn.
-    markEmpty: 'Signature',
+    addToPage: 'Add to page {page}',
+    // What a Mark is called, by kind: its name on the page, before a Signature is drawn,
+    // and in its label.
+    kindSignature: 'Signature',
+    // {kind} is the kind's name above.
+    markLabel: '{kind} on page {page}',
+    smaller: 'Smaller',
+    bigger: 'Bigger',
     remove: 'Remove',
-    removeLabel: 'Remove the signature on page {page}',
+    // A chosen Mark's button, named for the Mark it acts on: {action} is the button's
+    // words and {mark} the Mark's label.
+    controlLabel: '{action}: {mark}',
   },
   // Painting a Mark needs the page's canvas.
   worker: false,
