@@ -49,3 +49,35 @@ export function nudge(mark: Mark, direction: Direction, big: boolean, fit: Fit):
   if (direction === 'down') moved.y += by;
   return keepInside(moved, fit);
 }
+
+/** Smaller and Bigger change a Mark's width by this much each time… */
+export const sizeStep = 1.1;
+/** …down to this width, a twentieth of the page… */
+export const smallest = 0.05;
+/** …and up to the page's whole width (less, if the Mark would then be taller than the page). */
+export const largest = 1;
+
+/** The widest a Mark may be: no wider than the page, and no taller than it. */
+function widest(fit: Fit): number {
+  return Math.min(largest, fit.markAspect / fit.pageAspect);
+}
+
+/**
+ * Smaller or Bigger: a tenth off or on the width, about the Mark's centre, within the
+ * smallest and largest sizes, then kept inside the page.
+ */
+export function resize(mark: Mark, way: 'smaller' | 'bigger', fit: Fit): Mark {
+  const factor = way === 'bigger' ? sizeStep : 1 / sizeStep;
+  const width = Math.min(Math.max(mark.width * factor, smallest), Math.max(smallest, widest(fit)));
+  const before = heightOf(mark, fit);
+  const after = heightOf({ width }, fit);
+  return keepInside(
+    {
+      ...mark,
+      width,
+      x: mark.x + (mark.width - width) / 2,
+      y: mark.y + (before - after) / 2,
+    },
+    fit,
+  );
+}
