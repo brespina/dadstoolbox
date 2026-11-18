@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
-import { decodePDFRawStream, PDFArray, PDFDocument, PDFRawStream, type PDFPage } from 'pdf-lib';
+import { PDFDocument } from 'pdf-lib';
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import { ToolFailure } from '../types';
 import { tool, type Mark, type Options } from './declaration';
 import { makeRun } from './run';
 import type { PaintMark } from './paint';
+import { picturesOn } from './pictures-on';
 
 const sample = (name: string) =>
   new File([readFileSync(new URL(name, import.meta.url))], name, { type: 'application/pdf' });
@@ -41,46 +42,11 @@ function standIn() {
   return { paint, asked };
 }
 
-/** Where each picture is drawn on a page, in PDF points: its lower-left corner and size. */
-function picturesOn(page: PDFPage) {
-  const contents = page.node.Contents();
-  const streams = contents instanceof PDFArray ? contents.asArray() : [contents!];
-  const code = streams
-    .map((ref) => page.doc.context.lookup(ref) as PDFRawStream)
-    .map((stream) => new TextDecoder().decode(decodePDFRawStream(stream).decode()))
-    .join('\n');
-  // Follow the drawing state through q, Q and cm, and note it at each Do.
-  type Matrix = [number, number, number, number, number, number];
-  const times = ([a, b, c, d, e, f]: Matrix, [A, B, C, D, E, F]: Matrix): Matrix => [
-    a * A + b * C,
-    a * B + b * D,
-    c * A + d * C,
-    c * B + d * D,
-    e * A + f * C + E,
-    e * B + f * D + F,
-  ];
-  let now: Matrix = [1, 0, 0, 1, 0, 0];
-  const saved: Matrix[] = [];
-  const numbers: number[] = [];
-  const found: { x: number; y: number; width: number; height: number }[] = [];
-  for (const token of code.split(/\s+/)) {
-    if (/^-?[\d.]+$/.test(token)) numbers.push(Number(token));
-    else {
-      if (token === 'q') saved.push(now);
-      if (token === 'Q') now = saved.pop()!;
-      if (token === 'cm') now = times(numbers.slice(-6) as Matrix, now);
-      if (token === 'Do') {
-        const [a, , , d, e, f] = now;
-        found.push({ x: e, y: f, width: a, height: d });
-      }
-      numbers.length = 0;
-    }
-  }
-  return found;
-}
-
-const near = (box: Record<string, number>) =>
-  Object.fromEntries(Object.entries(box).map(([k, v]) => [k, expect.closeTo(v, 3)]));
+/** An upright picture's box, near enough these points. */
+const near = (box: { x: number; y: number; width: number; height: number }) => ({
+  ...Object.fromEntries(Object.entries(box).map(([k, v]) => [k, expect.closeTo(v, 3)])),
+  turn: 0,
+});
 
 describe('Sign a PDF', () => {
   it('saves one PDF, named "signed", with the same pages and the picture where it was tapped', async () => {

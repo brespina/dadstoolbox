@@ -3,7 +3,7 @@
   // scrolling the page. Strokes go into the options as plain numbers, once each line is
   // finished, and are never stored anywhere.
   import type { OptionsProps } from '../types';
-  import { padShape, tool, type Options, type Stroke } from './declaration';
+  import { tool, type Options, type Stroke } from './declaration';
   import { traceStrokes } from './paint';
 
   let { options = $bindable() }: OptionsProps<Options> = $props();
@@ -77,7 +77,6 @@
   <canvas
     bind:this={canvas}
     class="pad"
-    style:aspect-ratio={padShape}
     role="img"
     aria-label={notes.padLabel}
     onpointerdown={start}
@@ -104,6 +103,8 @@
   /* Paper-white in both themes, so the ink shows as it will on the page. */
   .pad {
     width: 100%;
+    /* padShape in declaration.ts. Not a style attribute: the browser lock blocks those. */
+    aspect-ratio: 3;
     border: 2px solid var(--line);
     border-radius: 0.5rem;
     background: #fff;
