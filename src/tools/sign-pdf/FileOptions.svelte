@@ -1,19 +1,30 @@
 <script lang="ts">
-  // One PDF's pages, on its Ready row, where the person taps to place a Signature Mark.
-  // The page viewer (pdf.js) loads here with a dynamic import(), behind "Getting ready…",
-  // so it is never in another Tool's page files (ADR-0006). Pages draw as they come near
-  // view, at the row's width, and are freed far off screen.
+  // One PDF's pages, on its Ready row, where the person places Marks (by a tap or "Add to
+  // page"), moves them (drag or arrow keys) and resizes them. The rules are in marks.ts;
+  // PlacedMark and MarkControls turn events into calls on them. The page viewer (pdf.js)
+  // loads here with a dynamic import(), behind "Getting ready…", so it is never in another
+  // Tool's page files (ADR-0006). Pages draw as they come near view, at the row's width,
+  // and are freed far off screen.
+  import { tick } from 'svelte';
+  import ChoiceGroup from '../../practice/ChoiceGroup.svelte';
   import { fillText as fill, text } from '../../text';
   import { ToolFailure, type FileOptionsProps } from '../types';
   import { hasSignature, padShape, tool, type Mark, type Options } from './declaration';
+  import MarkControls from './MarkControls.svelte';
+  import { placeCentred, placeLowerMiddle, resize, startingWidth, type Fit } from './marks';
   import { paintOnCanvas } from './paint';
+  import PlacedMark from './PlacedMark.svelte';
   import type { ShownPage, ShownPdf } from './viewer';
 
   let { file, options, change, pageOptions }: FileOptionsProps<Options> = $props();
 
   const notes = tool.notes as Record<string, string>;
-  /** A new Signature Mark's width, as a fraction of the page's. */
-  const signatureWidth = 1 / 3;
+  /** Makes element ids unique when several PDFs are chosen. */
+  const uid = $props.id();
+  /** What a Mark is called, by kind. */
+  const kindNames: Record<Mark['kind'], string> = { signature: notes.kindSignature! };
+  /** What the next tap or "Add to page" puts down. #112 adds Text and Today's date. */
+  let kind: Mark['kind'] = $state('signature');
   /** How far, in CSS pixels, a press may move and still count as a tap. */
   const tapSlop = 10;
 
@@ -57,7 +68,10 @@
     let current = true;
     let url: string | undefined;
     // Every Signature Mark has the same picture, so any one will do.
-    paintOnCanvas(newMark('signature', 1, 0, 0), chosen)
+    paintOnCanvas(
+      { kind: 'signature', page: 1, x: 0, y: 0, width: startingWidth('signature') },
+      chosen,
+    )
       .then(async (picture) => {
         const width = 600;
         const png = await picture.paint(width, Math.max(1, Math.round(width / picture.shape)));
@@ -74,39 +88,52 @@
     };
   });
 
-  function newMark(kind: Mark['kind'], page: number, x: number, y: number): Mark {
-    return { kind, page, x, y, width: signatureWidth };
-  }
-
   // The Mark chosen to change or remove, by its place in the list.
   let chosenMark: number | null = $state(null);
 
-  /** Places a Signature Mark centred on a point, as fractions of the page, inside it. */
-  function place(number: number, page: ShownPage, x: number, y: number) {
-    const width = signatureWidth;
-    // The Mark's height on the page, as a fraction of the page's height.
-    const tall = (width * page.width) / signature.shape / page.height;
-    const inside = (start: number, size: number) => Math.min(Math.max(start, 0), 1 - size);
-    const mark = newMark(
-      'signature',
-      number,
-      inside(x - width / 2, width),
-      inside(y - tall / 2, tall),
-    );
-    // Its place in the list, taken before the list changes.
+  /** A page's shape and the Signature's make a Mark's height (ADR-0007). */
+  const fitOf = (page: ShownPage): Fit => ({
+    markAspect: signature.shape,
+    pageAspect: page.width / page.height,
+  });
+  const labelOf = (mark: Mark) =>
+    fill(notes.markLabel!, { kind: kindNames[mark.kind], page: mark.page });
+  const markId = (index: number) => `${uid}-mark-${index}`;
+  const addId = (page: number) => `${uid}-add-${page}`;
+
+  /** Adds a Mark to the list and chooses it. Gives its place in the list. */
+  function add(mark: Mark): number {
     const index = options.marks.length;
+    // A new list: the default `marks` array is shared by every chosen PDF.
     change({ marks: [...options.marks, mark] });
     chosenMark = index;
+    return index;
   }
 
-  function remove(index: number) {
+  function replace(index: number, mark: Mark) {
+    change({ marks: options.marks.map((was, i) => (i === index ? mark : was)) });
+  }
+
+  /** "Add to page N": the lower middle of the page, with the new Mark focused. */
+  async function addToPage(number: number, page: ShownPage) {
+    const index = add(placeLowerMiddle(kind, number, fitOf(page)));
+    await tick();
+    document.getElementById(markId(index))?.focus();
+  }
+
+  /** Takes a Mark away, and moves focus to its page's Add button, not to the page's top. */
+  async function remove(index: number) {
+    const { page } = options.marks[index]!;
     change({ marks: options.marks.filter((_, i) => i !== index) });
     chosenMark = null;
+    await tick();
+    document.getElementById(addId(page))?.focus();
   }
 
   // A press that didn't move is a tap; one that moved was scrolling.
   let pressed: { id: number; x: number; y: number } | null = null;
   function press(event: PointerEvent) {
+    if (event.button !== 0 || !event.isPrimary) return;
     pressed = { id: event.pointerId, x: event.clientX, y: event.clientY };
   }
   function release(event: PointerEvent, number: number, page: ShownPage) {
@@ -117,12 +144,16 @@
     // A tap on a Mark chooses it instead.
     if ((event.target as Element).closest('.mark')) return;
     const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    place(
-      number,
-      page,
-      (event.clientX - box.left) / box.width,
-      (event.clientY - box.top) / box.height,
+    const index = add(
+      placeCentred(
+        kind,
+        number,
+        { x: (event.clientX - box.left) / box.width, y: (event.clientY - box.top) / box.height },
+        fitOf(page),
+      ),
     );
+    // So the arrow keys work at once; the page keeps its place.
+    void tick().then(() => document.getElementById(markId(index))?.focus({ preventScroll: true }));
   }
 
   let rowWidth = $state(0);
@@ -172,11 +203,17 @@
     <p>{text.tool.gettingReady}</p>
   {:else}
     <p class="how-to">{notes.howToPlace}</p>
+    <ChoiceGroup
+      legend={notes.addLegend!}
+      name={`${uid}-kind`}
+      choices={[{ value: 'signature', label: kindNames.signature }]}
+      bind:value={kind}
+    />
     <ol class="pages">
       {#each shown.pages as page, index (index)}
         {@const number = index + 1}
         <li class="page-item">
-          <!-- A tap places a Mark; keyboard placing comes in #113. -->
+          <!-- A tap places a Mark; "Add to page" is the way without a pointer. -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="sheet"
@@ -196,39 +233,45 @@
             ></canvas>
             {#each options.marks as mark, markIndex (markIndex)}
               {#if mark.page === number}
-                <button
-                  type="button"
-                  class="mark"
-                  class:chosen={chosenMark === markIndex}
-                  class:empty={!signature.url}
-                  style:left={`${mark.x * 100}%`}
-                  style:top={`${mark.y * 100}%`}
-                  style:width={`${mark.width * 100}%`}
-                  style:aspect-ratio={signature.shape}
-                  aria-label={fill(notes.markLabel!, { page: number })}
-                  aria-pressed={chosenMark === markIndex}
-                  onclick={() => (chosenMark = chosenMark === markIndex ? null : markIndex)}
+                <PlacedMark
+                  id={markId(markIndex)}
+                  {mark}
+                  fit={fitOf(page)}
+                  label={labelOf(mark)}
+                  chosen={chosenMark === markIndex}
+                  blank={!signature.url}
+                  onchoose={() => (chosenMark = markIndex)}
+                  onchange={(next) => replace(markIndex, next)}
+                  onremove={() => remove(markIndex)}
                 >
                   {#if signature.url}
-                    <img src={signature.url} alt="" />
+                    <img src={signature.url} alt="" draggable="false" />
                   {:else}
-                    <span>{notes.markEmpty}</span>
+                    <span>{kindNames[mark.kind]}</span>
                   {/if}
-                </button>
+                </PlacedMark>
               {/if}
             {/each}
           </div>
-          {#if chosenMark !== null && options.marks[chosenMark]?.page === number}
-            {@const index = chosenMark}
-            <div class="mark-buttons">
-              <button
-                type="button"
-                class="small-button"
-                aria-label={fill(notes.removeLabel!, { page: number })}
-                onclick={() => remove(index)}>{notes.remove}</button
-              >
-            </div>
-          {/if}
+          <div class="page-tools">
+            <button
+              type="button"
+              id={addId(number)}
+              class="small-button"
+              onclick={() => addToPage(number, page)}
+              >{fill(notes.addToPage!, { page: number })}</button
+            >
+            {#if chosenMark !== null && options.marks[chosenMark]?.page === number}
+              {@const index = chosenMark}
+              {@const chosen = options.marks[index]!}
+              <MarkControls
+                label={labelOf(chosen)}
+                onsmaller={() => replace(index, resize(chosen, 'smaller', fitOf(page)))}
+                onbigger={() => replace(index, resize(chosen, 'bigger', fitOf(page)))}
+                onremove={() => remove(index)}
+              />
+            {/if}
+          </div>
         </li>
       {/each}
     </ol>
@@ -275,44 +318,17 @@
     height: 100%;
   }
 
-  .mark {
-    position: absolute;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    border: 2px dashed transparent;
-    background: transparent;
-    cursor: pointer;
-  }
-
-  .mark img {
+  /* The Signature's picture fills its Mark, whose shape it gives. */
+  .page-item img {
+    display: block;
     width: 100%;
     height: 100%;
   }
 
-  /* Before a Signature is drawn: its name in a dashed box, dark on the white page. */
-  .mark.empty {
-    border-color: #555;
-    color: #222;
-    font: inherit;
-    font-size: 0.875rem;
-    font-weight: 600;
-    background: rgb(255 255 255 / 0.85);
-  }
-
-  .mark.chosen {
-    border: 2px solid var(--focus);
-  }
-
-  .mark:focus-visible {
-    outline: 3px solid var(--focus);
-    outline-offset: 2px;
-  }
-
-  .mark-buttons {
+  .page-tools {
     display: flex;
-    justify-content: flex-end;
+    flex-wrap: wrap;
+    align-items: flex-start;
     gap: 0.5rem;
     margin-top: 0.5rem;
   }
