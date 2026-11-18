@@ -420,9 +420,15 @@ video starts and ends. Tools without them work as before.
 - List those option names in `fileOptions`, and give their starting values in
   `defaultOptions` as usual. Each chosen file starts from those values.
 - Add `FileOptions.svelte` to the Tool's folder. The shared page shows it full width on
-  each file's Ready row, with three props: `file` (the chosen File), `options` (that
-  file's own values) and `change(values)`, which sets some of them. Pass plain values:
-  a worker Tool gets a copy.
+  each file's Ready row, with the props in `FileOptionsProps` (`types.ts`): `file` (the
+  chosen File), `options` (that file's own values), `change(values)`, which sets some of
+  them, and `pageOptions`, a read-only copy of the page's options, given again whenever
+  they change (Sign a PDF shows the Signature with it). An editor that doesn't need
+  `pageOptions` leaves it out. Pass plain values: a worker Tool gets a copy.
+- Every Tool page imports every `FileOptions.svelte` (and what it imports) with the
+  page, so keep it small: load a big library inside it with a dynamic `import()`, and
+  show "Getting ready…" (`text.tool.gettingReady`) yourself while it loads, as Sign a
+  PDF does.
 - `run` gets one options object: the page's options, with the file's own values in place.
   A changed value counts as new work for that file only, so start runs it again.
 - To stop start until the values make sense, give `optionsProblem`. Its words go in
@@ -433,6 +439,43 @@ video starts and ends. Tools without them work as before.
 
 Trim a video (`src/tools/trim-video/`) is the worked example: a preview with Start and
 End, each set from where the preview is paused.
+
+## Sign a PDF
+
+Sign a PDF (`src/tools/sign-pdf/`) is a Tool in input mode `each` whose Ready row shows the
+PDF's pages ([ADR-0006](adr/0006-pdf-pages-are-shown-with-pdfjs.md),
+[ADR-0007](adr/0007-marks-are-pictures-on-the-page-as-shown.md)). Its parts, for the work
+that builds on it:
+
+- **The options.** The Signature (see the glossary) and the ink are page options, set by
+  the pad in `Options.svelte`: drawn strokes are lists of `[x, y]` points as fractions of
+  the pad, whose shape is `padShape`. The Marks are the file option `marks`, set by the page
+  editor in `FileOptions.svelte`. Everything is plain data and nothing is stored.
+- **The Mark** (`declaration.ts`) is `{ kind, page, x, y, width }`: `page` counts from 1,
+  and `x`, `y` (its top-left corner, `y` down from the top) and `width` are fractions of the
+  page as shown. It has no stored height: its height always follows from its picture's
+  shape.
+- **The painter seam** (`paint.ts`). `PaintMark` gives a Mark's picture from the Mark and
+  the page's options: its `shape` (width ÷ height) and `paint(width, height)`, a
+  see-through PNG. `run` (`makeRun(paint)`) works out the place and paints at 300 dots an
+  inch of the Mark's size on the page, longest side at most 2000 pixels; the editor uses
+  the same painter to show the Mark. `paintOnCanvas` is the browser's own painting, so the
+  Tool runs with `worker: false`; `run.test.ts` passes a stand-in. `pictures-on.ts` reads
+  back where a saved PDF's pictures landed, for tests.
+- **The shared check** (`can-sign.ts`). `openToSign(bytes)` opens the PDF with pdf-lib,
+  or throws a `ToolFailure` with the reason it can't be signed here (a password, for
+  now). `run` and the editor both call it; the editor shows the reason in place of the
+  pages. A file that isn't a PDF throws an ordinary error, so it gets the shared fallback.
+- **Saving.** `run` draws each Mark on its page and saves with
+  `updateFieldAppearances: false`. It never calls `getForm()`.
+- **The page viewer** (`viewer.ts`) is pdf.js's **legacy** build: the modern build calls
+  the newest JavaScript (such as `Map.prototype.getOrInsertComputed` and `Math.sumPrecise`)
+  that iPhone Safari lacks. Only the editor imports it, with a dynamic `import()`. It runs
+  the shared check, then opens the PDF with `useWasm: false` and draws pages with
+  annotation mode "enable storage", at a pixel ratio of at most 2. Its worker is bundled;
+  the files it asks for by name (CMaps and the plain-script picture decoders) are served
+  from `pdfjs/<version>/` by `src/site/pdfjs-files.ts`. The standard fonts are left out, so
+  the device's own fonts stand in for a font a PDF names but doesn't hold.
 
 ## Options that follow the chosen files
 
@@ -499,7 +542,10 @@ Options must work for phones and keyboards: every tappable thing at least 44 × 
 - **The generated page test** (`tests/e2e/tools.spec.ts`, Playwright, phone-sized WebKit
   and Chromium). Nothing to write: for every discovered Tool it checks the Tool is listed
   on the home page under its Category, then opens the page, chooses `sample.<ext>`,
-  presses start and waits for Save and the "All done" message. A Tool in input mode
+  presses start and waits for Save and the "All done" message. For a Tool whose start
+  waits on the person (its `optionsProblem` gives words for the default options, as Sign a
+  PDF's does until a Mark is placed), it instead checks that start is greyed and the
+  words show. A Tool in input mode
   `none` types `sample.txt` instead, or, with no type box, fills each field named in
   `sample.json`, then waits for the picture and saves it. A Practice Tool's test opens
   the page and checks the heading, the privacy line, the back link and that the area

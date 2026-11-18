@@ -203,3 +203,30 @@ test('a PDF with a password shows the reason in place of its pages', async ({ pa
   await expect(page.getByRole('group', { name: /^Page 1 of/ })).toHaveCount(0);
   await expect(start(page)).toBeDisabled();
 });
+
+test('a long PDF draws its pages near view and frees them far away', async ({ page }) => {
+  const long = await PDFDocument.create();
+  for (let i = 0; i < 40; i++) long.addPage([300, 200]);
+  const buffer = Buffer.from(await long.save());
+  await page.goto('sign-pdf/');
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByText(/Choose (more )?PDFs/).click();
+  await (await chooser).setFiles({ name: 'long.pdf', mimeType: 'application/pdf', buffer });
+
+  const canvasOf = (n: number) =>
+    page.getByRole('group', { name: `Page ${n} of long.pdf`, exact: true }).locator('canvas');
+  const drawnWidth = (n: number) =>
+    canvasOf(n).evaluate((canvas: HTMLCanvasElement) => canvas.width);
+  await expect.poll(() => drawnWidth(1)).toBeGreaterThan(0);
+  // Drawn at the width it shows, at 2 pixels to each CSS pixel: these phones have more.
+  const ratio = await canvasOf(1).evaluate(
+    (canvas: HTMLCanvasElement) => canvas.width / canvas.getBoundingClientRect().width,
+  );
+  expect(ratio).toBeGreaterThan(1.95);
+  expect(ratio).toBeLessThanOrEqual(2);
+  expect(await drawnWidth(40)).toBe(0);
+
+  await canvasOf(40).scrollIntoViewIfNeeded();
+  await expect.poll(() => drawnWidth(40)).toBeGreaterThan(0);
+  await expect.poll(() => drawnWidth(1)).toBe(0);
+});

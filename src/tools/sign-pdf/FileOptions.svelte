@@ -176,7 +176,7 @@
           <!-- A tap places a Mark; keyboard placing comes in #113. -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
-            class="page"
+            class="sheet"
             role="group"
             aria-label={fill(notes.pageLabel!, { page: number, name: file.name })}
             style:aspect-ratio={`${page.width} / ${page.height}`}
@@ -184,7 +184,13 @@
             onpointerup={(event) => release(event, number, page)}
             onpointercancel={() => (pressed = null)}
           >
-            <canvas {@attach (canvas) => drawNearView(canvas, page)} aria-hidden="true"></canvas>
+            <!-- No pixels until it is drawn. -->
+            <canvas
+              width="0"
+              height="0"
+              aria-hidden="true"
+              {@attach (canvas) => drawNearView(canvas, page)}
+            ></canvas>
             {#each options.marks as mark, markIndex (markIndex)}
               {#if mark.page === number}
                 <button
@@ -252,7 +258,7 @@
   }
 
   /* Each page keeps its shape before it is drawn, so scrolling doesn't jump. */
-  .page {
+  .sheet {
     position: relative;
     width: 100%;
     background: #fff;
@@ -260,7 +266,7 @@
     overflow: hidden;
   }
 
-  .page canvas {
+  .sheet canvas {
     display: block;
     width: 100%;
     height: 100%;
