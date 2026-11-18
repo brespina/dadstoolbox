@@ -3,6 +3,7 @@ import { degrees, PDFDocument, PDFName, PDFNumber, type PDFPage } from 'pdf-lib'
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import { ToolFailure } from '../types';
+import { openToSign } from './can-sign';
 import { tool, type Mark, type Options } from './declaration';
 import { makeRun } from './run';
 import type { PaintMark } from './paint';
@@ -176,6 +177,27 @@ describe('Sign a PDF', () => {
     );
     expect(failure).toBeInstanceOf(ToolFailure);
     expect((failure as ToolFailure).reason).toBe(tool.reasons.password);
+  });
+
+  it('fails a PDF that was already signed digitally, with the reason to ask for an unsigned copy', async () => {
+    const { paint, asked } = standIn();
+    const mark: Mark = { kind: 'signature', page: 1, x: 0, y: 0, width: 0.3 };
+    const failure = await makeRun(paint)(sample('sample-signed.pdf'), signed([mark])).catch(
+      (e: unknown) => e,
+    );
+    expect(failure).toBeInstanceOf(ToolFailure);
+    expect((failure as ToolFailure).reason).toBe(tool.reasons.digitallySigned);
+    expect(asked).toEqual([]);
+  });
+
+  it('signs a PDF whose signature field is empty, leaving the field as it was', async () => {
+    const { paint } = standIn();
+    const mark: Mark = { kind: 'signature', page: 1, x: 0.1, y: 0.2, width: 0.5 };
+    const [result] = await makeRun(paint)(sample('sample-signature-field.pdf'), signed([mark]));
+    const doc = await PDFDocument.load(await result!.blob.arrayBuffer());
+    expect(picturesOn(doc.getPage(0))).toHaveLength(1);
+    // Still a signature field, still empty: the same PDF would still be signable.
+    expect(await openToSign(await result!.blob.arrayBuffer())).toBeDefined();
   });
 
   it('throws an ordinary error for a file that is not a PDF', async () => {
