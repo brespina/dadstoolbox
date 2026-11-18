@@ -11,7 +11,13 @@
     type ToolPageState,
   } from '../tools/batch';
   import { toolAt } from '../tools/registry';
-  import { wordsFor, type OptionsProps, type ReadyLine, type ReadyNote } from '../tools/types';
+  import {
+    wordsFor,
+    type FileOptionsProps,
+    type OptionsProps,
+    type ReadyLine,
+    type ReadyNote,
+  } from '../tools/types';
   import { fileTypeOf } from '../tools/file-type';
   import { runInWorker, type AnyRun } from '../tools/worker';
   import { saveFiles, type SavableFile } from '../site/save';
@@ -29,16 +35,11 @@
     { eager: true },
   );
   // A Tool's editor for one chosen file's own options (`fileOptions`), on its Ready row,
-  // such as Trim a video's Start and End. Few Tools have one, and it is small.
-  type FileOptionsProps = {
-    file: File;
-    options: object;
-    change: (values: object) => void;
-  };
-  const fileOptionsComponents = import.meta.glob<{ default: Component<FileOptionsProps> }>(
-    ['../tools/*/FileOptions.svelte', '!../tools/_*/FileOptions.svelte'],
-    { eager: true },
-  );
+  // such as Trim a video's Start and End. Few Tools have one, and it is small: one with
+  // a big library loads it with a dynamic import(), as Sign a PDF does its page viewer.
+  const fileOptionsComponents = import.meta.glob<{
+    default: Component<FileOptionsProps<object>>;
+  }>(['../tools/*/FileOptions.svelte', '!../tools/_*/FileOptions.svelte'], { eager: true });
   // A Tool's own lines for a Ready row, such as an estimated size. Few Tools have one.
   const readyModules = import.meta.glob<{ readyNote: ReadyNote }>([
     '../tools/*/ready.ts',
@@ -279,6 +280,7 @@
                   file={file.file}
                   options={file.fileOptions}
                   change={(values) => toolPage.setFileOptions(file.id, values)}
+                  pageOptions={$state.snapshot(options)}
                 />
               </div>
             {/if}

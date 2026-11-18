@@ -12,3 +12,7 @@ A Mark's place is stored as `{ page, x, y, width }`, each of `x`, `y` and `width
 - `run` never calls pdf-lib's `getForm()` (it drops XFA data) and saves with `updateFieldAppearances: false`, so filled form fields stay exactly as they were.
 
 Planned in spec #108 (Sign a PDF), built from #109.
+
+## Note, 2026-11-18
+
+The decision stands, built from #109. One detail the text left open: a Mark's `x, y` is its top-left corner, as fractions of the page as shown, with `y` measured down from the top.
