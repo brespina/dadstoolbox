@@ -242,6 +242,50 @@ test('Delete and Backspace remove a Mark, and focus goes to its page', async ({ 
   await expect(markOn(page, 1)).toHaveCount(2);
 });
 
+test('removing a middle Mark leaves the others where they were, and keys go to the right one', async ({
+  page,
+}) => {
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  const marks = markOn(page, 1);
+  // Three Marks on one page, each moved somewhere of its own (each Add focuses the new one).
+  await addTo(page, 1).click();
+  await page.keyboard.press('Shift+ArrowLeft');
+  await addTo(page, 1).click();
+  await page.keyboard.press('Shift+ArrowUp');
+  await addTo(page, 1).click();
+  await page.keyboard.press('Shift+ArrowRight');
+  await expect(marks).toHaveCount(3);
+  const first = await placeOnPageOne(page, marks.nth(0));
+  const last = await placeOnPageOne(page, marks.nth(2));
+  expect(first.x).not.toBeCloseTo(last.x, 2);
+
+  // Take the middle one away with its key: focus goes to the page's Add button.
+  await marks.nth(1).focus();
+  await page.keyboard.press('Delete');
+  await expect(marks).toHaveCount(2);
+  await expect(addTo(page, 1)).toBeFocused();
+  const after = [
+    await placeOnPageOne(page, marks.nth(0)),
+    await placeOnPageOne(page, marks.nth(1)),
+  ];
+  expect(after[0]!.x).toBeCloseTo(first.x, 3);
+  expect(after[0]!.y).toBeCloseTo(first.y, 3);
+  expect(after[1]!.x).toBeCloseTo(last.x, 3);
+  expect(after[1]!.y).toBeCloseTo(last.y, 3);
+
+  // The key goes to the Mark that has focus, and only to it. Only it is chosen.
+  await marks.nth(1).focus();
+  await page.keyboard.press('ArrowDown');
+  const moved = await placeOnPageOne(page, marks.nth(1));
+  expect(moved.y - last.y).toBeCloseTo(0.01, 2);
+  expect((await placeOnPageOne(page, marks.nth(0))).y).toBeCloseTo(first.y, 3);
+  await expect(marks.nth(0)).toHaveAttribute('aria-pressed', 'false');
+  await expect(marks.nth(1)).toHaveAttribute('aria-pressed', 'true');
+});
+
 test('a Mark stays inside the page, and its size has a smallest and a largest', async ({
   page,
 }) => {

@@ -72,7 +72,7 @@ export const tool = defineTool({
     clear: 'Clear',
     // On each chosen PDF's Ready row, over its pages.
     howToPlace:
-      'Tap a page to put it there, or use Add to page. Drag it to move it. On a keyboard, arrows move it (Shift for bigger steps), plus and minus resize it, and Delete removes it.',
+      'Choose what to add, then tap a page to put it there, or use Add to page. Drag it to move it. On a keyboard, arrows move it (Shift for bigger steps), plus and minus resize it, and Delete removes it.',
     // The choice of what to add. #112 adds Text and Today's date.
     addLegend: 'Add',
     // {page} is the page number and {name} the PDF's file name.

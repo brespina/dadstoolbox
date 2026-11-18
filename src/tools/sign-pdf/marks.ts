@@ -64,8 +64,9 @@ function widest(fit: Fit): number {
 }
 
 /**
- * Smaller or Bigger: a tenth off or on the width, about the Mark's centre, within the
- * smallest and largest sizes, then kept inside the page.
+ * Smaller or Bigger: the width a tenth more (Bigger) or the same step back (Smaller, so it
+ * undoes Bigger), about the Mark's centre, within the smallest and largest sizes, then kept
+ * inside the page.
  */
 export function resize(mark: Mark, way: 'smaller' | 'bigger', fit: Fit): Mark {
   const factor = way === 'bigger' ? sizeStep : 1 / sizeStep;

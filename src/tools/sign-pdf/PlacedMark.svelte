@@ -85,8 +85,6 @@
   }
 
   function onkeydown(event: KeyboardEvent) {
-    // Keys typed into something inside the Mark (such as a words box) are its own.
-    if (event.target !== event.currentTarget) return;
     const action = actionFor(event);
     if (!action) return;
     event.preventDefault();
