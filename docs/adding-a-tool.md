@@ -466,7 +466,8 @@ that builds on it:
   or throws a `ToolFailure` with the reason it can't be signed here: a password, or a
   signature field that holds a value (saving would break that seal; an empty signature
   field is fine). It reads the AcroForm dictionary directly, never `getForm()`. `run` and
-  the editor both call it; the editor shows the reason in place of the pages. A file that isn't a PDF throws an ordinary error, so it gets the shared fallback.
+  the editor both call it; the editor shows the reason in place of the pages. A file that
+  isn't a PDF throws an ordinary error, so it gets the shared fallback.
 - **Page geometry** (`page-geometry.ts`). Pure: `placeOnPage(page, mark, shape)` maps a
   Mark's fractions of the page as shown to the PDF's own points (the picture's lower-left
   corner, its size and its turn), from the page's raw MediaBox, CropBox and `/Rotate`, the

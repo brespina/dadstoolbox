@@ -64,7 +64,7 @@ export const tool = defineTool({
     password: text.pdfs.password,
     // A signature field that holds a value: saving the PDF again would break that seal.
     digitallySigned:
-      'This PDF was already signed digitally. Signing it here would break that seal. Ask the sender for an unsigned copy.',
+      'This PDF was already signed digitally, and signing it here would break that seal. Ask the sender for an unsigned copy.',
   },
   notes: {
     nothingPlaced,
