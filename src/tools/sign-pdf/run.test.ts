@@ -84,6 +84,13 @@ describe('Sign a PDF', () => {
     expect(asked.map(({ width, height }) => [width, height])).toEqual([[2000, 1000]]);
   });
 
+  it('paints a very small Mark at least a pixel each way', async () => {
+    const { paint, asked } = standIn();
+    const mark: Mark = { kind: 'signature', page: 1, x: 0, y: 0, width: 0.0001 };
+    await makeRun(paint)(sample('sample.pdf'), signed([mark]));
+    expect(asked.map(({ width, height }) => [width, height])).toEqual([[1, 1]]);
+  });
+
   it('keeps what is typed in a form field', async () => {
     const form = await PDFDocument.create();
     const page = form.addPage([300, 200]);

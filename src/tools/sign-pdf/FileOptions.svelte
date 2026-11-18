@@ -93,8 +93,10 @@
       inside(x - width / 2, width),
       inside(y - tall / 2, tall),
     );
+    // Its place in the list, taken before the list changes.
+    const index = options.marks.length;
     change({ marks: [...options.marks, mark] });
-    chosenMark = options.marks.length;
+    chosenMark = index;
   }
 
   function remove(index: number) {

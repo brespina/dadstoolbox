@@ -30,7 +30,11 @@ function placeOn(page: PDFPage, mark: Mark, shape: number) {
 /** The picture's size in pixels for a place on the page `width` × `height` points. */
 function pixelsFor(width: number, height: number) {
   const scale = Math.min(dotsPerInch / pointsPerInch, longestSide / Math.max(width, height));
-  return { width: Math.round(width * scale), height: Math.round(height * scale) };
+  // At least a pixel each way, so a very small Mark still paints.
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
 }
 
 async function drawMark(doc: PDFDocument, mark: Mark, options: Options, paint: PaintMark) {

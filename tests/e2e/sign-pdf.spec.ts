@@ -4,7 +4,7 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { test, expect } from './fixtures';
 import { tool } from '../../src/tools/sign-pdf/declaration';
 import { picturesOn } from '../../src/tools/sign-pdf/pictures-on';
@@ -229,4 +229,45 @@ test('a long PDF draws its pages near view and frees them far away', async ({ pa
   await canvasOf(40).scrollIntoViewIfNeeded();
   await expect.poll(() => drawnWidth(40)).toBeGreaterThan(0);
   await expect.poll(() => drawnWidth(1)).toBe(0);
+});
+
+test('a PDF that uses the standard fonts without holding them still shows its words', async ({
+  page,
+}) => {
+  // Helvetica, Times and Courier named but not embedded: the device's own fonts stand in
+  // (the standard font files are not served, see src/site/pdfjs-files.ts).
+  const plain = await PDFDocument.create();
+  const sheet = plain.addPage([300, 200]);
+  let baseline = 160;
+  for (const name of [StandardFonts.Helvetica, StandardFonts.TimesRoman, StandardFonts.Courier]) {
+    sheet.drawText('Print name: Ana Diaz', {
+      x: 20,
+      y: baseline,
+      size: 18,
+      font: await plain.embedFont(name, { subset: false }),
+    });
+    baseline -= 50;
+  }
+  const buffer = Buffer.from(await plain.save());
+  await page.goto('sign-pdf/');
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByText(/Choose (more )?PDFs/).click();
+  await (await chooser).setFiles({ name: 'words.pdf', mimeType: 'application/pdf', buffer });
+
+  // The page is 200 points high and each line sits in its own 50-point band from the top.
+  // A drawn page's canvas is see-through except where there is ink.
+  const inked = (band: number) =>
+    page
+      .getByRole('group', { name: 'Page 1 of words.pdf', exact: true })
+      .locator('canvas')
+      .evaluate((canvas: HTMLCanvasElement, band) => {
+        const height = Math.floor(canvas.height / 4);
+        const { data } = canvas
+          .getContext('2d')!
+          .getImageData(0, height * band, canvas.width, height);
+        return data.filter((value, i) => i % 4 === 3 && value > 0).length;
+      }, band);
+  for (const band of [0, 1, 2]) {
+    await expect.poll(() => inked(band), { message: `ink in band ${band}` }).toBeGreaterThan(100);
+  }
 });
