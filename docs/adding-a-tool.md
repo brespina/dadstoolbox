@@ -463,9 +463,15 @@ that builds on it:
   Tool runs with `worker: false`; `run.test.ts` passes a stand-in. `pictures-on.ts` reads
   back where a saved PDF's pictures landed, for tests.
 - **The shared check** (`can-sign.ts`). `openToSign(bytes)` opens the PDF with pdf-lib,
-  or throws a `ToolFailure` with the reason it can't be signed here (a password, for
-  now). `run` and the editor both call it; the editor shows the reason in place of the
-  pages. A file that isn't a PDF throws an ordinary error, so it gets the shared fallback.
+  or throws a `ToolFailure` with the reason it can't be signed here: a password, or a
+  signature field that holds a value (saving would break that seal; an empty signature
+  field is fine). It reads the AcroForm dictionary directly, never `getForm()`. `run` and
+  the editor both call it; the editor shows the reason in place of the pages. A file that isn't a PDF throws an ordinary error, so it gets the shared fallback.
+- **Page geometry** (`page-geometry.ts`). Pure: `placeOnPage(page, mark, shape)` maps a
+  Mark's fractions of the page as shown to the PDF's own points (the picture's lower-left
+  corner, its size and its turn), from the page's raw MediaBox, CropBox and `/Rotate`, the
+  way pdf.js works out the visible box and turn. Only `run` uses it. `run.test.ts` checks
+  where the pictures land on turned and cropped pages with `pictures-on.ts`.
 - **Saving.** `run` draws each Mark on its page and saves with
   `updateFieldAppearances: false`. It never calls `getForm()`.
 - **The page viewer** (`viewer.ts`) is pdf.js's **legacy** build: the modern build calls
