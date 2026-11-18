@@ -3,6 +3,7 @@
 // kind uses them. A Mark's place is `x`, `y` and `width`, fractions of the page as shown
 // (ADR-0007); its height is never stored, it follows from the picture's shape.
 
+import { isShortcut } from '../../practice/keys';
 import type { Mark } from './declaration';
 
 /**
@@ -80,4 +81,65 @@ export function resize(mark: Mark, way: 'smaller' | 'bigger', fit: Fit): Mark {
     },
     fit,
   );
+}
+
+/** A new Mark's width: a third of the page for a Signature. #112 adds the other kinds. */
+export function startingWidth(_kind: Mark['kind']): number {
+  return 1 / 3;
+}
+
+/** A point on a page, as fractions of the page as shown. */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/** A new Mark of this kind on `page`, centred on `point` (a tap), kept inside the page. */
+export function placeCentred(kind: Mark['kind'], page: number, point: Point, fit: Fit): Mark {
+  const width = startingWidth(kind);
+  const height = heightOf({ width }, fit);
+  return keepInside({ kind, page, x: point.x - width / 2, y: point.y - height / 2, width }, fit);
+}
+
+/** Where "Add to page" puts a new Mark: centred across, and four fifths of the way down. */
+export function placeLowerMiddle(kind: Mark['kind'], page: number, fit: Fit): Mark {
+  return placeCentred(kind, page, { x: 0.5, y: 0.8 }, fit);
+}
+
+/**
+ * A drag: the Mark with the point it was grabbed at (`grab`, its distance from the Mark's
+ * top-left, as fractions of the page) under the pointer, kept inside the page.
+ */
+export function dragTo(mark: Mark, grab: Point, pointer: Point, fit: Fit): Mark {
+  return keepInside({ ...mark, x: pointer.x - grab.x, y: pointer.y - grab.y }, fit);
+}
+
+/** What a key does to a chosen Mark. */
+export type MarkAction =
+  | { do: 'move'; direction: Direction; big: boolean }
+  | { do: 'size'; way: 'smaller' | 'bigger' }
+  | { do: 'remove' };
+
+const arrows: Record<string, Direction> = {
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+};
+
+/**
+ * What a key press does to a chosen Mark, or nothing (the browser keeps the key). Arrows
+ * move, + and - resize (= and _ are the same keys without Shift), Delete and Backspace
+ * remove. Shortcuts such as Ctrl+- (zoom) or Alt+Left (back) stay the browser's.
+ */
+export function actionFor(
+  event: Pick<KeyboardEvent, 'key' | 'shiftKey' | 'ctrlKey' | 'altKey' | 'metaKey'>,
+): MarkAction | undefined {
+  if (isShortcut(event) || (event.altKey && event.key.length > 1)) return undefined;
+  const direction = arrows[event.key];
+  if (direction) return { do: 'move', direction, big: event.shiftKey };
+  if (event.key === '+' || event.key === '=') return { do: 'size', way: 'bigger' };
+  if (event.key === '-' || event.key === '_') return { do: 'size', way: 'smaller' };
+  if (event.key === 'Delete' || event.key === 'Backspace') return { do: 'remove' };
+  return undefined;
 }
