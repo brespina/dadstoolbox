@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { PDFDocument } from 'pdf-lib';
+import { degrees, PDFDocument, PDFName, PDFNumber, type PDFPage } from 'pdf-lib';
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import { ToolFailure } from '../types';
@@ -65,6 +65,68 @@ describe('Sign a PDF', () => {
     // 150 wide (half of 300) and so 75 high; its top-left corner 30 in and 40 down,
     // and PDF points count up from the bottom.
     expect(picturesOn(doc.getPage(1))).toEqual([near({ x: 30, y: 85, width: 150, height: 75 })]);
+  });
+
+  describe('on turned and cropped pages', () => {
+    // A page 400 × 300 whose visible box is 50..350 across and 20..220 up, turned as asked.
+    // The Mark is a tenth in, a fifth down and half the page's width, on a 2 : 1 picture.
+    const mark: Mark = { kind: 'signature', page: 1, x: 0.1, y: 0.2, width: 0.5 };
+    const made = async (build: (doc: PDFDocument, page: PDFPage) => void) => {
+      const source = await PDFDocument.create();
+      build(source, source.addPage([400, 300]));
+      const { paint, asked } = standIn();
+      const [result] = await makeRun(paint)(asFile(await source.save()), signed([mark]));
+      const doc = await PDFDocument.load(await result!.blob.arrayBuffer());
+      return { page: doc.getPage(0), asked };
+    };
+    const crop = (page: PDFPage) => page.setCropBox(50, 20, 300, 200);
+
+    // The box each picture covers in the saved PDF, worked by hand (page-geometry.test.ts).
+    it.each([
+      [0, { x: 80, y: 105, width: 150, height: 75 }],
+      [90, { x: 110, y: 40, width: 50, height: 100 }],
+      [180, { x: 170, y: 60, width: 150, height: 75 }],
+      [270, { x: 240, y: 100, width: 50, height: 100 }],
+    ])('puts a Mark where it was placed on a cropped page turned %i', async (turn, box) => {
+      const { page } = await made((_, page) => {
+        crop(page);
+        page.setRotation(degrees(turn));
+      });
+      expect(picturesOn(page)).toEqual([{ ...near(box), turn }]);
+      // The page's own turn is untouched.
+      expect(page.getRotation().angle).toBe(turn);
+    });
+
+    it('keeps the picture as wide as it is on the page, whatever the turn', async () => {
+      const { asked } = await made((_, page) => {
+        crop(page);
+        page.setRotation(degrees(90));
+      });
+      // 100 × 50 points is 1 7/18 × 25/36 inches: 417 × 208 dots, the same as on an unturned page.
+      expect(asked.map(({ width, height }) => [width, height])).toEqual([[417, 208]]);
+    });
+
+    it('follows a turn the pages inherit from the page tree', async () => {
+      const { page } = await made((doc, page) => {
+        crop(page);
+        doc.catalog.Pages().set(PDFName.of('Rotate'), PDFNumber.of(90));
+      });
+      expect(picturesOn(page)).toEqual([
+        { ...near({ x: 110, y: 40, width: 50, height: 100 }), turn: 90 },
+      ]);
+    });
+
+    it('treats a page with no media box as Letter, as the page viewer does', async () => {
+      const { page } = await made((_, page) => page.node.delete(PDFName.of('MediaBox')));
+      // Letter is 612 × 792: the picture is 306 × 153, lower-left 61.2 across, 158.4 + 153 down.
+      expect(picturesOn(page)).toEqual([near({ x: 61.2, y: 480.6, width: 306, height: 153 })]);
+    });
+
+    it('follows a visible box that starts away from the corner, with no crop box', async () => {
+      const { page } = await made((_, page) => page.setMediaBox(10, 10, 400, 300));
+      // Page 400 × 300 from 10, 10: the picture is 200 × 100, lower-left 40 across, 160 down.
+      expect(picturesOn(page)).toEqual([near({ x: 50, y: 150, width: 200, height: 100 })]);
+    });
   });
 
   it('paints each Mark at 300 dots an inch of its size on the page, in the ink', async () => {
