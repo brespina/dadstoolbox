@@ -56,6 +56,7 @@
     }
     let current = true;
     let url: string | undefined;
+    // Every Signature Mark has the same picture, so any one will do.
     paintOnCanvas(newMark('signature', 1, 0, 0), chosen)
       .then(async (picture) => {
         const width = 600;
