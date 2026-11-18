@@ -4,7 +4,7 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { degrees, PDFDocument, StandardFonts } from 'pdf-lib';
 import { test, expect } from './fixtures';
 import { tool } from '../../src/tools/sign-pdf/declaration';
 import { picturesOn } from '../../src/tools/sign-pdf/pictures-on';
@@ -13,6 +13,8 @@ const samples = fileURLToPath(new URL('../../src/tools/sign-pdf/', import.meta.u
 // Three pages, each 300 × 200 points.
 const sample = `${samples}sample.pdf`;
 const locked = `${samples}sample-password.pdf`;
+const signed = `${samples}sample-signed.pdf`;
+const emptyField = `${samples}sample-signature-field.pdf`;
 const notes = tool.notes as Record<string, string>;
 
 /** The page viewer's files: pdf.js's own code and its worker. */
@@ -497,6 +499,69 @@ test('a PDF with a password shows the reason in place of its pages', async ({ pa
   await expect(page.getByText(tool.reasons.password!, { exact: true })).toBeVisible();
   await expect(page.getByRole('group', { name: /^Page 1 of/ })).toHaveCount(0);
   await expect(start(page)).toBeDisabled();
+});
+
+test('a PDF already signed digitally shows the reason in place of its pages', async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await choose(page, [signed]);
+  await expect(page.getByText(tool.reasons.digitallySigned!, { exact: true })).toBeVisible();
+  await expect(page.getByRole('group', { name: /^Page 1 of/ })).toHaveCount(0);
+  await expect(start(page)).toBeDisabled();
+});
+
+test('a PDF with an empty signature field shows its pages and signs', async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await choose(page, [emptyField]);
+  const sheet = page.getByRole('group', { name: 'Page 1 of sample-signature-field.pdf' });
+  await expect(sheet).toBeVisible();
+  await sheet.click();
+  await expect(start(page)).toBeEnabled();
+});
+
+test('a turned, cropped page shows as it reads, and the saved Mark sits upright where it was tapped', async ({
+  page,
+}) => {
+  // 400 × 300 points with a visible box 50..350 across and 20..220 up, turned a quarter
+  // clockwise: it shows 200 across and 300 down.
+  const made = await PDFDocument.create();
+  const sheet = made.addPage([400, 300]);
+  sheet.setCropBox(50, 20, 300, 200);
+  sheet.setRotation(degrees(90));
+  const buffer = Buffer.from(await made.save());
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByText(/Choose (more )?PDFs/).click();
+  await (await chooser).setFiles({ name: 'turned.pdf', mimeType: 'application/pdf', buffer });
+
+  const shown = page.getByRole('group', { name: 'Page 1 of turned.pdf' });
+  await expect(shown).toBeVisible();
+  // The editor shows the turned page: taller than wide, 200 : 300.
+  const box = (await shown.boundingBox())!;
+  expect(box.height / box.width).toBeCloseTo(1.5, 2);
+  // Tapped a quarter in from the left and a quarter down from the top.
+  await shown.click({ position: { x: box.width * 0.25, y: box.height * 0.25 } });
+  await start(page).click();
+  const saved = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save turned_dtb_signed.pdf' }).click();
+  const doc = await PDFDocument.load(await readFile((await (await saved).path())!));
+  expect(doc.getPage(0).getRotation().angle).toBe(90);
+  const [picture, ...more] = picturesOn(doc.getPage(0));
+  expect(more).toEqual([]);
+  // Shown 200 across and 300 down, the tap is 50 across and 75 down. Across counts up the
+  // PDF on this page and down counts across it: from the visible box's lower-left (50, 20)
+  // that is x = 50 + 75, y = 20 + 50. The picture is turned to read upright.
+  const within = (value: number, expected: number) =>
+    expect(Math.abs(value - expected)).toBeLessThan(2);
+  within(picture!.x + picture!.width / 2, 125);
+  within(picture!.y + picture!.height / 2, 70);
+  expect(picture!.turn).toBe(90);
+  // A third of the page across (66.7 points), now along the PDF's up; higher than wide
+  // there, as the picture is wider than it is high on the page.
+  within(picture!.height, 200 / 3);
+  expect(picture!.width).toBeLessThan(picture!.height);
 });
 
 test('a long PDF draws its pages near view and frees them far away', async ({ page }) => {
