@@ -14,7 +14,7 @@ The process comes from `implement-spec`; this skill adds what this repo learned.
 3. **Notes folder.** Create `~/.cache/dadstoolbox/spec-<n>/`, which outlasts the session, so a resumed build keeps it. Spawn one exploration subagent (model and effort from [`models.md`](models.md)) to write per-ticket notes there (libraries with versions and licenses, browser facts, pitfalls). Keep a `shared-machinery.md` there, and append each implementer's report of new shared APIs to it.
 4. **Implementers.** For each frontier ticket, give it a kind and spawn a background subagent with `isolation: "worktree"`, using that kind's model and effort from [`models.md`](models.md). When the ticket answers one of its open questions, run it as a duel instead. Its prompt is [`implementer.md`](implementer.md) with the placeholders filled in, plus a line about any parallel tickets that touch the same shared files. Give each its own `E2E_PORT` (5000 + ticket number).
 5. **Review.** When an implementer reports its PR, spawn a fresh reviewer from [`reviewer.md`](reviewer.md), with its model and effort from [`models.md`](models.md). If the user asks to save tokens, skip this step and rely on step 7.
-6. **Merge.** Turn on auto-merge: `gh pr merge <pr> --auto --merge`. GitHub merges it once `checks` passes on a branch that is up to date with the integration branch. When the PR is behind, send it back to its implementer (or a fresh one) to merge the integration branch, carry the other tickets' changes through its own work, and rerun the checks. Add the implementer's report to `shared-machinery.md`, then spawn implementers for the new frontier.
+6. **Merge.** Turn on auto-merge: `gh pr merge <pr> --auto --merge`. GitHub merges it once `checks` passes on a branch that is up to date with the integration branch. When the PR is behind with no conflicts, bring it up to date with `gh pr update-branch <pr>` and let the checks rerun. When it conflicts, send it back to its implementer (or a fresh one) to merge the integration branch, carry the other tickets' changes through its own work, and rerun the checks. Add the implementer's report to `shared-machinery.md`, then spawn implementers for the new frontier.
 7. **Final review.** Once every ticket is merged, spawn one fresh reviewer from [`reviewer.md`](reviewer.md), with the whole-branch model from [`models.md`](models.md), on the whole integration branch against `origin/main`, opening its fixes as one PR into the integration branch.
 8. **Ship.** Open a PR from the integration branch into `main` with `Closes #<n>` for the spec and every ticket. Auto-merge it, watch the Deploy run until it finishes, then load the live pages with `curl`.
 9. **Learn.** Log every duel and rescue in [`models.md`](models.md), apply its rules for changing the table, and open the change as a PR. Tell the user what changed and why.
@@ -30,11 +30,15 @@ The process comes from `implement-spec`; this skill adds what this repo learned.
 
 Every agent ends its work with a break, as the last step of its own prompt (see [`implementer.md`](implementer.md), [`reviewer.md`](reviewer.md), [`judge.md`](judge.md)), so no extra message has to wake it again:
 
-- It stops its preview servers and writes a few lines about anything it likes to a new `.txt` file in the breaks worktree, named after its role and ticket, without reading the other notes there.
-- Its report says what it would most love to do on its break. Pass the answer to the user.
-- Fill `{BREAKS}` with the breaks worktree path. Keep the step's wording free of praise for the work's quality, because praise biases an agent's later checking.
+- It stops its preview servers and ends its report with a few lines about something non-work it would love to do. It writes no file: an agent in a `worktree` can't write outside it (spec #108).
+- You write those lines to a new `.md` file in the breaks worktree, named after the spec, role and ticket (`spec-108-ticket-110-reviewer.md`), commit and push it, and pass the answer to the user.
+- Keep the step's wording free of praise for the work's quality, because praise biases an agent's later checking.
 
-The breaks worktree holds the orphan `agent-breaks` branch: `git fetch origin agent-breaks && git worktree add <scratchpad>/breaks agent-breaks`. You commit and push each note, and remove the worktree at clean-up.
+The breaks worktree holds the orphan `agent-breaks` branch: `git fetch origin agent-breaks && git worktree add <scratchpad>/breaks agent-breaks`. Remove it at clean-up.
+
+## Skills a subagent can't call
+
+`grill-with-docs`, `to-spec`, `to-tickets`, `handoff` and `retro` can only be started by the user. An interviewer subagent runs `mattpocock-skills:grilling` and `mattpocock-skills:domain-modeling` instead, and writes the spec and tickets in the shape of the last spec's issues (spec #108 did this).
 
 ## When `gh` fails
 

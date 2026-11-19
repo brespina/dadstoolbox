@@ -50,6 +50,7 @@ A tie goes to the cheaper arm: the question is whether the cheaper model is enou
 
 - ~~Is haiku at high effort enough for **pattern** tickets?~~ No (log row 1): it copied shared code and cost more tokens. Closed.
 - ~~Is sonnet at high effort enough for **hand-drawn** tickets?~~ Yes (log rows 2 and 3): a tie, then a win. Closed.
+- Is sonnet at **medium** effort enough for **pattern** tickets? Planned duel: #113 (spec #108), sonnet high against sonnet medium.
 - Is opus at medium effort a better one-PR reviewer than sonnet at high? Not duelled yet: reviewers fix code, so a duel needs a findings-only variant.
 
 ## Log
