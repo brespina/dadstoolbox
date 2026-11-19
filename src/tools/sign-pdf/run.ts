@@ -5,7 +5,8 @@ import { degrees, PDFNumber, type PDFArray, type PDFDocument, type PDFPage } fro
 import type { ToolRun } from '../types';
 import { openToSign } from './can-sign';
 import type { Mark, Options } from './declaration';
-import { placeOnPage, type PageBoxes } from './page-geometry';
+import { keepInside } from './marks';
+import { placeOnPage, shownSize, type PageBoxes } from './page-geometry';
 import { paintOnCanvas, type PaintMark } from './paint';
 
 /** Marks are painted at this many dots an inch of their size on the page (ADR-0007)… */
@@ -48,7 +49,15 @@ function pixelsFor(width: number, height: number) {
 async function drawMark(doc: PDFDocument, mark: Mark, options: Options, paint: PaintMark) {
   const page = doc.getPage(mark.page - 1);
   const picture = await paint(mark, options);
-  const place = placeOnPage(boxesOf(page), mark, picture.shape);
+  const boxes = boxesOf(page);
+  const shown = shownSize(boxes);
+  // Inside the page by the same rule as the editor, in case the picture's shape changed
+  // after the Mark was placed.
+  const inside = keepInside(mark, {
+    markAspect: picture.shape,
+    pageAspect: shown.width / shown.height,
+  });
+  const place = placeOnPage(boxes, inside, picture.shape);
   const pixels = pixelsFor(place.width, place.height);
   const image = await doc.embedPng(await picture.paint(pixels.width, pixels.height));
   page.drawImage(image, {

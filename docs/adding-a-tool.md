@@ -466,9 +466,12 @@ that builds on it:
   pointer (with `touch-action: none` on Marks only, so a finger elsewhere still scrolls the
   pages) and takes the keys, and draws the kind's picture from its `children`.
   `MarkControls.svelte` is the chosen Mark's Smaller, Bigger and Remove buttons, and
-  takes a kind's own controls as `children`. A new kind adds its name to `notes`, its
-  starting width to `startingWidth`, and its picture to the `PlacedMark` in
-  `FileOptions.svelte`.
+  takes a kind's own controls as `children`. A new kind (#112 adds Text) adds its name to
+  `notes` and `kindNames`, its choice to the Add choice, its starting width to
+  `startingWidth`, its picture to the `PlacedMark` in `FileOptions.svelte`, and its own
+  shape to `fitOf` there (today every Mark has the Signature's shape). When a picture's
+  shape changes after its Marks were placed, the editor and `run` fit them back inside
+  the page with `keepInside`.
 - **The painter seam** (`paint.ts`). `PaintMark` gives a Mark's picture from the Mark and
   the page's options: its `shape` (width ÷ height) and `paint(width, height)`, a
   see-through PNG. `run` (`makeRun(paint)`) works out the place and paints at 300 dots an

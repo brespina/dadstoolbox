@@ -4,6 +4,7 @@ import {
   actionFor,
   dragTo,
   heightOf,
+  keepInside,
   nudge,
   placeCentred,
   placeLowerMiddle,
@@ -125,6 +126,31 @@ describe('making a Mark smaller or bigger', () => {
     const bottom = resize(mark(0.4, 0.9, 0.6), 'bigger', fit);
     expect(bottom.y + heightOf(bottom, fit)).toBeLessThanOrEqual(1 + 1e-9);
     expect(bottom.y).toBeGreaterThan(0.5);
+  });
+});
+
+describe('fitting a Mark to a Signature drawn after it was placed', () => {
+  // Placed with the pad's shape (3), then the Signature drawn is taller than that.
+  it('moves a Mark up when its new height would run past the bottom', () => {
+    const square = { markAspect: 1, pageAspect: 1.5 };
+    const fitted = keepInside(mark(0.3, 0.8), square);
+    expect(fitted.width).toBeCloseTo(1 / 3, 10);
+    expect(fitted.x).toBe(0.3);
+    expect(fitted.y + heightOf(fitted, square)).toBeCloseTo(1, 10);
+  });
+
+  it('makes a Mark narrower when its new shape would be taller than the page', () => {
+    // A picture four times as high as it is wide: at a third of the page wide it would be
+    // twice the page's height.
+    const tall = { markAspect: 0.25, pageAspect: 1.5 };
+    const fitted = keepInside(mark(0.3, 0.5), tall);
+    expect(fitted.width).toBeCloseTo(0.25 / 1.5, 10);
+    expect(fitted.y).toBe(0);
+    expect(heightOf(fitted, tall)).toBeCloseTo(1, 10);
+  });
+
+  it('leaves a Mark that already fits as it was', () => {
+    expect(keepInside(mark(0.2, 0.3), fit)).toEqual(mark(0.2, 0.3));
   });
 });
 
