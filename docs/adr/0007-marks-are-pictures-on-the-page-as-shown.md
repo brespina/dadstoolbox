@@ -15,4 +15,4 @@ Planned in spec #108 (Sign a PDF), built from #109.
 
 ## Note, 2026-11-18
 
-The decision stands, built from #109. One detail the text left open: a Mark's `x, y` is its top-left corner, as fractions of the page as shown, with `y` measured down from the top.
+The decision stands, built from #109. One detail the text left open: a Mark's `x, y` is its top-left corner, as fractions of the page as shown, with `y` measured down from the top. Built so far is the drawn Signature only: the typed Signature comes with #113 and the line of words with #112. A Mark whose picture's shape changes after it was placed (a Signature drawn after placing) is fitted back inside its page, by the editor and by `run`.

@@ -5,13 +5,20 @@
   // loads here with a dynamic import(), behind "Getting ready…", so it is never in another
   // Tool's page files (ADR-0006). Pages draw as they come near view, at the row's width,
   // and are freed far off screen.
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import ChoiceGroup from '../../practice/ChoiceGroup.svelte';
   import { fillText as fill, text } from '../../text';
   import { ToolFailure, type FileOptionsProps } from '../types';
   import { hasSignature, padShape, tool, type Mark, type Options } from './declaration';
   import MarkControls from './MarkControls.svelte';
-  import { placeCentred, placeLowerMiddle, resize, startingWidth, type Fit } from './marks';
+  import {
+    keepInside,
+    placeCentred,
+    placeLowerMiddle,
+    resize,
+    startingWidth,
+    type Fit,
+  } from './marks';
   import { paintOnCanvas } from './paint';
   import PlacedMark from './PlacedMark.svelte';
   import type { ShownPage, ShownPdf } from './viewer';
@@ -96,6 +103,26 @@
     markAspect: signature.shape,
     pageAspect: page.width / page.height,
   });
+
+  // Drawing, clearing or redrawing the Signature changes its shape, and so the height of
+  // every Mark already placed (one placed before drawing has the pad's shape): fit each
+  // back inside its page, as `run` does.
+  $effect(() => {
+    const pages = shown?.pages;
+    void signature.shape;
+    if (!pages) return;
+    untrack(() => {
+      const fitted = options.marks.map((mark) => keepInside(mark, fitOf(pages[mark.page - 1]!)));
+      const moved = fitted.some(
+        (mark, i) =>
+          mark.x !== options.marks[i]!.x ||
+          mark.y !== options.marks[i]!.y ||
+          mark.width !== options.marks[i]!.width,
+      );
+      if (moved) change({ marks: fitted });
+    });
+  });
+
   const labelOf = (mark: Mark) =>
     fill(notes.markLabel!, { kind: kindNames[mark.kind], page: mark.page });
   const markId = (index: number) => `${uid}-mark-${index}`;

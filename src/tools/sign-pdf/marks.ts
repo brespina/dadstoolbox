@@ -31,12 +31,18 @@ export function heightOf(mark: Pick<Mark, 'width'>, { markAspect, pageAspect }: 
 const between = (value: number, least: number, most: number) =>
   Math.min(Math.max(value, least), Math.max(least, most));
 
-/** The Mark moved the least it takes to lie wholly inside its page. */
+/**
+ * The Mark moved the least it takes to lie wholly inside its page, and made narrower first
+ * if its picture's shape would make it taller than the page (as when a Signature drawn
+ * after the Mark was placed is taller than the pad's shape it was placed with).
+ */
 export function keepInside(mark: Mark, fit: Fit): Mark {
+  const width = Math.min(mark.width, widest(fit));
   return {
     ...mark,
-    x: between(mark.x, 0, 1 - mark.width),
-    y: between(mark.y, 0, 1 - heightOf(mark, fit)),
+    width,
+    x: between(mark.x, 0, 1 - width),
+    y: between(mark.y, 0, 1 - heightOf({ width }, fit)),
   };
 }
 
@@ -70,7 +76,7 @@ function widest(fit: Fit): number {
  */
 export function resize(mark: Mark, way: 'smaller' | 'bigger', fit: Fit): Mark {
   const factor = way === 'bigger' ? sizeStep : 1 / sizeStep;
-  const width = Math.min(Math.max(mark.width * factor, smallest), Math.max(smallest, widest(fit)));
+  const width = between(mark.width * factor, smallest, widest(fit));
   const before = heightOf(mark, fit);
   const after = heightOf({ width }, fit);
   return keepInside(

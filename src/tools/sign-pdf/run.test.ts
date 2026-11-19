@@ -68,6 +68,15 @@ describe('Sign a PDF', () => {
     expect(picturesOn(doc.getPage(1))).toEqual([near({ x: 30, y: 85, width: 150, height: 75 })]);
   });
 
+  it('keeps a Mark inside its page when its picture is taller than when it was placed', async () => {
+    const { paint } = standIn();
+    // 150 × 75 points with the stand-in's shape: from 0.9 down it would run off the bottom.
+    const mark: Mark = { kind: 'signature', page: 1, x: 0.1, y: 0.9, width: 0.5 };
+    const results = await makeRun(paint)(sample('sample.pdf'), signed([mark]));
+    const doc = await PDFDocument.load(await results[0]!.blob.arrayBuffer());
+    expect(picturesOn(doc.getPage(0))).toEqual([near({ x: 30, y: 0, width: 150, height: 75 })]);
+  });
+
   describe('on turned and cropped pages', () => {
     // A page 400 × 300 whose visible box is 50..350 across and 20..220 up, turned as asked.
     // The Mark is a tenth in, a fifth down and half the page's width, on a 2 : 1 picture.

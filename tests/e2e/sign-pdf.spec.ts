@@ -1,6 +1,7 @@
 // Sign a PDF end to end, in a real browser: the Signature pad, the page viewer loading
 // only here, placing and removing a Mark, start held back until there is something to
 // sign, the password reason in place of the pages, and the saved PDF.
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
@@ -19,6 +20,12 @@ const notes = tool.notes as Record<string, string>;
 
 /** The page viewer's files: pdf.js's own code and its worker. */
 const isViewer = (url: string) => /\/_astro\/(viewer|pdf\.worker)[.-]|\/pdfjs\//.test(url);
+/** pdf.js's version, which its code holds as text whatever file it is bundled into. */
+const pdfjsVersion = (
+  JSON.parse(
+    readFileSync(new URL('../../node_modules/pdfjs-dist/package.json', import.meta.url), 'utf8'),
+  ) as { version: string }
+).version;
 
 async function choose(page: Page, files: string[]) {
   const chooser = page.waitForEvent('filechooser');
@@ -26,23 +33,39 @@ async function choose(page: Page, files: string[]) {
   await (await chooser).setFiles(files);
 }
 
-/** Draws a zigzag across the pad with the mouse. */
-async function drawSignature(page: Page) {
+/** Whether the pad shows any ink. */
+const padHasInk = (page: Page) =>
+  page.getByRole('img', { name: notes.padLabel }).evaluate((canvas: HTMLCanvasElement) => {
+    const { data } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
+    return data.some((value, i) => i % 4 === 3 && value > 0);
+  });
+
+/** Draws a line through these points on the pad (fractions of it) with the mouse. */
+async function drawOnPad(page: Page, points: readonly (readonly [number, number])[]) {
   const pad = page.getByRole('img', { name: notes.padLabel });
   await pad.scrollIntoViewIfNeeded();
-  const box = (await pad.boundingBox())!;
-  await page.mouse.move(box.x + box.width * 0.1, box.y + box.height * 0.6);
-  await page.mouse.down();
-  for (const [x, y] of [
+  // A line drawn before the page has woken up leaves no ink, so draw until it shows.
+  await expect(async () => {
+    const box = (await pad.boundingBox())!;
+    const at = ([x, y]: readonly [number, number]) =>
+      [box.x + box.width * x, box.y + box.height * y] as const;
+    await page.mouse.move(...at(points[0]!));
+    await page.mouse.down();
+    for (const point of points.slice(1)) await page.mouse.move(...at(point), { steps: 4 });
+    await page.mouse.up();
+    expect(await padHasInk(page)).toBe(true);
+  }).toPass({ timeout: 10_000 });
+}
+
+/** Draws a zigzag across the pad with the mouse. */
+const drawSignature = (page: Page) =>
+  drawOnPad(page, [
+    [0.1, 0.6],
     [0.3, 0.3],
     [0.5, 0.7],
     [0.7, 0.3],
     [0.9, 0.6],
-  ] as const) {
-    await page.mouse.move(box.x + box.width * x, box.y + box.height * y, { steps: 4 });
-  }
-  await page.mouse.up();
-}
+  ]);
 
 const pageOne = (page: Page) => page.getByRole('group', { name: 'Page 1 of sample.pdf' });
 
@@ -163,6 +186,38 @@ function expectSavedAt(
   near(picture.width, shown.width * 300);
   near(picture.y + picture.height, 200 - shown.y * 200);
 }
+
+test('a Mark placed before a tall Signature is drawn is fitted back inside its page', async ({
+  page,
+}) => {
+  await page.goto('sign-pdf/');
+  await choose(page, [sample]);
+  // Placed near the bottom with the pad's shape, three times as wide as it is high.
+  await tapPageOne(page, 0.5, 0.9);
+  const mark = markOn(page, 1);
+  await expect(mark).toBeVisible();
+
+  // A nearly upright line: at a third of the page wide it would be taller than the page.
+  await drawOnPad(page, [
+    [0.5, 0.1],
+    [0.52, 0.5],
+    [0.55, 0.9],
+  ]);
+  await expect(mark.locator('img')).toHaveCount(1);
+  await expect
+    .poll(async () => {
+      const place = await placeOnPageOne(page, mark);
+      return place.y >= -0.001 && place.y + place.height <= 1.001 && place.width < 1 / 3;
+    })
+    .toBe(true);
+  const shown = await placeOnPageOne(page, mark);
+
+  const [picture, ...more] = picturesOn((await savedPdf(page)).getPage(0));
+  expect(more).toEqual([]);
+  expectSavedAt(picture!, shown);
+  expect(picture!.y).toBeGreaterThan(-2);
+  expect(picture!.height).toBeGreaterThan(picture!.width);
+});
 
 test('Remove takes a Mark away', async ({ page }) => {
   await page.goto('sign-pdf/');
@@ -449,23 +504,44 @@ test('the pad draws instead of scrolling, and nothing is kept', async ({ page })
   await drawSignature(page);
   expect(await page.evaluate(() => window.scrollY)).toBe(before);
   // The ink shows on the pad.
-  expect(
-    await pad.evaluate((canvas: HTMLCanvasElement) => {
-      const { data } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
-      return data.some((value, i) => i % 4 === 3 && value > 0);
-    }),
-  ).toBe(true);
+  expect(await padHasInk(page)).toBe(true);
   expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
 });
 
-test('the page viewer loads only once a PDF is chosen, with "Getting ready…"', async ({ page }) => {
-  const viewerRequests: string[] = [];
+/**
+ * Notes every page viewer file the page asks for: by its name, or, whatever a file is
+ * called, any script holding pdf.js's code. `loaded()` waits for the scripts to be read.
+ */
+function watchViewer(page: Page) {
+  const found: string[] = [];
+  const reading: Promise<void>[] = [];
   page.context().on('request', (request) => {
-    if (isViewer(request.url())) viewerRequests.push(request.url());
+    if (isViewer(request.url())) found.push(request.url());
   });
+  page.context().on('response', (response) => {
+    if (!/\.m?js(\?|$)/.test(response.url())) return;
+    reading.push(
+      response.text().then(
+        (code) => void (code.includes(pdfjsVersion) && found.push(response.url())),
+        () => undefined,
+      ),
+    );
+  });
+  return {
+    async loaded() {
+      await Promise.all(reading);
+      // Scripts were read, so finding none means something.
+      expect(reading.length).toBeGreaterThan(0);
+      return found;
+    },
+  };
+}
+
+test('the page viewer loads only once a PDF is chosen, with "Getting ready…"', async ({ page }) => {
+  const viewer = watchViewer(page);
   await page.goto('sign-pdf/');
   await expect(page.getByRole('img', { name: notes.padLabel })).toBeVisible();
-  expect(viewerRequests).toEqual([]);
+  expect(await viewer.loaded()).toEqual([]);
   // Hold the viewer back, so "Getting ready…" can be seen.
   let release!: () => void;
   const held = new Promise<void>((resolve) => (release = resolve));
@@ -477,20 +553,19 @@ test('the page viewer loads only once a PDF is chosen, with "Getting ready…"',
   await expect(page.getByText('Getting ready…', { exact: true })).toBeVisible();
   release();
   await expect(pageOne(page)).toBeVisible();
-  expect(viewerRequests.length).toBeGreaterThan(0);
+  // The viewer's script is found twice: by its name, and by pdf.js's code in it.
+  const found = await viewer.loaded();
+  expect(found.filter((url) => /\/_astro\/viewer[.-]/.test(url)).length).toBe(2);
 });
 
 test('no other PDF Tool loads the page viewer', async ({ page }) => {
-  const viewerRequests: string[] = [];
-  page.context().on('request', (request) => {
-    if (isViewer(request.url())) viewerRequests.push(request.url());
-  });
+  const viewer = watchViewer(page);
   for (const other of ['rotate-pdf', 'split-pdf']) {
     await page.goto(`${other}/`);
     await choose(page, [sample]);
     await expect(page.getByText('sample.pdf', { exact: true })).toBeVisible();
   }
-  expect(viewerRequests).toEqual([]);
+  expect(await viewer.loaded()).toEqual([]);
 });
 
 test('a PDF with a password shows the reason in place of its pages', async ({ page }) => {
