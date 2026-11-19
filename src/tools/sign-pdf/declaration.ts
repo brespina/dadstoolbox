@@ -9,11 +9,11 @@ export type Stroke = [x: number, y: number][];
 
 /**
  * The person's Signature (see the glossary), as plain data so options still compare as
- * text. Never stored. #111 adds a typed one.
+ * text. Never stored. #113 adds a typed one.
  */
 export type Signature = { kind: 'drawn'; strokes: Stroke[] };
 
-/** The ink every Mark is painted in, by name. #111 adds blue. */
+/** The ink every Mark is painted in, by name. #113 adds blue. */
 export const inks = { black: '#000000' } as const;
 export type Ink = keyof typeof inks;
 
@@ -41,11 +41,13 @@ export interface Options {
   marks: Mark[];
 }
 
-/** Whether the person has drawn (or typed) a Signature yet. */
+/** Whether the person has drawn a Signature yet. */
 export const hasSignature = (signature: Signature) => signature.strokes.length > 0;
 
-const nothingPlaced = 'Put your signature or some text on a page first.';
-const noSignature = 'Draw or type your signature first.';
+// Signature-only for now: #112 makes the first "Put your signature or some text on a page
+// first.", and #113 makes the second "Draw or type your signature first." (spec #108).
+const nothingPlaced = 'Put your signature on a page first.';
+const noSignature = 'Draw your signature first.';
 
 export const tool = defineTool({
   address: 'sign-pdf',
