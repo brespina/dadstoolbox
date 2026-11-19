@@ -77,7 +77,14 @@ for (const { tool, folder } of tools) {
       return;
     }
 
-    test('choose the sample, press start, and Save appears', async ({ page }) => {
+    // A Tool whose start waits on the person, such as Sign a PDF before a Mark is placed,
+    // has a problem with its default options: start stays greyed with its words.
+    const waitsOnPerson = tool.optionsProblem(tool.defaultOptions);
+    const title = waitsOnPerson
+      ? 'choose the sample, and start waits, greyed, saying why'
+      : 'choose the sample, press start, and Save appears';
+
+    test(title, async ({ page }) => {
       const sample = readdirSync(folder).find((name) => /^sample\.[^.]+$/.test(name));
       expect(sample, `a sample file in ${folder}`).toBeTruthy();
 
@@ -90,6 +97,12 @@ for (const { tool, folder } of tools) {
       await page.getByText(fillText(text.tool.choose, { noun: tool.noun.many })).click();
       await (await chooser).setFiles(join(folder, sample!));
       await expect(page.getByText(sample!)).toBeVisible();
+
+      if (waitsOnPerson) {
+        await expect(page.getByText(waitsOnPerson, { exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: tool.startButton })).toBeDisabled();
+        return;
+      }
 
       await page.getByRole('button', { name: tool.startButton }).click();
       // Some Tools take a few seconds, such as one reading video frames.

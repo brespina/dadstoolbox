@@ -142,7 +142,7 @@ export const text = {
   },
   // Shared by the photo Tools.
   pdfs: {
-    // Split a PDF and Rotate PDF pages can't open a PDF with a password.
+    // Split a PDF, Rotate PDF pages and Sign a PDF can't open a PDF with a password.
     password: 'This PDF has a password. Remove it and try again.',
   },
   photos: {

@@ -8,7 +8,9 @@
  * - Option (Alt) on its own types characters such as { on a Mac's German keyboard. Alt
  *   with a plain letter or digit (Alt+D on Windows) is still a shortcut.
  */
-export function isShortcut(event: KeyboardEvent): boolean {
+export function isShortcut(
+  event: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey'>,
+): boolean {
   if (event.metaKey) return true;
   if (event.ctrlKey) return !event.altKey;
   if (event.altKey) return /^[a-z0-9]$/i.test(event.key);

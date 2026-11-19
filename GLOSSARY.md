@@ -47,3 +47,11 @@ _Avoid_: Level, chapter, unit
 **Drill**:
 One go at a Lesson: a short block of text, a cursor and a highlighted target to move the cursor to. A round is 10 Drills.
 _Avoid_: Puzzle, challenge, task
+
+**Signature**:
+A person's name as they sign it, drawn with a finger or mouse, for Sign a PDF to put on a PDF's pages (#113 adds typing it in a handwriting-style font). It is a picture of a signature, not a digital ID, and it is never kept: it is drawn afresh on each visit.
+_Avoid_: E-signature, digital signature, autograph
+
+**Mark**:
+Something Sign a PDF puts on one page of a PDF: a Signature, with its own place and size on that page (#112 adds a short line of words, such as a printed name or today's date). A page can hold any number of Marks. A PDF's own form fields are not Marks.
+_Avoid_: Stamp, annotation, field, item

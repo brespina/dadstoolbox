@@ -75,6 +75,41 @@ export const credits: Credit[] = [
     ...github('microsoft/tslib', 'v1.14.1', 'LICENSE.txt'),
   },
   {
+    name: 'PDF.js',
+    package: 'pdfjs-dist',
+    version: '6.4.299',
+    license: 'Apache-2.0',
+    does: 'Shows the pages of your PDF, so you can tap where your signature goes.',
+    ...github('mozilla/pdf.js', 'v6.4.299', 'LICENSE'),
+  },
+  // PDF.js's own parts for pictures and letters some PDFs hold, served from the Site and
+  // loaded only for a PDF that needs them. None records its own version.
+  {
+    name: 'OpenJPEG',
+    partOf: 'pdfjs-dist',
+    license: 'BSD-2-Clause',
+    does: 'Shows JPEG 2000 pictures inside a PDF, as in some scanned pages.',
+    codeUrl: 'https://github.com/mozilla/pdf.js.openjpeg',
+    licenseUrl: 'https://github.com/mozilla/pdf.js.openjpeg/blob/main/LICENSE',
+  },
+  {
+    name: 'pdf.js.jbig2',
+    partOf: 'pdfjs-dist',
+    // PDF.js's wrapper is Apache-2.0; the PDFium code inside it is BSD-3-Clause.
+    license: 'Apache-2.0 AND BSD-3-Clause',
+    does: 'Shows black-and-white scanned pages inside a PDF.',
+    codeUrl: 'https://github.com/mozilla/pdf.js.jbig2',
+    licenseUrl: 'https://github.com/mozilla/pdf.js.jbig2/blob/main/LICENSE',
+  },
+  {
+    name: 'CMap resources',
+    partOf: 'pdfjs-dist',
+    license: 'BSD-3-Clause',
+    does: 'Shows Chinese, Japanese and Korean letters a PDF names but leaves out.',
+    codeUrl: 'https://github.com/adobe-type-tools/cmap-resources',
+    licenseUrl: 'https://github.com/adobe-type-tools/cmap-resources/blob/master/LICENSE.md',
+  },
+  {
     name: 'qrcode',
     package: 'qrcode',
     version: '1.5.4',
