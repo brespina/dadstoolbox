@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config';
 import svelte from '@astrojs/svelte';
 import { cspDirectives } from './src/site/csp';
+import { pdfjsFiles } from './src/site/pdfjs-files';
 import { discoverTools } from './src/tools/discover';
 import { toolRuns } from './src/tools/tool-runs';
 
@@ -12,7 +13,8 @@ export default defineConfig({
   base: '/dadstoolbox',
   output: 'static',
   trailingSlash: 'always',
-  integrations: [svelte()],
+  // pdfjsFiles: the files Sign a PDF's page viewer asks for by name (ADR-0006).
+  integrations: [svelte(), pdfjsFiles()],
   // Shiki's inline styles break the browser lock, and the Site has no code samples.
   markdown: { syntaxHighlight: false },
   // The Tool worker loads each worker Tool's `run` only when asked, which needs module
