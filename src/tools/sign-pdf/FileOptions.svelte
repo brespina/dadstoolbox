@@ -9,17 +9,20 @@
   import ChoiceGroup from '../../practice/ChoiceGroup.svelte';
   import { fillText as fill, text } from '../../text';
   import { ToolFailure, type FileOptionsProps } from '../types';
-  import { hasSignature, padShape, tool, type Mark, type Options } from './declaration';
+  import { hasSignature, hasWords, tool, type Mark, type Options } from './declaration';
   import MarkControls from './MarkControls.svelte';
   import {
     keepInside,
     placeCentred,
     placeLowerMiddle,
     resize,
-    startingWidth,
+    startingMark,
+    withWords,
+    type Choice,
     type Fit,
+    type Point,
   } from './marks';
-  import { paintOnCanvas } from './paint';
+  import { paintOnCanvas, shapeOf } from './paint';
   import PlacedMark from './PlacedMark.svelte';
   import type { ShownPage, ShownPdf } from './viewer';
 
@@ -29,9 +32,17 @@
   /** Makes element ids unique when several PDFs are chosen. */
   const uid = $props.id();
   /** What a Mark is called, by kind. */
-  const kindNames: Record<Mark['kind'], string> = { signature: notes.kindSignature! };
-  /** What the next tap or "Add to page" puts down. #112 adds Text and Today's date. */
-  let kind: Mark['kind'] = $state('signature');
+  const kindNames: Record<Mark['kind'], string> = {
+    signature: notes.kindSignature!,
+    text: notes.kindText!,
+  };
+  /** What the next tap or "Add to page" puts down. */
+  let choice: Choice = $state('signature');
+  const choices: { value: Choice; label: string }[] = [
+    { value: 'signature', label: notes.kindSignature! },
+    { value: 'text', label: notes.kindText! },
+    { value: 'date', label: notes.kindDate! },
+  ];
   /** How far, in CSS pixels, a press may move and still count as a tap. */
   const tapSlop = 10;
 
@@ -63,56 +74,98 @@
     };
   });
 
-  // The Signature's picture, painted at about the size it shows, from the page's options.
-  // Blank until the Signature is drawn: its Marks then show their name.
-  let signature: { shape: number; url: string | null } = $state.raw({ shape: padShape, url: null });
+  /** The page's options, or the starting ones before the page gives them. */
+  const settings = () => pageOptions ?? tool.defaultOptions;
+
+  // Each Mark has the picture of what it shows, painted at about the size it shows, from
+  // the page's options. Pictures are kept by what they look like (the same words in the
+  // same ink, or the Signature as drawn), never by a Mark's place in the list, so removing
+  // a Mark leaves the others' pictures alone. A Mark with nothing to paint yet (a Text Mark
+  // with no words, a Signature not drawn) has no picture and shows its name in a dashed box.
+  const signatureLook = $derived(
+    pageOptions && hasSignature(pageOptions.signature)
+      ? JSON.stringify([pageOptions.ink, pageOptions.signature])
+      : undefined,
+  );
+  const lookOf = (mark: Mark): string | undefined => {
+    if (!pageOptions) return undefined;
+    if (mark.kind === 'text')
+      return hasWords(mark.text) ? `text|${pageOptions.ink}|${mark.text}` : undefined;
+    return signatureLook && `signature|${signatureLook}`;
+  };
+  /** Picture addresses by look. */
+  let pictures: Record<string, string> = $state.raw({});
+  const painting = new Set<string>();
+  let wanted = new Set<string>();
+  let alive = true;
+
+  async function showPicture(look: string, mark: Mark, chosen: Options) {
+    try {
+      const picture = await paintOnCanvas(mark, chosen);
+      const width = 600;
+      const png = await picture.paint(width, Math.max(1, Math.round(width / picture.shape)));
+      const url = URL.createObjectURL(
+        new Blob([png as Uint8Array<ArrayBuffer>], { type: 'image/png' }),
+      );
+      if (alive && wanted.has(look)) pictures = { ...pictures, [look]: url };
+      else URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Could not paint a Mark', error);
+    } finally {
+      painting.delete(look);
+    }
+  }
+
   $effect(() => {
     const chosen = pageOptions;
-    if (!chosen || !hasSignature(chosen.signature)) {
-      signature = { shape: padShape, url: null };
-      return;
+    const needed = new Map<string, Mark>();
+    for (const mark of options.marks) {
+      const look = lookOf(mark);
+      if (look) needed.set(look, mark);
     }
-    let current = true;
-    let url: string | undefined;
-    // Every Signature Mark has the same picture, so any one will do.
-    paintOnCanvas(
-      { kind: 'signature', page: 1, x: 0, y: 0, width: startingWidth('signature') },
-      chosen,
-    )
-      .then(async (picture) => {
-        const width = 600;
-        const png = await picture.paint(width, Math.max(1, Math.round(width / picture.shape)));
-        if (!current) return;
-        url = URL.createObjectURL(
-          new Blob([png as Uint8Array<ArrayBuffer>], { type: 'image/png' }),
-        );
-        signature = { shape: picture.shape, url };
-      })
-      .catch((error: unknown) => console.error('Could not paint the Signature', error));
-    return () => {
-      current = false;
-      if (url) URL.revokeObjectURL(url);
-    };
+    if (!chosen) return;
+    untrack(() => {
+      wanted = new Set(needed.keys());
+      // Free the pictures no Mark shows any more.
+      const kept: Record<string, string> = {};
+      for (const [look, url] of Object.entries(pictures)) {
+        if (needed.has(look)) kept[look] = url;
+        else URL.revokeObjectURL(url);
+      }
+      if (Object.keys(kept).length !== Object.keys(pictures).length) pictures = kept;
+      for (const [look, mark] of needed) {
+        if (look in pictures || painting.has(look)) continue;
+        painting.add(look);
+        void showPicture(look, mark, chosen);
+      }
+    });
+  });
+  $effect(() => () => {
+    alive = false;
+    for (const url of Object.values(pictures)) URL.revokeObjectURL(url);
   });
 
   // The Mark chosen to change or remove, by its place in the list.
   let chosenMark: number | null = $state(null);
 
-  /** A page's shape and the Signature's make a Mark's height (ADR-0007). */
-  const fitOf = (page: ShownPage): Fit => ({
-    markAspect: signature.shape,
+  /** A page's shape and the Mark's own picture's make its height (ADR-0007). */
+  const fitOf = (page: ShownPage, mark: Mark): Fit => ({
+    markAspect: shapeOf(mark, settings()),
     pageAspect: page.width / page.height,
   });
 
   // Drawing, clearing or redrawing the Signature changes its shape, and so the height of
-  // every Mark already placed (one placed before drawing has the pad's shape): fit each
-  // back inside its page, as `run` does.
+  // every Signature Mark already placed (one placed before drawing has the pad's shape): fit
+  // each back inside its page, as `run` does.
+  const signatureShape = $derived(shapeOf(startingMark('signature', 1), settings()));
   $effect(() => {
     const pages = shown?.pages;
-    void signature.shape;
+    void signatureShape;
     if (!pages) return;
     untrack(() => {
-      const fitted = options.marks.map((mark) => keepInside(mark, fitOf(pages[mark.page - 1]!)));
+      const fitted = options.marks.map((mark) =>
+        keepInside(mark, fitOf(pages[mark.page - 1]!, mark)),
+      );
       const moved = fitted.some(
         (mark, i) =>
           mark.x !== options.marks[i]!.x ||
@@ -126,6 +179,7 @@
   const labelOf = (mark: Mark) =>
     fill(notes.markLabel!, { kind: kindNames[mark.kind], page: mark.page });
   const markId = (index: number) => `${uid}-mark-${index}`;
+  const wordsId = (index: number) => `${uid}-words-${index}`;
   const addId = (page: number) => `${uid}-add-${page}`;
 
   /** Adds a Mark to the list and chooses it. Gives its place in the list. */
@@ -141,11 +195,34 @@
     change({ marks: options.marks.map((was, i) => (i === index ? mark : was)) });
   }
 
-  /** "Add to page N": the lower middle of the page, with the new Mark focused. */
-  async function addToPage(number: number, page: ShownPage) {
-    const index = add(placeLowerMiddle(kind, number, fitOf(page)));
+  /**
+   * Adds the chosen kind of Mark, placed by `put` once its own picture's shape is known, and
+   * focuses it: a Text Mark with no words yet gives focus to its words, so typing starts.
+   * Today's date holds the device's short date, from the moment it is added.
+   */
+  async function addChosen(
+    number: number,
+    page: ShownPage,
+    put: (choice: Choice, number: number, fit: Fit, words: string) => Mark,
+    focus?: FocusOptions,
+  ) {
+    const words = choice === 'date' ? new Date().toLocaleDateString() : '';
+    const fit = fitOf(page, startingMark(choice, number, words));
+    const mark = put(choice, number, fit, words);
+    const index = add(mark);
     await tick();
-    document.getElementById(markId(index))?.focus();
+    const wantsWords = mark.kind === 'text' && !hasWords(mark.text);
+    document.getElementById(wantsWords ? wordsId(index) : markId(index))?.focus(focus);
+  }
+
+  /** "Add to page N": the lower middle of the page, with the new Mark focused. */
+  const addToPage = (number: number, page: ShownPage) => addChosen(number, page, placeLowerMiddle);
+
+  /** New words in a Text Mark: it keeps the size of its letters, so it grows with them. */
+  function setWords(index: number, page: ShownPage, text: string) {
+    const mark = options.marks[index];
+    if (mark?.kind !== 'text') return;
+    replace(index, withWords(mark, text, fitOf(page, mark), fitOf(page, { ...mark, text })));
   }
 
   /** Takes a Mark away, and moves focus to its page's Add button, not to the page's top. */
@@ -171,16 +248,17 @@
     // A tap on a Mark chooses it instead.
     if ((event.target as Element).closest('.mark')) return;
     const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const index = add(
-      placeCentred(
-        kind,
-        number,
-        { x: (event.clientX - box.left) / box.width, y: (event.clientY - box.top) / box.height },
-        fitOf(page),
-      ),
+    const point: Point = {
+      x: (event.clientX - box.left) / box.width,
+      y: (event.clientY - box.top) / box.height,
+    };
+    // So the arrow keys (or typing) work at once; the page keeps its place.
+    void addChosen(
+      number,
+      page,
+      (choice, number, fit, words) => placeCentred(choice, number, point, fit, words),
+      { preventScroll: true },
     );
-    // So the arrow keys work at once; the page keeps its place.
-    void tick().then(() => document.getElementById(markId(index))?.focus({ preventScroll: true }));
   }
 
   let rowWidth = $state(0);
@@ -230,12 +308,7 @@
     <p>{text.tool.gettingReady}</p>
   {:else}
     <p class="how-to">{notes.howToPlace}</p>
-    <ChoiceGroup
-      legend={notes.addLegend!}
-      name={`${uid}-kind`}
-      choices={[{ value: 'signature', label: kindNames.signature }]}
-      bind:value={kind}
-    />
+    <ChoiceGroup legend={notes.addLegend!} name={`${uid}-kind`} {choices} bind:value={choice} />
     <ol class="pages">
       {#each shown.pages as page, index (index)}
         {@const number = index + 1}
@@ -263,16 +336,20 @@
                 <PlacedMark
                   id={markId(markIndex)}
                   {mark}
-                  fit={fitOf(page)}
+                  fit={fitOf(page, mark)}
                   label={labelOf(mark)}
                   chosen={chosenMark === markIndex}
-                  blank={!signature.url}
+                  blank={!lookOf(mark)}
                   onchoose={() => (chosenMark = markIndex)}
                   onchange={(next) => replace(markIndex, next)}
                   onremove={() => remove(markIndex)}
                 >
-                  {#if signature.url}
-                    <img src={signature.url} alt="" draggable="false" />
+                  {@const look = lookOf(mark)}
+                  {#if look}
+                    <!-- No picture for an instant after the words change. -->
+                    {#if pictures[look]}
+                      <img src={pictures[look]} alt="" draggable="false" />
+                    {/if}
                   {:else}
                     <span>{kindNames[mark.kind]}</span>
                   {/if}
@@ -293,10 +370,30 @@
               {@const chosen = options.marks[index]!}
               <MarkControls
                 label={labelOf(chosen)}
-                onsmaller={() => replace(index, resize(chosen, 'smaller', fitOf(page)))}
-                onbigger={() => replace(index, resize(chosen, 'bigger', fitOf(page)))}
+                onsmaller={() => replace(index, resize(chosen, 'smaller', fitOf(page, chosen)))}
+                onbigger={() => replace(index, resize(chosen, 'bigger', fitOf(page, chosen)))}
                 onremove={() => remove(index)}
-              />
+              >
+                {#if chosen.kind === 'text'}
+                  <label class="words">
+                    <span>{notes.wordsLabel}</span>
+                    <!-- Typed words are never trimmed or changed; each script sets its own direction. -->
+                    <input
+                      id={wordsId(index)}
+                      type="text"
+                      dir="auto"
+                      maxlength="100"
+                      autocomplete="off"
+                      aria-label={fill(notes.controlLabel!, {
+                        action: notes.wordsLabel!,
+                        mark: labelOf(chosen),
+                      })}
+                      value={chosen.text}
+                      oninput={(event) => setWords(index, page, event.currentTarget.value)}
+                    />
+                  </label>
+                {/if}
+              </MarkControls>
             {/if}
           </div>
         </li>
@@ -345,7 +442,7 @@
     height: 100%;
   }
 
-  /* The Signature's picture fills its Mark, whose shape it gives. */
+  /* A Mark's picture fills it, and gives it its shape. */
   .page-item img {
     display: block;
     width: 100%;
@@ -358,6 +455,32 @@
     align-items: flex-start;
     gap: 0.5rem;
     margin-top: 0.5rem;
+  }
+
+  /* A Text Mark's words: a box at least 44 px high that takes the row's spare width. */
+  .words {
+    display: flex;
+    flex: 1 1 14rem;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    font-weight: 600;
+  }
+
+  .words input {
+    flex: 1;
+    min-width: 0;
+    min-height: 2.75rem;
+    box-sizing: border-box;
+    padding: 0.25rem 0.75rem;
+    border: 2px solid var(--muted);
+    border-radius: 0.5rem;
+    background: var(--bg);
+    color: var(--text);
+    /* 16px or more, so iPhones don't zoom the page when it takes focus. */
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 400;
   }
 
   /* At least 44 x 44 px to tap, like the shared page's small buttons. */
