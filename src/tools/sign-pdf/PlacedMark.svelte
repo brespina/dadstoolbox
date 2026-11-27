@@ -132,6 +132,10 @@
     outline: 2px dashed transparent;
     outline-offset: -2px;
     background: transparent;
+    /* Small words on a big page are still a target a finger can find (WCAG 2.5.8). The
+       box grows below and right of its picture, which stays where the Mark's place puts it. */
+    min-width: 24px;
+    min-height: 24px;
     cursor: grab;
     /* A finger that starts on a Mark drags it instead of scrolling the pages. Only here:
        a finger anywhere else on a page still scrolls. */

@@ -706,3 +706,180 @@ test('a PDF that uses the standard fonts without holding them still shows its wo
     await expect.poll(() => inked(band), { message: `ink in band ${band}` }).toBeGreaterThan(100);
   }
 });
+
+/** The Text Mark's words box, which shows for the chosen Text Mark. */
+const wordsOn = (page: Page, number: number) =>
+  page.getByRole('textbox', { name: `Words: Text on page ${number}`, exact: true });
+
+/** A page's Text Marks, by their label (Today's date is one too). */
+const textOn = (page: Page, number: number) =>
+  page.getByRole('button', { name: `Text on page ${number}`, exact: true });
+
+/** Moves the page's last Text Mark up out of the way, 20% of the page. */
+async function moveUp(page: Page, number: number) {
+  await textOn(page, number).last().focus();
+  await page.keyboard.press('Shift+ArrowUp');
+  await page.keyboard.press('Shift+ArrowUp');
+}
+
+const kindRadio = (page: Page, name: string) => page.getByRole('radio', { name, exact: true });
+
+test("adds Text and Today's date, edits the words, signs and saves", async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  // The choice has all three kinds, Signature first.
+  await expect(kindRadio(page, 'Signature')).toBeChecked();
+  await expect(kindRadio(page, 'Text')).not.toBeChecked();
+  await expect(kindRadio(page, "Today's date")).not.toBeChecked();
+  await expect(page.getByText(tool.notes.nothingPlaced!, { exact: true })).toBeVisible();
+  await expect(start(page)).toBeDisabled();
+
+  // Text: a dashed box that names itself, and the words box ready to type in. With no
+  // words it still counts as nothing placed.
+  await kindRadio(page, 'Text').check();
+  await addTo(page, 1).click();
+  await expect(wordsOn(page, 1)).toBeFocused();
+  await expect(textOn(page, 1)).toHaveText('Text');
+  await expect(textOn(page, 1)).toHaveClass(/blank/);
+  await expect(page.getByText(tool.notes.nothingPlaced!, { exact: true })).toBeVisible();
+  await expect(start(page)).toBeDisabled();
+
+  // Typing shows the words in the Mark and lets start go. Mark keys typed in the box
+  // belong to the box: the minus and plus are letters here, and Backspace deletes one.
+  await page.keyboard.type('Ana Diaz-+x');
+  await page.keyboard.press('Backspace');
+  await expect(wordsOn(page, 1)).toHaveValue('Ana Diaz-+');
+  await expect(textOn(page, 1)).toHaveCount(1);
+  await expect(textOn(page, 1).locator('img')).toHaveCount(1);
+  await expect(textOn(page, 1)).not.toHaveClass(/blank/);
+  await expect(start(page)).toBeEnabled();
+  await wordsOn(page, 1).fill('Ana Diaz');
+  await moveUp(page, 1);
+  // A Mark's own picture is its place; a small Mark's tap area may reach past it.
+  const name = await placeOnPageOne(page, textOn(page, 1).locator('img'));
+
+  // Today's date: filled in, and still editable.
+  await kindRadio(page, "Today's date").check();
+  await addTo(page, 1).click();
+  await expect(textOn(page, 1)).toHaveCount(2);
+  await expect(textOn(page, 1).nth(1)).toBeFocused();
+  const date = await wordsOn(page, 1).inputValue();
+  expect(date).toMatch(/\d/);
+  await wordsOn(page, 1).fill('4 March');
+  await expect(wordsOn(page, 1)).toHaveValue('4 March');
+  const second = await placeOnPageOne(page, textOn(page, 1).nth(1).locator('img'));
+  expect(second.width).toBeLessThan(name.width);
+
+  // Choosing the first Mark brings its words back.
+  await textOn(page, 1).first().click();
+  await expect(wordsOn(page, 1)).toHaveValue('Ana Diaz');
+
+  const saved = await savedPdf(page);
+  const pictures = picturesOn(saved.getPage(0));
+  expect(pictures).toHaveLength(2);
+  expectSavedAt(pictures[0]!, name);
+  expectSavedAt(pictures[1]!, second);
+  // Words are wider than they are high.
+  expect(pictures[0]!.width).toBeGreaterThan(pictures[0]!.height * 2);
+  expect(picturesOn(saved.getPage(1))).toEqual([]);
+  expect(await page.evaluate(() => (window as unknown as { blocked: string[] }).blocked)).toEqual(
+    [],
+  );
+});
+
+test('words keep their size as they grow, and a Mark with them removed is left out', async ({
+  page,
+}) => {
+  await page.goto('sign-pdf/');
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  await kindRadio(page, 'Text').check();
+  await addTo(page, 1).click();
+  await page.keyboard.type('Ana');
+  const short = await placeOnPageOne(page, textOn(page, 1).locator('img'));
+  await page.keyboard.type(' Diaz Lopez');
+  const long = await placeOnPageOne(page, textOn(page, 1).locator('img'));
+  expect(long.width).toBeGreaterThan(short.width * 2);
+  // The letters are the same size: the height holds.
+  expect(long.height).toBeCloseTo(short.height, 2);
+
+  // Emptied, it is nothing again, and a second Mark with words is all that is saved.
+  await wordsOn(page, 1).fill('   ');
+  await expect(start(page)).toBeDisabled();
+  await kindRadio(page, "Today's date").check();
+  await addTo(page, 1).click();
+  await expect(start(page)).toBeEnabled();
+  const saved = await savedPdf(page);
+  expect(picturesOn(saved.getPage(0))).toHaveLength(1);
+});
+
+test('words in Japanese and Arabic are kept as typed, shown and saved', async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  await kindRadio(page, 'Text').check();
+  for (const words of ['サイン', 'توقيع']) {
+    await addTo(page, 1).click();
+    await wordsOn(page, 1).fill(words);
+    await expect(wordsOn(page, 1)).toHaveValue(words);
+    // Out of the way of the next.
+    if (words === 'サイン') await moveUp(page, 1);
+  }
+  await expect(textOn(page, 1)).toHaveCount(2);
+  await expect(textOn(page, 1).nth(1).locator('img')).toHaveCount(1);
+  // Each Mark has a picture of its own: the first Mark's words didn't change.
+  await textOn(page, 1).first().click();
+  await expect(wordsOn(page, 1)).toHaveValue('サイン');
+  const saved = await savedPdf(page);
+  expect(picturesOn(saved.getPage(0))).toHaveLength(2);
+});
+
+test('a tap places Text with its box ready, and nothing scrolls sideways at 375 px', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 700 });
+  await page.goto('sign-pdf/');
+  await choose(page, [sample]);
+  await kindRadio(page, 'Text').check();
+  await tapPageOne(page, 0.5, 0.4);
+  await expect(wordsOn(page, 1)).toBeFocused();
+  await page.keyboard.type('A name that is rather long to print on a small page');
+  const box = (await wordsOn(page, 1).boundingBox())!;
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(box.x + box.width).toBeLessThanOrEqual(375);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+  ).toBeLessThanOrEqual(0);
+  // The Mark stays inside the page however long the words.
+  const place = await placeOnPageOne(page, textOn(page, 1).locator('img'));
+  expect(place.x).toBeGreaterThanOrEqual(-0.001);
+  expect(place.x + place.width).toBeLessThanOrEqual(1.001);
+  expect(place.y + place.height).toBeLessThanOrEqual(1.001);
+});
+
+// 4 March 2026 at ten in the morning, UTC: the same day anywhere a person might be.
+const fixedDay = new Date('2026-03-04T10:00:00Z');
+
+for (const [locale, expected] of [
+  ['en-GB', '04/03/2026'],
+  ['en-US', '3/4/2026'],
+] as const) {
+  test.describe(`on a device set to ${locale}`, () => {
+    test.use({ locale, timezoneId: 'UTC' });
+
+    test("Today's date is the device's short date", async ({ page }) => {
+      // The words as the browser's own formatting gives them, from a fixed day.
+      expect(fixedDay.toLocaleDateString(locale, { timeZone: 'UTC' })).toBe(expected);
+      await page.clock.setFixedTime(fixedDay);
+      await page.goto('sign-pdf/');
+      await choose(page, [sample]);
+      await expect(pageOne(page)).toBeVisible();
+      await kindRadio(page, "Today's date").check();
+      await addTo(page, 1).click();
+      await expect(wordsOn(page, 1)).toHaveValue(expected);
+      // And it is what is saved: a picture where the Mark is.
+      expect(picturesOn((await savedPdf(page)).getPage(0))).toHaveLength(1);
+    });
+  });
+}

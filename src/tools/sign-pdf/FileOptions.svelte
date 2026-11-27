@@ -447,6 +447,9 @@
     display: block;
     width: 100%;
     height: 100%;
+    /* Never stretched, if its Mark is held to a smallest size to tap. */
+    object-fit: contain;
+    object-position: left top;
   }
 
   .page-tools {
