@@ -1,10 +1,10 @@
 // The page's side of a Run: it starts the Python worker, tracks whether Python is
-// getting ready, ready, running or failed, sends a Program and passes what comes back to
-// the Console. It takes the worker as an argument (`makeWorker`), so Vitest passes a
-// fake; Practice.svelte passes the real blob worker.
+// getting ready, ready, running, stopping or failed, sends a Program, typed lines and
+// Stop, and passes what comes back to the Console. It takes the worker as an argument
+// (`makeWorker`), so Vitest passes a fake; RunPython.svelte passes the real blob worker.
 //
-// Seams for the tickets after this one (#126 to #129): add the message in messages.ts, send it from a new method here,
-// and turn what comes back in `onMessage` into a state change or a Console call.
+// Seam: a new message goes in messages.ts, is sent from a method here, and what comes
+// back is turned in `onMessage` into a state change or a Console call.
 
 import type { Stream } from './console-buffer';
 import { createInputBuffer, resetInput, sendLine, sendStop } from './input-channel';

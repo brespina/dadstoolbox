@@ -121,8 +121,9 @@ field is required.
   such as an empty network name: the page then shows no result and no reason. Give
   `textFor` a `pictureLabel`, so the picture is described from the options, without
   anything private such as a password.
-- **`practice`, a Practice Tool** (Typing test, Vim practice). No file, no `run` and
-  nothing to save: the Tool's own `Practice.svelte` is the page. `definePracticeTool`
+- **`practice`, a Practice Tool** (Typing test, Vim practice, Run Python). No file, no
+  `run` and no result to save: the Tool's own `Practice.svelte` is the page. (Run Python
+  Chooses and Saves the visitor's own Program, the one exception, ADR-0012.) `definePracticeTool`
   sets this mode; see [Practice Tools](#practice-tools).
 
   A typed Tool's options may hold a file the visitor chooses, such as the logo in a QR
@@ -156,8 +157,11 @@ step as its third argument, so tests pass a stand-in.
 ## Practice Tools
 
 A **Practice Tool** (see the glossary) lets the visitor practise a skill on the page,
-such as the Typing test. It makes nothing to save, so it has no `run`, options component
-or sample file ([ADR-0005](adr/0005-practice-tools-are-their-own-page.md)). Its folder
+such as the Typing test. It makes no result to save, so it has no `run`, options component
+or sample file ([ADR-0005](adr/0005-practice-tools-are-their-own-page.md)). Run Python
+Chooses and Saves the visitor's own Program, which is their writing, not a result
+([ADR-0012](adr/0012-run-python-is-a-practice-tool.md)); the generated page test checks
+that no other Practice Tool has a Choose or Save button. Its folder
 holds these two files, plus its own plain TypeScript, any smaller Svelte parts its page
 uses (the Typing test's `SettingsBar.svelte`, for one) and tests:
 
@@ -449,17 +453,28 @@ PDF's pages ([ADR-0006](adr/0006-pdf-pages-are-shown-with-pdfjs.md),
 that builds on it:
 
 - **The options.** The Signature (see the glossary) and the ink are page options, set by
-  the pad in `Options.svelte`: drawn strokes are lists of `[x, y]` points as fractions of
-  the pad, whose shape is `padShape`. The Marks are the file option `marks`, set by the page
+  `Options.svelte`. The Signature is `{ kind: 'drawn', strokes }` (lists of `[x, y]` points
+  as fractions of the pad, whose shape is `padShape`) or `{ kind: 'typed', words, font }`
+  (`font` is `signatureFont`, Dancing Script), whichever way the person chose last: "Type
+  it instead" swaps the pad for a box, and each way keeps what it held while the other
+  shows. The ink is `black` (the default) or `blue` (`inks` in `declaration.ts`) and
+  applies to every Mark. The Marks are the file option `marks`, set by the page
   editor in `FileOptions.svelte`. Everything is plain data and nothing is stored.
-- **The Mark** (`declaration.ts`) is `{ kind, page, x, y, width }`: `page` counts from 1,
-  and `x`, `y` (its top-left corner, `y` down from the top) and `width` are fractions of the
-  page as shown. It has no stored height: its height always follows from its picture's
-  shape.
+- **The Mark** (`declaration.ts`) is `{ kind, page, x, y, width }`, a Signature (`kind:
+  'signature'`) or a Text Mark (`kind: 'text'`, with its `text`, kept exactly as typed):
+  `page` counts from 1, and `x`, `y` (its top-left corner, `y` down from the top) and `width`
+  are fractions of the page as shown. It has no stored height: its height always follows from
+  its picture's shape. Today's date is not a kind: the editor adds a Text Mark filled with
+  `new Date().toLocaleDateString()` when it is added. A Text Mark with no words (or only
+  spaces) is not `isFilled`: it counts as nothing placed for `optionsProblem` and `run` leaves
+  it out.
 - **Moving and resizing Marks** (`marks.ts`). The rules are plain functions, unit-tested in
   `marks.test.ts`: `nudge` (arrow keys: 1% of the page, 10% with Shift), `resize` (Smaller
   and Bigger: a tenth, about the centre, from `smallest` to the page's width), `dragTo`,
-  `placeCentred` (a tap) and `placeLowerMiddle` ("Add to page"), and `actionFor`, which turns
+  `placeCentred` (a tap) and `placeLowerMiddle` ("Add to page"), both for a `Choice`
+  (Signature, Text or Today's date, each with its own `startingWidth`), `withWords` (a Text
+  Mark's new words: the letters keep their size, so the width follows the words and the
+  height holds) and `actionFor`, which turns
   a key press into an action (or nothing, so shortcuts stay the browser's). Each takes a
   `Fit`, the picture's shape and the page's shape, because a Mark's height is never stored;
   every result is kept inside the page. They change only `x`, `y` and `width`.
@@ -467,18 +482,32 @@ that builds on it:
   pointer (with `touch-action: none` on Marks only, so a finger elsewhere still scrolls the
   pages) and takes the keys, and draws the kind's picture from its `children`.
   `MarkControls.svelte` is the chosen Mark's Smaller, Bigger and Remove buttons, and
-  takes a kind's own controls as `children`. A new kind (#112 adds Text) adds its name to
-  `notes` and `kindNames`, its choice to the Add choice, its starting width to
-  `startingWidth`, its picture to the `PlacedMark` in `FileOptions.svelte`, and its own
-  shape to `fitOf` there (today every Mark has the Signature's shape). When a picture's
-  shape changes after its Marks were placed, the editor and `run` fit them back inside
-  the page with `keepInside`.
+  takes a kind's own controls as `children` (a Text Mark's words box is one, outside the
+  Mark's button so the keys typed in it are the box's). A new kind adds its name to `notes`
+  and `kindNames`, its choice to the Add choice, its starting width to `startingWidth`, its
+  painting and its shape to `paint.ts`, and its own controls to the `MarkControls` in
+  `FileOptions.svelte`. Every Mark has a picture and a shape of its own: the editor keeps
+  each picture by what it shows (the words and ink, or the Signature as drawn), never by the
+  Mark's place in the list, and `fitOf` takes the Mark. A Mark is never smaller than 24 CSS
+  pixels to tap (the box reaches past a very small picture). When a picture's shape changes
+  after its Marks were placed, the editor and `run` fit them back inside the page with
+  `keepInside`.
 - **The painter seam** (`paint.ts`). `PaintMark` gives a Mark's picture from the Mark and
   the page's options: its `shape` (width ÷ height) and `paint(width, height)`, a
   see-through PNG. `run` (`makeRun(paint)`) works out the place and paints at 300 dots an
   inch of the Mark's size on the page, longest side at most 2000 pixels; the editor uses
-  the same painter to show the Mark. `paintOnCanvas` is the browser's own painting, so the
-  Tool runs with `worker: false`; `run.test.ts` passes a stand-in. `pictures-on.ts` reads
+  the same painter to show the Mark, and `shapeOf` (the same shape, worked out at once) to
+  lay a Mark out before its picture is painted. Text is measured and painted at one size and
+  scaled to the Mark, in the device's `system-ui, sans-serif` (a typed Signature: Dancing
+  Script, then the same device font for letters it lacks), left to right or right to left
+  by its first letter. The font (`signature-font.ts`, its latin, latin-ext and vietnamese
+  files, each with its `unicodeRange`) is bundled with `?url` and loaded with `FontFace` by
+  `loadSignatureFont()` only once "Type it instead" is chosen, with "Getting ready…" on the
+  button meanwhile; the options take typed words only after it has loaded (or failed to,
+  when the device's font stands in everywhere), and `paintOnCanvas` waits for it, so the
+  editor's `shapeOf` and `run` measure the same letters. Never import the package's CSS:
+  its `@font-face` would fetch the files eagerly. `paintOnCanvas` is the browser's own
+  painting, so the Tool runs with `worker: false`; `run.test.ts` passes a stand-in. `pictures-on.ts` reads
   back where a saved PDF's pictures landed, for tests.
 - **The shared check** (`can-sign.ts`). `openToSign(bytes)` opens the PDF with pdf-lib,
   or throws a `ToolFailure` with the reason it can't be signed here: a password, or a
@@ -544,7 +573,7 @@ with Pyodide ([ADR-0008](adr/0008-python-runs-in-the-browser-with-pyodide.md)). 
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `declaration.ts`                | Plain data, as for any Tool. Every word the page shows is in `notes`, including the starter Program.                                                                           |
 | `Practice.svelte`               | A small shell: `PracticeToolPage.svelte` loads every Practice page into every Practice Tool's page, so the shell loads `RunPython.svelte` with `import()` once the page opens. |
-| `RunPython.svelte`              | The page: editor, Run button, Console. It owns the Program text and turns the runner's state into buttons and words.                                                           |
+| `RunPython.svelte`              | The page: editor, Run, Stop and Clear the Console buttons, Console. It owns the Program text and turns the runner's state into buttons and words. |
 | `ProgramEditor.svelte` | **The editor seam.** `value` in, `onchange(value)` out, `focus()`, named by `areaLabel`. It mounts the editor in a shadow root. |
 | `code-editor.ts` | CodeMirror's setup: line numbers, history, default keys, Tab to indent, Python colours from the `--code-*` tokens. The only file that imports CodeMirror. |
 | `Console.svelte`                | Draws the Console: a labelled live region (`role="log"`), text only (never HTML). Error runs get a bar and a hidden "Error:" for screen readers.                              |
@@ -552,10 +581,10 @@ with Pyodide ([ADR-0008](adr/0008-python-runs-in-the-browser-with-pyodide.md)). 
 | `messages.ts`                   | **The message protocol** between page and worker, and `parseToWorker` / `parseFromWorker`, which let in nothing else.                                                          |
 | `runner.ts`                     | **The page's side of a Run.** States `gettingReady`, `ready`, `running`, `stopping`, `failed`; takes the worker (`makeWorker`) and a `ConsoleSink` as arguments, so Vitest passes fakes. |
 | `python-worker.ts`              | The worker. Loads Pyodide by the absolute address the page sends, runs each Program in a fresh namespace, and streams output as `out` messages.                               |
-| `helper.py`                     | **The Python helper**, loaded with `?raw` and run once by the worker. `run_program(source)` compiles the Program as `main.py`, runs it in a fresh namespace, catches the error and prints the traceback from the Program's own first frame (the page's frames cut). It returns `ok`, `error`, `missingModule` or `stopped` (an uncaught `KeyboardInterrupt`, with no traceback). `helper.test.ts` runs it under Node with the same `pyodide` package. |
+| `helper.py`                     | **The Python helper**, loaded with `?raw` and run once by the worker. `run_program(source)` compiles the Program as `main.py`, runs it in a fresh namespace, catches the error and prints the traceback from the Program's own first frame (the page's frames cut). It returns `ok`, `error`, `missingModule` or `stopped` (an uncaught `KeyboardInterrupt`, with no traceback). A part of Python's own library the browser lacks (turtle, tkinter, curses; `sys.stdlib_module_names`) is an `error`, so the "only built-in modules" line never shows for it. `helper.test.ts` runs it under Node with the same `pyodide` package. |
 | `input-channel.ts`              | **The typing channel** for `input()`: an 8 KB `SharedArrayBuffer` (state, length, the line as UTF-8) the page writes into with `sendLine` and the worker waits on with `waitForLine`. `createStdin` is the function the worker gives Pyodide. Vitest-tested. |
 | `interrupt-channel.ts`          | **The interrupt buffer** for Stop: one shared byte the page writes 2 into and Pyodide reads (`setInterruptBuffer`). Vitest-tested.                                           |
-| `files.ts`                      | The pinned Pyodide version and the Site folder its files are served from (`files.test.ts` keeps it equal to the installed package). Also, pure, the Program's own file: `readProgram` (strict UTF-8, no NUL bytes, 500 KB cap, each refusal a plain reason from `notes`) and `programFileName` (the chosen file's name made safe, always `.py`, else `my-program.py`). |
+| `files.ts`                      | The pinned Pyodide version and the Site folder its files are served from (`files.test.ts` keeps it equal to the installed package). Also, pure, the Program's own file: `readProgram` (strict UTF-8, no NUL bytes, 500 KB cap, each refusal a plain reason from `notes`) and `programFileName` (the chosen file's name made safe, always `.py`, else `my-program.py`). `maxProgramBytes` is also Keep's cap: `keep.ts` neither stores nor opens a longer Program. |
 | `keep.ts` / `KeepChoice.svelte` | **Keep** (#132). `keep.ts` is pure (the storage is an argument): `openKept` reads and checks what was kept, `createKeeper` stores it. `KeepChoice.svelte` is the choice and its words. |
 | `src/site/pyodide-files.ts`     | Build integration, like `pdfjs-files.ts`: serves and copies the five Pyodide files to `run-python/pyodide/<version>/`. They are not committed.                                |
 
@@ -625,7 +654,9 @@ and the folder Pyodide loads the rest from) is absolute and sent by the page.
 **The per-page lock.** Python's WebAssembly needs `'wasm-unsafe-eval'` in `script-src`. It
 is added for this page only, in `src/pages/run-python.astro`, with
 `Astro.csp?.insertScriptResource("'wasm-unsafe-eval'")`, which merges it into Astro's own
-`script-src` (a second `script-src` directive would be ignored by the browser). Never add
+`script-src` (a second `script-src` directive would be ignored by the browser). Adding any
+source drops Astro's default `'self'`, so the page also calls
+`Astro.csp?.insertScriptResource("'self'")`; copy both lines. Never add
 it in `src/site/csp.ts`, which every page shares. `tests/e2e/run-python.spec.ts` checks
 that this page has it and the home page and other Tools do not. Without it Pyodide waits
 for ever and says nothing, so the runner gives up after 3 minutes and shows a reason with
@@ -639,7 +670,10 @@ is that folder only (no `Service-Worker-Allowed` header, no wider `scope`); no o
 registers it or is controlled by it. `isolation.ts` decides (pure, Vitest-tested):
 isolated; register and reload once; or unavailable. `Practice.svelte` runs it first,
 showing only "Getting ready…", so the one reload on a first visit comes before the editor
-and loses nothing typed. A flag in the tab's session storage stops a second reload; when
+and loses nothing typed. While it isolates, the "Getting ready…" line carries
+`data-isolating`; the shared page-test fixture (`tests/e2e/fixtures.ts`) waits for that
+mark to go, and for the page to load, before its end-of-test checks, so the reload never
+cuts a test short. A flag in the tab's session storage stops a second reload; when
 isolation still has not started, the page says so in one line (`notes.noIsolation`) and
 Run works as before. RunPython.svelte gets `isolated` as a prop. **To remove it** (if the
 Tool goes): keep the file at the same address and make it a service worker that
@@ -689,9 +723,10 @@ a worker that dies at once cannot loop. Python itself ends `[0] * 10**10` with `
 and a Program that fills memory with `MemoryError`, so no Program a visitor can write kills the
 worker on demand: only the runner's fake-worker tests cover this path.
 
-Tests: Vitest for `console-buffer`, `messages`, `runner` (with a fake worker), `input-channel`, `interrupt-channel`, `isolation` and `files`;
-`tests/e2e/run-python.spec.ts` for the real thing, with a longer timeout because Python
-takes 10 to 20 seconds to load.
+Tests: Vitest for `console-buffer`, `messages`, `runner` (with a fake worker), `input-channel`,
+`interrupt-channel`, `isolation`, `files`, `keep`, and `helper` (helper.py under Node);
+the page tests `tests/e2e/run-python.spec.ts` and `run-python-{editor,files,keep,stop}.spec.ts`
+for the real thing, with a longer timeout because Python takes 10 to 20 seconds to load.
 
 ## Words on the page
 

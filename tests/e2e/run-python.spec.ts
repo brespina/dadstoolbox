@@ -88,6 +88,19 @@ test('type a Program, run it, and run it again with a fresh start', async ({ pag
   await expect(consoleOf(page)).not.toContainText('first 42');
 });
 
+test('Clear the Console empties it, and is greyed while it is empty', async ({ page }) => {
+  test.setTimeout(slow);
+  await page.goto('run-python/');
+  const clear = page.getByRole('button', { name: notes.clear, exact: true });
+  await expect(clear).toBeDisabled();
+  await run(page, 'print("to be cleared")');
+  await expect(consoleOf(page).locator('.note')).toHaveText(notes.done);
+  await clear.click();
+  await expect(consoleOf(page)).not.toContainText('to be cleared');
+  await expect(consoleOf(page)).toContainText(notes.consoleEmpty);
+  await expect(clear).toBeDisabled();
+});
+
 test('a partial line stays on its line, and an error is marked as one', async ({ page }) => {
   test.setTimeout(slow);
   await page.goto('run-python/');

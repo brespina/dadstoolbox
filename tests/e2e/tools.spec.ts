@@ -2,8 +2,9 @@
 // choose its sample file, press start, and a Save button appears. A Tool with no file
 // (input mode "none") types the text in its sample.txt instead, or, with no type box,
 // fills the fields in its sample.json, and a result appears. A Practice Tool's page
-// opens with its practice area ready to focus.
-// Adding a Tool adds its test; nothing here is written per Tool.
+// opens with its practice area ready to focus, and no Choose or Save button.
+// Adding a Tool adds its test; nothing here is written per Tool, except that Run Python
+// may Choose and Save its Program (ADR-0012).
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures';
@@ -28,6 +29,11 @@ for (const { tool, folder } of tools) {
         await expect(page.getByRole('heading', { level: 1 })).toHaveText(tool.name);
         await expect(page.getByText(tool.privacyLine)).toBeVisible();
         await expect(page.getByRole('link', { name: text.tool.backLink })).toBeVisible();
+        // A Practice Tool makes nothing: no Choose, start or Save. Run Python is the one
+        // exception (ADR-0012): it Chooses and Saves the visitor's own Program.
+        if (tool.address !== 'run-python') {
+          await expect(page.getByRole('button', { name: /^(Choose|Save)/ })).toHaveCount(0);
+        }
 
         const area = page.getByLabel(tool.areaLabel, { exact: true });
         await area.focus();

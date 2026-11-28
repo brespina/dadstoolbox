@@ -5,8 +5,9 @@ On Windows, `.gitattributes` keeps checkouts in LF so these match CI; after firs
 ## Page tests (Playwright)
 
 - **Ports.** Each run builds this checkout and serves it on `E2E_PORT` (default 4321). If that port is taken, the run fails. When several worktrees run at once, give each its own port: `E2E_PORT=5018 npm run test:e2e`.
-- **WebKit.** On Windows, Playwright's WebKit runs, but the video Tools' and AVIF page tests fail there for missing browser features; run the rest and let CI cover those. On Arch, WebKit's system libraries don't install. To test it locally, run `npm run test:e2e:webkit` (Playwright's Docker image; your account needs Docker access). For Chromium only, run `npx playwright test --project chromium-phone`. Otherwise CI covers WebKit.
+- **WebKit.** On Windows, Playwright's WebKit runs, but the video Tools' and AVIF page tests fail there for missing browser features; run the rest and let CI cover those. On Arch, WebKit's system libraries don't install. To test it locally, run `npm run test:e2e:webkit` (Playwright's Docker image; your account needs Docker access). It uses one worker, because WebKit's web process aborts under memory pressure when several suites run at once; pass `-- --workers=N` to override. For Chromium only, run `npx playwright test --project chromium-phone`. Otherwise CI covers WebKit.
 - **HEIC tests are slow.** The iPhone photo (HEIC) page tests in `change-image-type` and `make-photo-smaller` can time out on a busy machine. Rerun once before debugging; if CI passes, treat it as load.
+- **Run Python reloads once.** On a first visit Run Python's page reloads once to isolate itself. The shared fixture (`tests/e2e/fixtures.ts`) waits up to 30 s for its `data-isolating` mark to go before every test's end checks; other pages never carry it, so the wait costs them nothing.
 - **Matching text.** After the first Choose, the button reads "Choose more {noun}". Row reasons also appear in the live region. Match with `{ exact: true }`.
 
 ## Unit tests (Vitest)

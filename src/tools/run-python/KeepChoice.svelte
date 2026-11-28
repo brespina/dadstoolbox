@@ -33,29 +33,27 @@
   let applied: KeepChoice = initial;
   let refused = $state(false);
 
+  /** Keep could not be had: the choice goes back to Never keep, with the reason. */
+  function refuse() {
+    refused = true;
+    applied = 'never';
+    choice = 'never';
+  }
+
   const keeper = createKeeper({
     store,
     // svelte-ignore state_referenced_locally
     initial,
-    onRefused() {
-      refused = true;
-      applied = 'never';
-      choice = 'never';
-    },
+    onRefused: refuse,
   });
 
   $effect(() => {
     const wanted = choice;
     if (wanted === applied) return;
     applied = wanted;
-    if (untrack(() => keeper.choose(wanted, program))) {
-      refused = false;
-    } else {
-      // The radio showed Keep for a moment; it goes back, with the reason.
-      refused = true;
-      applied = 'never';
-      choice = 'never';
-    }
+    // If refused, the radio showed Keep for a moment; it goes back, with the reason.
+    if (untrack(() => keeper.choose(wanted, program))) refused = false;
+    else refuse();
   });
 
   // Every change to the Program, however it came about.

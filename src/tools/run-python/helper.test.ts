@@ -38,6 +38,8 @@ beforeAll(async () => {
   // The worker's wiring for input() (Python's own input() sends what was printed before it
   // waits, which these tests check), with the page's answer sent as soon as it is asked.
   pyodide.setInterruptBuffer(new Uint8Array(interrupt));
+  // A Program presses Stop with `from js import pressStop`, so the interrupt comes while it runs.
+  (globalThis as { pressStop?: () => void }).pressStop = () => requestInterrupt(interrupt);
   const buffer = createInputBuffer();
   const stdin = (usable: SharedArrayBuffer | undefined) =>
     createStdin(usable, {
@@ -121,6 +123,15 @@ describe('the Python helper', () => {
     expect(err).not.toMatch(/micropip|loadPackage|install/i);
   });
 
+  it("gives a part of Python's own library the browser lacks no plain line", () => {
+    // turtle is built in to Python but not in a browser, so "only built-in modules work"
+    // would be untrue: Python's message stands alone.
+    const { outcome, err } = run('import turtle\n');
+    expect(outcome).toBe('error');
+    expect(err).toContain("ModuleNotFoundError: No module named 'turtle'");
+    expect(err).not.toMatch(/micropip|loadPackage|install/i);
+  });
+
   it('counts an error inside a module that is there as a plain error', () => {
     const { outcome, err } = run('import json\njson.loads("{")\n');
     expect(outcome).toBe('error');
@@ -199,8 +210,13 @@ describe('input() in a Program', () => {
 
 describe('Stop', () => {
   it('ends a Program that never ends, with no traceback', () => {
-    requestInterrupt(interrupt);
-    expect(run('while True:\n    pass')).toEqual({ outcome: 'stopped', out: '', err: '' });
+    // Stop is pressed once the Program runs. Set before the Run, the interrupt would land
+    // wherever Python next looks, which depends on what earlier tests ran.
+    expect(run('from js import pressStop\npressStop()\nwhile True:\n    pass')).toEqual({
+      outcome: 'stopped',
+      out: '',
+      err: '',
+    });
     expect(run('print("fine")')).toEqual({ outcome: 'ok', out: 'fine\n', err: '' });
   });
 
