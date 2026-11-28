@@ -121,8 +121,9 @@ field is required.
   such as an empty network name: the page then shows no result and no reason. Give
   `textFor` a `pictureLabel`, so the picture is described from the options, without
   anything private such as a password.
-- **`practice`, a Practice Tool** (Typing test, Vim practice). No file, no `run` and
-  nothing to save: the Tool's own `Practice.svelte` is the page. `definePracticeTool`
+- **`practice`, a Practice Tool** (Typing test, Vim practice, Run Python). No file, no
+  `run` and no result to save: the Tool's own `Practice.svelte` is the page. (Run Python
+  Chooses and Saves the visitor's own Program, the one exception, ADR-0012.) `definePracticeTool`
   sets this mode; see [Practice Tools](#practice-tools).
 
   A typed Tool's options may hold a file the visitor chooses, such as the logo in a QR
@@ -156,8 +157,11 @@ step as its third argument, so tests pass a stand-in.
 ## Practice Tools
 
 A **Practice Tool** (see the glossary) lets the visitor practise a skill on the page,
-such as the Typing test. It makes nothing to save, so it has no `run`, options component
-or sample file ([ADR-0005](adr/0005-practice-tools-are-their-own-page.md)). Its folder
+such as the Typing test. It makes no result to save, so it has no `run`, options component
+or sample file ([ADR-0005](adr/0005-practice-tools-are-their-own-page.md)). Run Python
+Chooses and Saves the visitor's own Program, which is their writing, not a result
+([ADR-0012](adr/0012-run-python-is-a-practice-tool.md)); the generated page test checks
+that no other Practice Tool has a Choose or Save button. Its folder
 holds these two files, plus its own plain TypeScript, any smaller Svelte parts its page
 uses (the Typing test's `SettingsBar.svelte`, for one) and tests:
 
@@ -202,7 +206,8 @@ Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage
 - **Fixed-width text.** Use the `--mono` token from `src/styles/base.css`, the device's own
   fixed-width font.
 - **The Promise.** Keep nothing: no `localStorage`, no personal bests. Make no outside
-  requests.
+  requests. (Run Python's Keep is the one exception, by the visitor's choice; see its
+  section.)
 - **Motion.** The Site turns transitions and animations off under reduced motion
   (`base.css`), and every page test runs with reduced motion, so a check never sees a
   fade halfway. Something that fades away while the visitor types, such as the Typing
@@ -557,6 +562,171 @@ No v1 Tool declares one, and the page tests enforce that: `tests/e2e/fixtures.ts
 adding an outside address is not just filling in a field. It is a decision about the
 Promise: record it in an ADR, then change those checks on purpose. Never send a visitor's
 files to an outside address.
+
+## Run Python
+
+Run Python (`src/tools/run-python/`) is a Practice Tool
+([ADR-0012](adr/0012-run-python-is-a-practice-tool.md)) that runs a visitor's own Python
+with Pyodide ([ADR-0008](adr/0008-python-runs-in-the-browser-with-pyodide.md)). Its pieces:
+
+| File                            | What it holds                                                                                                                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `declaration.ts`                | Plain data, as for any Tool. Every word the page shows is in `notes`, including the starter Program.                                                                           |
+| `Practice.svelte`               | A small shell: `PracticeToolPage.svelte` loads every Practice page into every Practice Tool's page, so the shell loads `RunPython.svelte` with `import()` once the page opens. |
+| `RunPython.svelte`              | The page: editor, Run, Stop and Clear the Console buttons, Console. It owns the Program text and turns the runner's state into buttons and words. |
+| `ProgramEditor.svelte` | **The editor seam.** `value` in, `onchange(value)` out, `focus()`, named by `areaLabel`. It mounts the editor in a shadow root. |
+| `code-editor.ts` | CodeMirror's setup: line numbers, history, default keys, Tab to indent, Python colours from the `--code-*` tokens. The only file that imports CodeMirror. |
+| `Console.svelte`                | Draws the Console: a labelled live region (`role="log"`), text only (never HTML). Error runs get a bar and a hidden "Error:" for screen readers.                              |
+| `console-buffer.ts`             | Pure. The lines, partial lines, the 5,000-line cap and the one "older lines removed" note. Tested with Vitest.                                                                  |
+| `messages.ts`                   | **The message protocol** between page and worker, and `parseToWorker` / `parseFromWorker`, which let in nothing else.                                                          |
+| `runner.ts`                     | **The page's side of a Run.** States `gettingReady`, `ready`, `running`, `stopping`, `failed`; takes the worker (`makeWorker`) and a `ConsoleSink` as arguments, so Vitest passes fakes. |
+| `python-worker.ts`              | The worker. Loads Pyodide by the absolute address the page sends, runs each Program in a fresh namespace, and streams output as `out` messages.                               |
+| `helper.py`                     | **The Python helper**, loaded with `?raw` and run once by the worker. `run_program(source)` compiles the Program as `main.py`, runs it in a fresh namespace, catches the error and prints the traceback from the Program's own first frame (the page's frames cut). It returns `ok`, `error`, `missingModule` or `stopped` (an uncaught `KeyboardInterrupt`, with no traceback). A part of Python's own library the browser lacks (turtle, tkinter, curses; `sys.stdlib_module_names`) is an `error`, so the "only built-in modules" line never shows for it. `helper.test.ts` runs it under Node with the same `pyodide` package. |
+| `input-channel.ts`              | **The typing channel** for `input()`: an 8 KB `SharedArrayBuffer` (state, length, the line as UTF-8) the page writes into with `sendLine` and the worker waits on with `waitForLine`. `createStdin` is the function the worker gives Pyodide. Vitest-tested. |
+| `interrupt-channel.ts`          | **The interrupt buffer** for Stop: one shared byte the page writes 2 into and Pyodide reads (`setInterruptBuffer`). Vitest-tested.                                           |
+| `files.ts`                      | The pinned Pyodide version and the Site folder its files are served from (`files.test.ts` keeps it equal to the installed package). Also, pure, the Program's own file: `readProgram` (strict UTF-8, no NUL bytes, 500 KB cap, each refusal a plain reason from `notes`) and `programFileName` (the chosen file's name made safe, always `.py`, else `my-program.py`). `maxProgramBytes` is also Keep's cap: `keep.ts` neither stores nor opens a longer Program. |
+| `keep.ts` / `KeepChoice.svelte` | **Keep** (#132). `keep.ts` is pure (the storage is an argument): `openKept` reads and checks what was kept, `createKeeper` stores it. `KeepChoice.svelte` is the choice and its words. |
+| `src/site/pyodide-files.ts`     | Build integration, like `pdfjs-files.ts`: serves and copies the five Pyodide files to `run-python/pyodide/<version>/`. They are not committed.                                |
+
+**The editor lives in a shadow root.** CodeMirror adds its styles as a `<style>` element, and
+the Site's style hashes block that element, so the editor would show unstyled. In a shadow
+root CodeMirror adopts a stylesheet instead, which the hashes do not cover. So
+`ProgramEditor.svelte` does `host.attachShadow({ mode: 'open' })` and mounts the editor
+there; never add `unsafe-inline` to let it work. Custom properties cross a shadow root, so
+the editor's colours are the `--code-*` tokens in `src/styles/base.css` (light and dark, each
+at least 4.5 : 1 on its background); change a colour there, not in `code-editor.ts`. Tab
+indents, so the page says in `notes.leaveEditor` that Escape, then Tab, moves on.
+Playwright's locators and axe both look inside an open shadow root.
+
+**Choose and Save** (#131). Two buttons above the editor. **Choose a .py file** presses a hidden
+`<input type="file">` (`accept` lists `.py` and the text types, because phones differ); the
+text goes through `readProgram` and into the editor with `ProgramEditor`'s `value`, which
+`code-editor.ts` `setText` applies as one change marked `isolateHistory`, so Ctrl+Z / Undo
+brings the old Program back whole (no confirmation box). The input is cleared after each
+choice, so the same file can be chosen twice. A refused file leaves the Program alone and
+puts its reason in a `role="status"` line. A file over the cap is refused from `file.size`
+without being read. **Save** hands the editor's text to `saveFiles` (`src/site/save.ts`) as
+`programFileName(chosen name)`. The page tests (`run-python-files.spec.ts`) switch sharing
+off, as `tools.spec.ts` does, to check the saved file. `tools.spec.ts` no longer
+asserts that a Practice Tool has no Choose or Save button, since this one has both.
+
+**Keep** (#132, [ADR-0011](adr/0011-a-person-can-choose-to-keep-their-program-in-their-browser.md)).
+A visible choice above the editor, made with the shared `ChoiceGroup`: **Never keep** (the
+default) or **Keep my program in this browser**, with one plain line saying what the chosen
+one does. It is the only thing the Site stores at all, so read the ADR before touching it.
+Under Never keep nothing is stored, not even the choice. Under Keep, two `localStorage`
+entries are stored, keyed `dadstoolbox:run-python:keep` (the choice) and
+`dadstoolbox:run-python:program` (the Program's text). Choosing Keep writes both at once;
+after that, an edit (typing, or a chosen file) is written about half a second after typing
+stops, and when the page is hidden. Choosing Never keep deletes both at once and drops any
+write still waiting. On opening, `openKept` reads them once: text only, no NUL byte, under
+the 500 KB cap, and the choice must be the exact marker; anything else is removed and the
+page opens on Never keep. The kept text goes into the editor in place of the starter and is
+never run. If storage is missing, refuses a write, or is full (or a Program has grown over
+the cap), the entries are removed, the choice goes back to Never keep, and the line
+`notes.cannotKeep` says so; opening on blocked storage says nothing until the visitor asks to
+keep. A worker has no `localStorage`, so a Program cannot read what is kept. **No other
+Tool may keep anything without its own ADR.** Page tests: `run-python-keep.spec.ts`.
+
+**What the Console says.** The worker sends `done` with an `outcome`; the runner turns it into the
+page's own words (`notes.done`, `notes.onlyBuiltIn`), written to the Console with the stream
+`note`, which a Program cannot send (`parseFromWorker` refuses it). "Done." follows only an
+`ok` Run. A `missingModule` Run gets Python's own message, then the plain line, and no
+"Done.". The worker calls the helper directly and not `runPythonAsync`, which would add
+Pyodide's frames and its hint about `micropip`; the helper strips such a hint again for
+`ModuleNotFoundError`, and no network is ever tried. Python's own messages are English and
+are not scanned for banned words; the page's words in `notes` are.
+
+**To extend a Run:** add a message type to `messages.ts` (with a case in its parse function
+and a line in `messages.test.ts`), handle it in `python-worker.ts`, and give `runner.ts` a
+method that sends it or a case in `onMessage` that turns it into a state change or a
+Console call. Python's output reaches the page as `out` chunks, added to the buffer as they
+come and drawn once per animation frame; `runProgram` in the worker is the one place a
+Program runs.
+
+**A Tool that runs a visitor's own program must use a blob worker** (ADR-0010). A worker
+loaded from a normal address is not bound by the page's browser lock, so a Program could
+send things to other sites; a worker made from a `blob:` URL inherits the lock. Here that
+is `import PythonWorker from './python-worker?worker&inline'`. Keep the worker one
+self-contained file: it has no address of its own, so every address it uses (`pyodide.mjs`
+and the folder Pyodide loads the rest from) is absolute and sent by the page.
+
+**The per-page lock.** Python's WebAssembly needs `'wasm-unsafe-eval'` in `script-src`. It
+is added for this page only, in `src/pages/run-python.astro`, with
+`Astro.csp?.insertScriptResource("'wasm-unsafe-eval'")`, which merges it into Astro's own
+`script-src` (a second `script-src` directive would be ignored by the browser). Adding any
+source drops Astro's default `'self'`, so the page also calls
+`Astro.csp?.insertScriptResource("'self'")`; copy both lines. Never add
+it in `src/site/csp.ts`, which every page shares. `tests/e2e/run-python.spec.ts` checks
+that this page has it and the home page and other Tools do not. Without it Pyodide waits
+for ever and says nothing, so the runner gives up after 3 minutes and shows a reason with
+a "Try again" button.
+
+**Isolation** ([ADR-0009](adr/0009-typing-and-stop-need-isolation-from-a-service-worker.md)).
+`input()` and Stop need `SharedArrayBuffer`, so the page must be cross-origin isolated,
+which takes two headers GitHub Pages can't send. `public/run-python/coi-sw.js` is a small
+service worker that adds them. It is served from `/dadstoolbox/run-python/`, so its scope
+is that folder only (no `Service-Worker-Allowed` header, no wider `scope`); no other page
+registers it or is controlled by it. `isolation.ts` decides (pure, Vitest-tested):
+isolated; register and reload once; or unavailable. `Practice.svelte` runs it first,
+showing only "Getting ready…", so the one reload on a first visit comes before the editor
+and loses nothing typed. While it isolates, the "Getting ready…" line carries
+`data-isolating`; the shared page-test fixture (`tests/e2e/fixtures.ts`) waits for that
+mark to go, and for the page to load, before its end-of-test checks, so the reload never
+cuts a test short. A flag in the tab's session storage stops a second reload; when
+isolation still has not started, the page says so in one line (`notes.noIsolation`) and
+Run works as before. RunPython.svelte gets `isolated` as a prop. **To remove it** (if the
+Tool goes): keep the file at the same address and make it a service worker that
+unregisters itself and reloads its pages; the comment at its top has the code.
+
+**Typing (`input()`).** When isolated, the runner makes the `SharedArrayBuffer` and sends it
+in `init`. The worker's stdin function (`createStdin`) tells the page `input`, then blocks
+in `Atomics.wait`. The runner shows the Console's typing field (`onInput(true)`); Enter
+calls `runner.answer(line)`, which echoes the line to the Console as ordinary output,
+writes it into the buffer, wakes the worker and removes the field. Python's own `input()`
+sends the prompt before it reads, so a prompt such as `print("Name: ", end="")` shows
+first (`helper.test.ts` checks this); Pyodide's stdin function runs with Python locked
+out, so it cannot flush for itself. Where the page is not isolated, no buffer is sent:
+the worker says `inputUnavailable`, the runner writes `notes.noInput` as a page line, and
+`input()` ends with `EOFError`, so the traceback follows.
+
+**Stop** ([ADR-0009](adr/0009-typing-and-stop-need-isolation-from-a-service-worker.md)). While a
+Program runs, Run is greyed ("Running…") and Stop is available; otherwise Stop is greyed.
+`runner.stop()` works by whether the runner holds the shared buffers:
+
+- *With isolation* it writes 2 into Pyodide's interrupt buffer (`interrupt-channel.ts`, a second
+  `SharedArrayBuffer` sent in `init`; the worker gives it to `setInterruptBuffer`). Python raises
+  `KeyboardInterrupt` at its next check and `helper.py` returns the outcome `stopped`, which the
+  Console shows as "Stopped." in place of a traceback. Nothing reloads. The state is `stopping`
+  until the worker answers `done`; any `done` then (even `ok`, from a Program that caught the
+  interrupt and ended) shows "Stopped.", not "Done.".
+- A Program waiting in `input()` is blocked in `Atomics.wait`, which the interrupt buffer cannot
+  wake. So if the Program waits, Stop also writes the third state (2) into the typing buffer and
+  notifies it; `waitForLine` returns nothing, and the worker's stdin function calls
+  `pyodide.checkInterrupt()`, which raises `KeyboardInterrupt` out of `input()` (the one Python
+  call a stdin function may make; others raise `NoGilError`). The wait also looks at the interrupt
+  buffer every 100 ms, in case a wake is missed. The runner clears both buffers before each Run,
+  so a Stop that came late leaves nothing behind.
+- If the worker is still running 3 seconds after Stop (`stopGraceMs`: a Program that catches the
+  interrupt in a loop), or *without isolation*, the runner ends the worker (`terminate()`),
+  writes "Stopped.", and starts a fresh worker at once (`begin(true)`), so its 10 to 20 seconds
+  of loading happen while the visitor edits. The state is `gettingReady` with `restarted` set:
+  Run stays pressable, and a press keeps the Program (`queued`, button "Getting ready…") and
+  runs it when Python is ready. On the first load Run stays greyed.
+
+**A worker that dies on its own** (`onerror`, `onmessageerror`, or the worker's `failed`
+message, which it sends when Pyodide itself breaks rather than the Program) while a Program
+runs or stops: the Console gets one plain line (`notes.died`), the worker is dropped, a fresh
+one starts, and Run works again. An idle worker that dies is replaced quietly. A worker that
+dies before Python is ready, including a replacement, is a `failed` state with "Try again", so
+a worker that dies at once cannot loop. Python itself ends `[0] * 10**10` with `OverflowError`
+and a Program that fills memory with `MemoryError`, so no Program a visitor can write kills the
+worker on demand: only the runner's fake-worker tests cover this path.
+
+Tests: Vitest for `console-buffer`, `messages`, `runner` (with a fake worker), `input-channel`,
+`interrupt-channel`, `isolation`, `files`, `keep`, and `helper` (helper.py under Node);
+the page tests `tests/e2e/run-python.spec.ts` and `run-python-{editor,files,keep,stop}.spec.ts`
+for the real thing, with a longer timeout because Python takes 10 to 20 seconds to load.
 
 ## Words on the page
 

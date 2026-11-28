@@ -13,6 +13,18 @@
   --action: #0b57a4;
   --action-text: #ffffff;
   --problem: #a4161a;
+  /* Code, as in Run Python's editor: text, background, the gutter of line numbers and the
+     colours of Python's words. Each is at least 4.5 : 1 on its background. */
+  --code-bg: #f4f4f2;
+  --code-text: #1b1b1b;
+  --code-keyword: #8a1c7c;
+  --code-string: #0a5c2e;
+  --code-number: #0b57a4;
+  --code-comment: #595959;
+  --code-name: #8a4500;
+  --code-gutter: #595959;
+  --code-gutter-bg: #ebebe8;
+  --code-select: #cfe3f7;
   /* The device's own fixed-width font, for text where every letter lines up. */
   --mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 }
@@ -29,6 +41,16 @@
     --action: #8cc4ff;
     --action-text: #141414;
     --problem: #ff9b9b;
+    --code-bg: #1f1f1f;
+    --code-text: #f2f2f2;
+    --code-keyword: #e6a3ff;
+    --code-string: #9be3a8;
+    --code-number: #8cc4ff;
+    --code-comment: #b0b0b0;
+    --code-name: #ffc27a;
+    --code-gutter: #b0b0b0;
+    --code-gutter-bg: #191919;
+    --code-select: #3a4a60;
   }
 }
 

@@ -21,6 +21,17 @@ test('Our promise page shows its four sections', async ({ page }) => {
   ).toBeVisible();
 });
 
+test('Our promise page says Run Python keeps a program only by choice', async ({ page }) => {
+  await page.goto('promise/');
+  await expect(
+    page
+      .getByRole('main')
+      .getByText(
+        'Run Python keeps your program in your browser only if you choose to, and never sends it anywhere.',
+      ),
+  ).toBeVisible();
+});
+
 test('Our promise page never calls itself a privacy policy', async ({ page }) => {
   await page.goto('promise/');
   await expect(page.locator('body')).not.toContainText(/privacy policy/i);

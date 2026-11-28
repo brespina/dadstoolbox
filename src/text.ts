@@ -41,6 +41,8 @@ export const text = {
         'No ads.',
         'Nothing counts or tracks you.',
         'Your files stay on your device. We never keep them or send them anywhere.',
+        // Run Python's Keep (ADR-0011): the one thing a Tool may hold, and only by choice.
+        'Run Python keeps your program in your browser only if you choose to, and never sends it anywhere.',
       ],
     },
     howItWorks: {

@@ -2,6 +2,7 @@ import { defineConfig } from 'astro/config';
 import svelte from '@astrojs/svelte';
 import { cspDirectives } from './src/site/csp';
 import { pdfjsFiles } from './src/site/pdfjs-files';
+import { pyodideFiles } from './src/site/pyodide-files';
 import { discoverTools } from './src/tools/discover';
 import { toolRuns } from './src/tools/tool-runs';
 
@@ -14,7 +15,8 @@ export default defineConfig({
   output: 'static',
   trailingSlash: 'always',
   // pdfjsFiles: the files Sign a PDF's page viewer asks for by name (ADR-0006).
-  integrations: [svelte(), pdfjsFiles()],
+  // pyodideFiles: Python's files for Run Python, loaded only on that Tool's page (ADR-0008).
+  integrations: [svelte(), pdfjsFiles(), pyodideFiles()],
   // Shiki's inline styles break the browser lock, and the Site has no code samples.
   markdown: { syntaxHighlight: false },
   // The Tool worker loads each worker Tool's `run` only when asked, which needs module

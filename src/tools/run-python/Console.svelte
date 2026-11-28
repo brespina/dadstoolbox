@@ -1,0 +1,163 @@
+<script lang="ts">
+  // The Console: what the Program has printed, shown as text (never as HTML) in a labelled
+  // live region. Error output is told apart by more than colour: a bar beside it, and the
+  // words "Error:" for a screen reader. The page's own words ("Done.") are a third kind,
+  // never mixed into the Program's output. The runs come from console-buffer.ts; the page
+  // hands over a new set at most once per animation frame.
+  //
+  // While the Program waits in input(), a one-line typing field follows the last output,
+  // focused. Enter sends the line (`onanswer`); the page then removes the field.
+  import type { ConsoleRun } from './console-buffer';
+  import { tool } from './declaration';
+
+  const { notes } = tool;
+
+  let {
+    runs,
+    removed,
+    waiting = false,
+    onanswer,
+  }: {
+    runs: ConsoleRun[];
+    removed: boolean;
+    /** The Program waits for a typed line: show the typing field. */
+    waiting?: boolean;
+    onanswer: (line: string) => void;
+  } = $props();
+
+  // Longest answer, in letters. Four bytes each at most, so it fits the channel's buffer.
+  const longest = 2000;
+
+  let answer: HTMLInputElement | undefined = $state();
+
+  // The field is new each time the Program waits, so it is focused when it appears.
+  $effect(() => answer?.focus());
+</script>
+
+<!-- tabindex: the Console scrolls, so the keyboard must be able to reach it. -->
+<div class="console" role="log" aria-label={notes.consoleLabel} tabindex="0">
+  {#if removed}
+    <p class="removed">{notes.linesRemoved}</p>
+  {/if}
+  {#each runs as run, i (i)}
+    {#if run.stream === 'stderr'}
+      <span class="error"
+        ><span class="visually-hidden">{notes.errorMark}</span>{run.text.endsWith('\n')
+          ? run.text.slice(0, -1)
+          : run.text}</span
+      >
+    {:else if run.stream === 'note'}
+      <span class="note">{run.text.endsWith('\n') ? run.text.slice(0, -1) : run.text}</span>
+    {:else}
+      <span class="plain">{run.text}</span>
+    {/if}
+  {:else}
+    <span class="empty" aria-hidden="true">{notes.consoleEmpty}</span>
+  {/each}
+  {#if waiting}
+    <form
+      class="typing"
+      onsubmit={(event) => {
+        event.preventDefault();
+        onanswer(answer?.value ?? '');
+      }}
+    >
+      <input
+        bind:this={answer}
+        type="text"
+        aria-label={notes.typeAnswer}
+        maxlength={longest}
+        enterkeyhint="send"
+        autocapitalize="off"
+        autocorrect="off"
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </form>
+  {/if}
+</div>
+
+<style>
+  .console {
+    box-sizing: border-box;
+    min-height: 8rem;
+    max-height: 24rem;
+    padding: 0.75rem;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    background: var(--surface);
+    color: var(--text);
+    font: 0.9375rem / 1.5 var(--mono);
+  }
+
+  /* Only the Program's own text keeps its spaces and newlines, so the markup's own
+     whitespace between the pieces never shows. */
+  .plain,
+  .error {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* On the line of the last output when it has room (a prompt such as "Name: "), or
+     under it. 2.75rem is the least height a finger can hit. */
+  .typing {
+    display: inline-block;
+    box-sizing: border-box;
+    width: min(100%, 24rem);
+    vertical-align: middle;
+  }
+
+  .typing input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0 0.75rem;
+    border: 2px solid var(--muted);
+    border-radius: 0.5rem;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    /* 16 px or more: iPhone Safari zooms the page in on a smaller field. */
+    font-size: 1rem;
+  }
+
+  .typing input:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .console:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .empty,
+  .removed {
+    color: var(--muted);
+  }
+
+  .removed {
+    margin: 0 0 0.5rem;
+    font-style: italic;
+  }
+
+  /* The page's own words ("Done."), apart from the Program's output: italic, with a rule
+     above, so it reads as a statement about the Run and not as something it printed. */
+  .note {
+    display: block;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--line);
+    font-style: italic;
+  }
+
+  /* A bar beside the lines, and bold letters: visible without colour too. */
+  .error {
+    display: block;
+    padding-left: 0.5rem;
+    border-left: 4px solid var(--problem);
+    color: var(--problem);
+    font-weight: 600;
+  }
+</style>
