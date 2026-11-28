@@ -37,7 +37,7 @@ export type FromWorker =
   | { type: 'input' }
   /** The Program called input() where the browser can't wait for typing. */
   | { type: 'inputUnavailable' }
-  /** Python could not start or broke. `message` is for the page to show or log. */
+  /** Python could not start or broke. `message` is the worker's own reason, which the page does not show: it says its own plain words. */
   | { type: 'failed'; message: string };
 
 const isObject = (data: unknown): data is Record<string, unknown> =>

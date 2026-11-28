@@ -1,10 +1,11 @@
 // The Python worker. The page builds it as a worker made from a `blob:` URL
-// (`?worker&inline`, see Practice.svelte), because only a blob worker inherits the page's
+// (`?worker&inline`, see RunPython.svelte), because only a blob worker inherits the page's
 // browser lock, so a Program cannot send anything beyond the Site (ADR-0010). Any Tool
 // that runs a visitor's own program must do the same.
 //
-// It is one self-contained file: it imports only `messages.ts` and `input-channel.ts` (and types), and loads
-// Pyodide by the absolute address the page sends in `init`. A blob worker has no address
+// It is one self-contained file: it imports only `messages.ts`, `input-channel.ts`,
+// `interrupt-channel.ts` and `helper.py` (and types), and loads Pyodide by the absolute
+// address the page sends in `init`. A blob worker has no address
 // of its own to resolve a relative one against. It loads no package (ADR-0008).
 //
 // Seams: each message the page sends has a case in `onMessage`; `runProgram` is the one

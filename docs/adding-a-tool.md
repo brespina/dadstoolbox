@@ -121,8 +121,9 @@ field is required.
   such as an empty network name: the page then shows no result and no reason. Give
   `textFor` a `pictureLabel`, so the picture is described from the options, without
   anything private such as a password.
-- **`practice`, a Practice Tool** (Typing test, Vim practice). No file, no `run` and
-  nothing to save: the Tool's own `Practice.svelte` is the page. `definePracticeTool`
+- **`practice`, a Practice Tool** (Typing test, Vim practice, Run Python). No file, no
+  `run` and no result to save: the Tool's own `Practice.svelte` is the page. (Run Python
+  Chooses and Saves the visitor's own Program, the one exception, ADR-0012.) `definePracticeTool`
   sets this mode; see [Practice Tools](#practice-tools).
 
   A typed Tool's options may hold a file the visitor chooses, such as the logo in a QR
@@ -156,8 +157,11 @@ step as its third argument, so tests pass a stand-in.
 ## Practice Tools
 
 A **Practice Tool** (see the glossary) lets the visitor practise a skill on the page,
-such as the Typing test. It makes nothing to save, so it has no `run`, options component
-or sample file ([ADR-0005](adr/0005-practice-tools-are-their-own-page.md)). Its folder
+such as the Typing test. It makes no result to save, so it has no `run`, options component
+or sample file ([ADR-0005](adr/0005-practice-tools-are-their-own-page.md)). Run Python
+Chooses and Saves the visitor's own Program, which is their writing, not a result
+([ADR-0012](adr/0012-run-python-is-a-practice-tool.md)); the generated page test checks
+that no other Practice Tool has a Choose or Save button. Its folder
 holds these two files, plus its own plain TypeScript, any smaller Svelte parts its page
 uses (the Typing test's `SettingsBar.svelte`, for one) and tests:
 
@@ -577,7 +581,7 @@ with Pyodide ([ADR-0008](adr/0008-python-runs-in-the-browser-with-pyodide.md)). 
 | `messages.ts`                   | **The message protocol** between page and worker, and `parseToWorker` / `parseFromWorker`, which let in nothing else.                                                          |
 | `runner.ts`                     | **The page's side of a Run.** States `gettingReady`, `ready`, `running`, `stopping`, `failed`; takes the worker (`makeWorker`) and a `ConsoleSink` as arguments, so Vitest passes fakes. |
 | `python-worker.ts`              | The worker. Loads Pyodide by the absolute address the page sends, runs each Program in a fresh namespace, and streams output as `out` messages.                               |
-| `helper.py`                     | **The Python helper**, loaded with `?raw` and run once by the worker. `run_program(source)` compiles the Program as `main.py`, runs it in a fresh namespace, catches the error and prints the traceback from the Program's own first frame (the page's frames cut). It returns `ok`, `error`, `missingModule` or `stopped` (an uncaught `KeyboardInterrupt`, with no traceback). `helper.test.ts` runs it under Node with the same `pyodide` package. |
+| `helper.py`                     | **The Python helper**, loaded with `?raw` and run once by the worker. `run_program(source)` compiles the Program as `main.py`, runs it in a fresh namespace, catches the error and prints the traceback from the Program's own first frame (the page's frames cut). It returns `ok`, `error`, `missingModule` or `stopped` (an uncaught `KeyboardInterrupt`, with no traceback). A part of Python's own library the browser lacks (turtle, tkinter, curses; `sys.stdlib_module_names`) is an `error`, so the "only built-in modules" line never shows for it. `helper.test.ts` runs it under Node with the same `pyodide` package. |
 | `input-channel.ts`              | **The typing channel** for `input()`: an 8 KB `SharedArrayBuffer` (state, length, the line as UTF-8) the page writes into with `sendLine` and the worker waits on with `waitForLine`. `createStdin` is the function the worker gives Pyodide. Vitest-tested. |
 | `interrupt-channel.ts`          | **The interrupt buffer** for Stop: one shared byte the page writes 2 into and Pyodide reads (`setInterruptBuffer`). Vitest-tested.                                           |
 | `files.ts`                      | The pinned Pyodide version and the Site folder its files are served from (`files.test.ts` keeps it equal to the installed package). Also, pure, the Program's own file: `readProgram` (strict UTF-8, no NUL bytes, 500 KB cap, each refusal a plain reason from `notes`) and `programFileName` (the chosen file's name made safe, always `.py`, else `my-program.py`). `maxProgramBytes` is also Keep's cap: `keep.ts` neither stores nor opens a longer Program. |
@@ -650,7 +654,9 @@ and the folder Pyodide loads the rest from) is absolute and sent by the page.
 **The per-page lock.** Python's WebAssembly needs `'wasm-unsafe-eval'` in `script-src`. It
 is added for this page only, in `src/pages/run-python.astro`, with
 `Astro.csp?.insertScriptResource("'wasm-unsafe-eval'")`, which merges it into Astro's own
-`script-src` (a second `script-src` directive would be ignored by the browser). Never add
+`script-src` (a second `script-src` directive would be ignored by the browser). Adding any
+source drops Astro's default `'self'`, so the page also calls
+`Astro.csp?.insertScriptResource("'self'")`; copy both lines. Never add
 it in `src/site/csp.ts`, which every page shares. `tests/e2e/run-python.spec.ts` checks
 that this page has it and the home page and other Tools do not. Without it Pyodide waits
 for ever and says nothing, so the runner gives up after 3 minutes and shows a reason with
@@ -664,7 +670,10 @@ is that folder only (no `Service-Worker-Allowed` header, no wider `scope`); no o
 registers it or is controlled by it. `isolation.ts` decides (pure, Vitest-tested):
 isolated; register and reload once; or unavailable. `Practice.svelte` runs it first,
 showing only "Getting ready…", so the one reload on a first visit comes before the editor
-and loses nothing typed. A flag in the tab's session storage stops a second reload; when
+and loses nothing typed. While it isolates, the "Getting ready…" line carries
+`data-isolating`; the shared page-test fixture (`tests/e2e/fixtures.ts`) waits for that
+mark to go, and for the page to load, before its end-of-test checks, so the reload never
+cuts a test short. A flag in the tab's session storage stops a second reload; when
 isolation still has not started, the page says so in one line (`notes.noIsolation`) and
 Run works as before. RunPython.svelte gets `isolated` as a prop. **To remove it** (if the
 Tool goes): keep the file at the same address and make it a service worker that
@@ -714,9 +723,10 @@ a worker that dies at once cannot loop. Python itself ends `[0] * 10**10` with `
 and a Program that fills memory with `MemoryError`, so no Program a visitor can write kills the
 worker on demand: only the runner's fake-worker tests cover this path.
 
-Tests: Vitest for `console-buffer`, `messages`, `runner` (with a fake worker), `input-channel`, `interrupt-channel`, `isolation` and `files`;
-`tests/e2e/run-python.spec.ts` for the real thing, with a longer timeout because Python
-takes 10 to 20 seconds to load.
+Tests: Vitest for `console-buffer`, `messages`, `runner` (with a fake worker), `input-channel`,
+`interrupt-channel`, `isolation`, `files`, `keep`, and `helper` (helper.py under Node);
+the page tests `tests/e2e/run-python.spec.ts` and `run-python-{editor,files,keep,stop}.spec.ts`
+for the real thing, with a longer timeout because Python takes 10 to 20 seconds to load.
 
 ## Words on the page
 

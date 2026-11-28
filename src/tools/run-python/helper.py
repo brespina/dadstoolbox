@@ -41,6 +41,10 @@ def run_program(source):
         while trace is not None and trace.tb_frame.f_code.co_filename != "main.py":
             trace = trace.tb_next
         traceback.print_exception(type(error), error, trace, file=sys.stderr)
+        # A part of Python's own library the browser can't have (turtle, tkinter, curses)
+        # would make the plain line untrue, so Python's message stands alone.
+        if missing and (error.name or "").split(".")[0] in sys.stdlib_module_names:
+            return "error"
         return "missingModule" if missing else "error"
     finally:
         # Python holds back a line with no newline yet: send it now, so it is part of this
