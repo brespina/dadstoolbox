@@ -202,7 +202,8 @@ Tool layout shows its `Practice.svelte` through `src/components/PracticeToolPage
 - **Fixed-width text.** Use the `--mono` token from `src/styles/base.css`, the device's own
   fixed-width font.
 - **The Promise.** Keep nothing: no `localStorage`, no personal bests. Make no outside
-  requests.
+  requests. (Run Python's Keep is the one exception, by the visitor's choice; see its
+  section.)
 - **Motion.** The Site turns transitions and animations off under reduced motion
   (`base.css`), and every page test runs with reduced motion, so a check never sees a
   fade halfway. Something that fades away while the visitor types, such as the Typing
@@ -553,6 +554,7 @@ with Pyodide ([ADR-0008](adr/0008-python-runs-in-the-browser-with-pyodide.md)). 
 | `python-worker.ts`              | The worker. Loads Pyodide by the absolute address the page sends, runs each Program in a fresh namespace, and streams output as `out` messages.                               |
 | `helper.py`                     | **The Python helper**, loaded with `?raw` and run once by the worker. `run_program(source)` compiles the Program as `main.py`, runs it in a fresh namespace, catches the error and prints the traceback from the Program's own first frame (the page's frames cut). It returns `ok`, `error` or `missingModule`. `helper.test.ts` runs it under Node with the same `pyodide` package. |
 | `files.ts`                      | The pinned Pyodide version and the Site folder its files are served from (`files.test.ts` keeps it equal to the installed package). Also, pure, the Program's own file: `readProgram` (strict UTF-8, no NUL bytes, 500 KB cap, each refusal a plain reason from `notes`) and `programFileName` (the chosen file's name made safe, always `.py`, else `my-program.py`). |
+| `keep.ts` / `KeepChoice.svelte` | **Keep** (#132). `keep.ts` is pure (the storage is an argument): `openKept` reads and checks what was kept, `createKeeper` stores it. `KeepChoice.svelte` is the choice and its words. |
 | `src/site/pyodide-files.ts`     | Build integration, like `pdfjs-files.ts`: serves and copies the five Pyodide files to `run-python/pyodide/<version>/`. They are not committed.                                |
 
 **The editor lives in a shadow root.** CodeMirror adds its styles as a `<style>` element, and
@@ -576,6 +578,24 @@ without being read. **Save** hands the editor's text to `saveFiles` (`src/site/s
 `programFileName(chosen name)`. The page tests (`run-python-files.spec.ts`) switch sharing
 off, as `tools.spec.ts` does, to check the saved file. `tools.spec.ts` no longer
 asserts that a Practice Tool has no Choose or Save button, since this one has both.
+
+**Keep** (#132, [ADR-0011](adr/0011-a-person-can-choose-to-keep-their-program-in-their-browser.md)).
+A visible choice above the editor, made with the shared `ChoiceGroup`: **Never keep** (the
+default) or **Keep my program in this browser**, with one plain line saying what the chosen
+one does. It is the only thing the Site stores at all, so read the ADR before touching it.
+Under Never keep nothing is stored, not even the choice. Under Keep, two `localStorage`
+entries are stored, keyed `dadstoolbox:run-python:keep` (the choice) and
+`dadstoolbox:run-python:program` (the Program's text). Choosing Keep writes both at once;
+after that, an edit (typing, or a chosen file) is written about half a second after typing
+stops, and when the page is hidden. Choosing Never keep deletes both at once and drops any
+write still waiting. On opening, `openKept` reads them once: text only, no NUL byte, under
+the 500 KB cap, and the choice must be the exact marker; anything else is removed and the
+page opens on Never keep. The kept text goes into the editor in place of the starter and is
+never run. If storage is missing, refuses a write, or is full (or a Program has grown over
+the cap), the entries are removed, the choice goes back to Never keep, and the line
+`notes.cannotKeep` says so; opening on blocked storage says nothing until the visitor asks to
+keep. A worker has no `localStorage`, so a Program cannot read what is kept. **No other
+Tool may keep anything without its own ADR.** Page tests: `run-python-keep.spec.ts`.
 
 **What the Console says.** The worker sends `done` with an `outcome`; the runner turns it into the
 page's own words (`notes.done`, `notes.onlyBuiltIn`), written to the Console with the stream

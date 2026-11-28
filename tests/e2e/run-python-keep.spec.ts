@@ -149,7 +149,7 @@ test('storage that refuses shows the plain line and Never keep', async ({ page }
   await open(page);
   // Nothing is said until the visitor asks to keep something.
   await expect(page.getByText(notes.cannotKeep)).toHaveCount(0);
-  await keepProgram(page).check();
+  await keepProgram(page).click();
   await expect(page.getByText(notes.cannotKeep)).toBeVisible();
   await expect(neverKeep(page)).toBeChecked();
   await expect(keepProgram(page)).not.toBeChecked();
@@ -164,7 +164,7 @@ test('storage that is full shows the plain line and Never keep', async ({ page }
     };
   });
   await open(page);
-  await keepProgram(page).check();
+  await keepProgram(page).click();
   await expect(page.getByText(notes.cannotKeep)).toBeVisible();
   await expect(neverKeep(page)).toBeChecked();
   expect(await stored(page)).toEqual({});
@@ -174,7 +174,7 @@ test('on a phone the choice is 44 px or more and nothing scrolls sideways', asyn
   test.setTimeout(slow);
   await page.setViewportSize({ width: 375, height: 700 });
   await open(page);
-  await keepProgram(page).check();
+  await keepProgram(page).click();
   for (const radio of [neverKeep(page), keepProgram(page)]) {
     const box = (await radio.boundingBox())!;
     expect(box.width).toBeGreaterThanOrEqual(44);
