@@ -495,12 +495,14 @@ that builds on it:
   lay a Mark out before its picture is painted. Text is measured and painted at one size and
   scaled to the Mark, in the device's `system-ui, sans-serif` (a typed Signature: Dancing
   Script, then the same device font for letters it lacks), left to right or right to left
-  by its first letter. The font (`signature-font.ts`) is bundled with `?url` and loaded
-  with `FontFace` by `loadSignatureFont()` only once "Type it instead" is chosen; the
-  options take typed words only after it has loaded, and `paintOnCanvas` waits for it, so
-  the editor's `shapeOf` and `run` measure the same letters. Never import the package's
-  CSS: its `@font-face` would fetch the file eagerly. `paintOnCanvas` is the browser's own painting, so the
-  Tool runs with `worker: false`; `run.test.ts` passes a stand-in. `pictures-on.ts` reads
+  by its first letter. The font (`signature-font.ts`, its latin, latin-ext and vietnamese
+  files, each with its `unicodeRange`) is bundled with `?url` and loaded with `FontFace` by
+  `loadSignatureFont()` only once "Type it instead" is chosen, with "Getting ready…" on the
+  button meanwhile; the options take typed words only after it has loaded (or failed to,
+  when the device's font stands in everywhere), and `paintOnCanvas` waits for it, so the
+  editor's `shapeOf` and `run` measure the same letters. Never import the package's CSS:
+  its `@font-face` would fetch the files eagerly. `paintOnCanvas` is the browser's own
+  painting, so the Tool runs with `worker: false`; `run.test.ts` passes a stand-in. `pictures-on.ts` reads
   back where a saved PDF's pictures landed, for tests.
 - **The shared check** (`can-sign.ts`). `openToSign(bytes)` opens the PDF with pdf-lib,
   or throws a `ToolFailure` with the reason it can't be signed here: a password, or a

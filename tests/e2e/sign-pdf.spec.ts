@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import type { Locator, Page } from '@playwright/test';
 import { degrees, PDFDocument, StandardFonts } from 'pdf-lib';
 import { test, expect } from './fixtures';
+import { text } from '../../src/text';
 import { tool } from '../../src/tools/sign-pdf/declaration';
 import { picturesOn } from '../../src/tools/sign-pdf/pictures-on';
 
@@ -958,14 +959,30 @@ test('Type it instead loads the font only then, and a typed Signature is placed,
   expect(fontRequests).toEqual([]);
   await expect(page.getByText(tool.notes.noSignature!, { exact: true })).toBeVisible();
 
+  // The font's files are held back, so "Getting ready…" shows while they come.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(
+    (url) => isTypedFont(url.href),
+    async (route) => {
+      await held;
+      await route.continue();
+    },
+  );
   await typeInstead(page).click();
+  const swapButton = page.getByRole('button', { name: text.tool.gettingReady, exact: true });
+  await expect(swapButton).toBeVisible();
+  await expect(typedBox(page)).toHaveCount(0);
+  release();
   await expect(typedBox(page)).toBeFocused();
+  await expect(swapButton).toHaveCount(0);
   await expect(page.getByRole('img', { name: notes.padLabel })).toHaveCount(0);
   // Words are still wanted: the box is empty.
   await expect(page.getByText(tool.notes.noSignature!, { exact: true })).toBeVisible();
   await expect(start(page)).toBeDisabled();
-  expect(fontRequests).toHaveLength(1);
-  expect(new URL(fontRequests[0]!).origin).toBe(new URL(page.url()).origin);
+  // One request for each of the font's files (latin, latin-ext, vietnamese), all the Site's own.
+  expect(fontRequests).toHaveLength(3);
+  for (const url of fontRequests) expect(new URL(url).origin).toBe(new URL(page.url()).origin);
 
   await page.keyboard.type('Ada Lovelace');
   await expect(typedBox(page)).toHaveValue('Ada Lovelace');
@@ -988,8 +1005,8 @@ test('Type it instead loads the font only then, and a typed Signature is placed,
   expectSavedAt(picture!, shown);
   // Words are wider than they are high.
   expect(picture!.width).toBeGreaterThan(picture!.height * 2);
-  // Still one request for the font, and the browser lock was never hit.
-  expect(fontRequests).toHaveLength(1);
+  // No more requests for the font, and the browser lock was never hit.
+  expect(fontRequests).toHaveLength(3);
   expect(await page.evaluate(() => (window as unknown as { blocked: string[] }).blocked)).toEqual(
     [],
   );
@@ -1065,10 +1082,13 @@ test('ink is black unless Blue is chosen, and blue shows on a drawn Signature, a
   ).toEqual(blue);
 
   // A typed Signature, in the same ink: every Signature Mark follows it.
+  const drawnPicture = await drawnMark.getAttribute('src');
   await typeInstead(page).click();
   await typedBox(page).fill('Ada');
   await expect(typedBox(page)).toHaveCSS('color', 'rgb(26, 63, 176)');
+  // The typed Signature's own picture, not the drawn one's.
   await expect(drawnMark).toHaveCount(1);
+  await expect(drawnMark).not.toHaveAttribute('src', drawnPicture!);
   await expect.poll(() => inkOf(drawnMark)).toEqual(blue);
 
   // Text, in the same ink.

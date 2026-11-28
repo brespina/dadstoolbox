@@ -6,7 +6,6 @@ import {
   hasWords,
   inks,
   padShape,
-  signatureFont,
   type Ink,
   type Mark,
   type Options,
@@ -90,7 +89,8 @@ const wordsFont = `${fontSize}px system-ui, sans-serif`;
  * A typed Signature's font, with the device's own after it: a letter the font lacks is
  * painted from the next one that has it.
  */
-const signatureWordsFont = `${fontSize}px "${signatureFont}", system-ui, sans-serif`;
+const typedFont = ({ font }: Extract<Signature, { kind: 'typed' }>) =>
+  `${fontSize}px "${font}", system-ui, sans-serif`;
 /** The shape of a Text Mark with no words yet: the dashed box it shows until there are. */
 export const blankWordsShape = 4;
 /** Words that read right to left, by their first letter (Hebrew, Arabic and the like). */
@@ -138,7 +138,7 @@ export function shapeOf(mark: Mark, { signature }: Pick<Options, 'signature'>): 
   }
   if (signature.kind === 'typed') {
     if (!hasWords(signature.words)) return padShape;
-    const box = wordsBox(signature.words, signatureWordsFont);
+    const box = wordsBox(signature.words, typedFont(signature));
     return box.width / box.height;
   }
   const box = inkBox(signature.strokes);
@@ -176,7 +176,7 @@ async function paintStrokes(strokes: Stroke[], ink: Ink, width: number, height: 
 /** The picture's painting for a Signature: its strokes cropped to their ink, or its words. */
 const paintSignature = (signature: Signature, ink: Ink, width: number, height: number) =>
   signature.kind === 'typed'
-    ? paintWords(signature.words, signatureWordsFont, ink, width, height)
+    ? paintWords(signature.words, typedFont(signature), ink, width, height)
     : paintStrokes(signature.strokes, ink, width, height);
 
 /**
