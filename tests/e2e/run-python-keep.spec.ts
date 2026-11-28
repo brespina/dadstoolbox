@@ -175,8 +175,9 @@ test('on a phone the choice is 44 px or more and nothing scrolls sideways', asyn
   await page.setViewportSize({ width: 375, height: 700 });
   await open(page);
   await keepProgram(page).click();
-  for (const radio of [neverKeep(page), keepProgram(page)]) {
-    const box = (await radio.boundingBox())!;
+  // The label is what a finger taps; its radio is laid over it, unseen.
+  for (const name of [notes.neverKeep, notes.keepProgram]) {
+    const box = (await page.locator('label', { hasText: name }).boundingBox())!;
     expect(box.width).toBeGreaterThanOrEqual(44);
     expect(box.height).toBeGreaterThanOrEqual(44);
   }
