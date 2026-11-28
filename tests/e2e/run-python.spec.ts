@@ -17,7 +17,8 @@ async function run(page: Page, program: string) {
 }
 
 const consoleOf = (page: Page) => page.getByRole('log', { name: notes.consoleLabel });
-const printed = (page: Page) => consoleOf(page).evaluate((element) => element.innerText);
+const printed = (page: Page) =>
+  consoleOf(page).evaluate((element) => (element as HTMLElement).innerText);
 
 /** The lock a built page carries: the content of its CSP tag. */
 function lockOf(file: string) {
