@@ -17,6 +17,9 @@ async function run(page: Page, program: string) {
   await runButton.click();
 }
 
+/** The text in the editor, line by line (CodeMirror draws each line as an element). */
+const programOf = async (page: Page) =>
+  (await page.locator('.cm-content .cm-line').allInnerTexts()).join('\n');
 const consoleOf = (page: Page) => page.getByRole('log', { name: notes.consoleLabel });
 const printed = (page: Page) =>
   consoleOf(page).evaluate((element) => (element as HTMLElement).innerText);
@@ -38,7 +41,7 @@ test('the first open says it is getting ready, then shows the starter Program', 
   test.setTimeout(slow);
   await page.goto('run-python/');
   await expect(page.getByRole('button', { name: 'Getting ready…' })).toBeDisabled();
-  await expect(page.getByLabel(tool.areaLabel, { exact: true })).toHaveValue(notes.starter);
+  await expect.poll(() => programOf(page)).toBe(notes.starter);
   await expect(page.getByRole('button', { name: notes.run, exact: true })).toBeEnabled({
     timeout: slow,
   });
@@ -102,7 +105,7 @@ test('20,000 lines leave the page responsive and the Console holds the last 5,00
   // The page still answers: Run is ready again and the editor takes typing.
   await expect(page.getByRole('button', { name: notes.run, exact: true })).toBeEnabled();
   await page.getByLabel(tool.areaLabel, { exact: true }).fill('print("still here")');
-  await expect(page.getByLabel(tool.areaLabel, { exact: true })).toHaveValue('print("still here")');
+  await expect.poll(() => programOf(page)).toBe('print("still here")');
 });
 
 test('only this page has the lock that lets Python start', async ({ page }) => {
