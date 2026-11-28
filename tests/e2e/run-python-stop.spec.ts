@@ -31,6 +31,17 @@ async function run(page: Page, program: string) {
   await runButton(page).click();
 }
 
+/**
+ * Counts the Python workers started from now on. With isolation Stop is an interrupt and
+ * starts none; a count above 0 means the worker was ended instead (the 3-second fallback
+ * would also write "Stopped.", so the words alone do not prove the interrupt worked).
+ */
+function countNewWorkers(page: Page) {
+  const started = { count: 0 };
+  page.on('worker', () => started.count++);
+  return started;
+}
+
 const forever = 'print("looping")\nwhile True:\n    pass';
 
 test('Run is greyed and Stop is ready while a Program runs, and both are phone-sized', async ({
@@ -60,12 +71,9 @@ test('Stop ends a Program that never ends, and the next Program runs', async ({ 
   await page.goto('run-python/');
   await run(page, forever);
   await expect(consoleOf(page)).toContainText('looping');
-  const workerBefore = page.workers();
-  expect(workerBefore).toHaveLength(1);
+  const started = countNewWorkers(page);
   await stopButton(page).click();
   await expect(consoleOf(page).locator('.note')).toHaveText(notes.stoppedLine);
-  // The interrupt ended it: the same Python worker is still there, none was started.
-  expect(page.workers()).toEqual(workerBefore);
   // Python's own words for the interrupt are not shown.
   expect(await printed(page)).not.toMatch(/Traceback|KeyboardInterrupt/);
   await expect(consoleOf(page)).not.toContainText(notes.done);
@@ -77,6 +85,8 @@ test('Stop ends a Program that never ends, and the next Program runs', async ({ 
   await expect(consoleOf(page)).toContainText('second program');
   await expect(consoleOf(page).locator('.note')).toHaveText(notes.done);
   await expect(consoleOf(page)).not.toContainText(notes.stoppedLine);
+  // The interrupt ended the first Program: no fresh worker was needed (nothing reloaded).
+  expect(started.count).toBe(0);
 });
 
 test('Stop ends a Program that waits at input(), and the typing field goes away', async ({
@@ -86,6 +96,7 @@ test('Stop ends a Program that waits at input(), and the typing field goes away'
   await page.goto('run-python/');
   await run(page, 'name = input("Name: ")\nprint("never", name)');
   await expect(answerField(page)).toBeVisible({ timeout: slow });
+  const started = countNewWorkers(page);
   await stopButton(page).click();
   await expect(consoleOf(page).locator('.note')).toHaveText(notes.stoppedLine);
   await expect(answerField(page)).toHaveCount(0);
@@ -96,6 +107,8 @@ test('Stop ends a Program that waits at input(), and the typing field goes away'
   await answerField(page).fill('Ada');
   await answerField(page).press('Enter');
   await expect(consoleOf(page)).toContainText('hi Ada');
+  // The wake ended input() itself: the 3-second fallback never started a fresh worker.
+  expect(started.count).toBe(0);
 });
 
 test('a Program that catches the interrupt is ended within about 10 seconds of Stop', async ({
