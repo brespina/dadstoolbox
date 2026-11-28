@@ -74,9 +74,13 @@ export function parseToWorker(data: unknown): ToWorker | undefined {
   switch (data.type) {
     case 'init':
       if (typeof data.base !== 'string') return undefined;
-      return typeof SharedArrayBuffer === 'function' && data.input instanceof SharedArrayBuffer
-        ? { type: 'init', base: data.base, input: data.input }
-        : { type: 'init', base: data.base };
+      if (typeof SharedArrayBuffer !== 'function') return { type: 'init', base: data.base };
+      return {
+        type: 'init',
+        base: data.base,
+        ...(data.input instanceof SharedArrayBuffer && { input: data.input }),
+        ...(data.interrupt instanceof SharedArrayBuffer && { interrupt: data.interrupt }),
+      };
     case 'run':
       return typeof data.code === 'string' ? { type: 'run', code: data.code } : undefined;
     default:

@@ -10,6 +10,7 @@ describe('messages from the worker', () => {
       { type: 'done', outcome: 'ok' },
       { type: 'done', outcome: 'error' },
       { type: 'done', outcome: 'missingModule' },
+      { type: 'done', outcome: 'stopped' },
       { type: 'failed', message: 'It did not start.' },
       { type: 'input' },
       { type: 'inputUnavailable' },
@@ -63,6 +64,20 @@ describe('messages to the worker', () => {
       type: 'init',
       base: 'http://x/',
     });
+  });
+
+  it('accepts init with the interrupt buffer, and drops one that is not shared memory', () => {
+    const input = new SharedArrayBuffer(16);
+    const interrupt = new SharedArrayBuffer(4);
+    expect(parseToWorker({ type: 'init', base: 'http://x/', input, interrupt })).toEqual({
+      type: 'init',
+      base: 'http://x/',
+      input,
+      interrupt,
+    });
+    expect(
+      parseToWorker({ type: 'init', base: 'http://x/', input, interrupt: new ArrayBuffer(4) }),
+    ).toEqual({ type: 'init', base: 'http://x/', input });
   });
 
   it('accepts init and run', () => {
