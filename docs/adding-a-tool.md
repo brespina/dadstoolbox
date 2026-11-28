@@ -544,7 +544,8 @@ with Pyodide ([ADR-0008](adr/0008-python-runs-in-the-browser-with-pyodide.md)). 
 | `declaration.ts`                | Plain data, as for any Tool. Every word the page shows is in `notes`, including the starter Program.                                                                           |
 | `Practice.svelte`               | A small shell: `PracticeToolPage.svelte` loads every Practice page into every Practice Tool's page, so the shell loads `RunPython.svelte` with `import()` once the page opens. |
 | `RunPython.svelte`              | The page: editor, Run button, Console. It owns the Program text and turns the runner's state into buttons and words.                                                           |
-| `ProgramEditor.svelte`          | **The editor seam.** `value` in, `onchange(value)` out, `focus()`, named by `areaLabel`. CodeMirror (#130) replaces the inside of this file only.                          |
+| `ProgramEditor.svelte` | **The editor seam.** `value` in, `onchange(value)` out, `focus()`, named by `areaLabel`. It mounts the editor in a shadow root. |
+| `code-editor.ts` | CodeMirror's setup: line numbers, history, default keys, Tab to indent, Python colours from the `--code-*` tokens. The only file that imports CodeMirror. |
 | `Console.svelte`                | Draws the Console: a labelled live region (`role="log"`), text only (never HTML). Error runs get a bar and a hidden "Error:" for screen readers.                              |
 | `console-buffer.ts`             | Pure. The lines, partial lines, the 5,000-line cap and the one "older lines removed" note. Tested with Vitest.                                                                  |
 | `messages.ts`                   | **The message protocol** between page and worker, and `parseToWorker` / `parseFromWorker`, which let in nothing else.                                                          |
@@ -553,6 +554,16 @@ with Pyodide ([ADR-0008](adr/0008-python-runs-in-the-browser-with-pyodide.md)). 
 | `helper.py`                     | **The Python helper**, loaded with `?raw` and run once by the worker. `run_program(source)` compiles the Program as `main.py`, runs it in a fresh namespace, catches the error and prints the traceback from the Program's own first frame (the page's frames cut). It returns `ok`, `error` or `missingModule`. `helper.test.ts` runs it under Node with the same `pyodide` package. |
 | `files.ts`                      | The pinned Pyodide version and the Site folder its files are served from (`files.test.ts` keeps it equal to the installed package).                                           |
 | `src/site/pyodide-files.ts`     | Build integration, like `pdfjs-files.ts`: serves and copies the five Pyodide files to `run-python/pyodide/<version>/`. They are not committed.                                |
+
+**The editor lives in a shadow root.** CodeMirror adds its styles as a `<style>` element, and
+the Site's style hashes block that element, so the editor would show unstyled. In a shadow
+root CodeMirror adopts a stylesheet instead, which the hashes do not cover. So
+`ProgramEditor.svelte` does `host.attachShadow({ mode: 'open' })` and mounts the editor
+there; never add `unsafe-inline` to let it work. Custom properties cross a shadow root, so
+the editor's colours are the `--code-*` tokens in `src/styles/base.css` (light and dark, each
+at least 4.5 : 1 on its background); change a colour there, not in `code-editor.ts`. Tab
+indents, so the page says in `notes.leaveEditor` that Escape, then Tab, moves on.
+Playwright's locators and axe both look inside an open shadow root.
 
 **What the Console says.** The worker sends `done` with an `outcome`; the runner turns it into the
 page's own words (`notes.done`, `notes.onlyBuiltIn`), written to the Console with the stream

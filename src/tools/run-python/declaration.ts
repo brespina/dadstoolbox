@@ -20,6 +20,8 @@ export const tool = definePracticeTool({
       '    print("Counting:", number)',
       '',
     ].join('\n'),
+    // Under the editor, because Tab indents there and would otherwise trap the keyboard.
+    leaveEditor: 'To leave the editor with the keyboard, press Escape, then Tab.',
     run: 'Run',
     running: 'Running…',
     // The label of the Console, which holds what the Program prints.
