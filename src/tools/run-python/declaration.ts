@@ -25,6 +25,8 @@ export const tool = definePracticeTool({
     run: 'Run',
     running: 'Running…',
     stop: 'Stop',
+    // Empties the Console, so the next thing printed starts on a clean screen.
+    clear: 'Clear the Console',
     // The label of the Console, which holds what the Program prints.
     consoleLabel: 'Console',
     consoleEmpty: 'What your program prints appears here.',

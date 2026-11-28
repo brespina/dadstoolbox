@@ -80,10 +80,7 @@
       onState: (next) => (state = next),
       onInput: (is) => (waiting = is),
       console: {
-        clear() {
-          buffer.clear();
-          draw();
-        },
+        clear: clearConsole,
         write(chunk, stream) {
           buffer.write(chunk, stream);
           draw();
@@ -149,6 +146,13 @@
         ? notes.running
         : notes.run,
   );
+  const consoleEmpty = $derived(runs.length === 0 && !removed);
+
+  function clearConsole() {
+    buffer.clear();
+    draw();
+  }
+
   const canRun = $derived(
     state.name === 'ready' || (state.name === 'gettingReady' && !!state.restarted && !state.queued),
   );
@@ -178,6 +182,9 @@
   </button>
   <button type="button" disabled={state.name !== 'running'} onclick={() => runner?.stop()}>
     {notes.stop}
+  </button>
+  <button type="button" class="quiet" disabled={consoleEmpty} onclick={clearConsole}>
+    {notes.clear}
   </button>
   {#if state.name === 'failed'}
     <p class="problem" role="alert">{state.reason}</p>
@@ -224,7 +231,8 @@
     margin-bottom: 0.25rem;
   }
 
-  .files button {
+  .files button,
+  .quiet:enabled {
     background: var(--bg);
     color: var(--action);
     border: 2px solid var(--action);
