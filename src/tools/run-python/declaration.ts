@@ -34,5 +34,8 @@ export const tool = definePracticeTool({
     stopped: 'Python stopped unexpectedly.',
     tookTooLong: 'Python is taking too long to start.',
     tryAgain: 'Try again',
+    // Shown near Run when this browser can't make the page wait for typing (ADR-0009).
+    noIsolation:
+      "This browser can't ask you to type while a program runs. Programs that don't use input() still work.",
   },
 });

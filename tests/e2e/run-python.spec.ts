@@ -116,8 +116,9 @@ test('only this page has the lock that lets Python start', async ({ page }) => {
   for (const file of ['index.html', 'vim-practice/index.html', 'typing-test/index.html']) {
     expect(lockOf(file), file).not.toContain('wasm-unsafe-eval');
   }
-  // The page the browser got says the same as the file.
+  // The page the browser got says the same as the file (after the first visit's reload).
   await page.goto('run-python/');
+  await expect(page.getByLabel(tool.areaLabel, { exact: true })).toBeVisible({ timeout: 30_000 });
   expect(
     await page.locator('meta[http-equiv="content-security-policy" i]').getAttribute('content'),
   ).toContain("'wasm-unsafe-eval'");
@@ -140,4 +141,67 @@ test("Python's files are served with the types the browser needs", async ({ page
     expect(response.ok(), name).toBe(true);
     expect(response.headers()['content-type'], name).toContain(type);
   }
+});
+
+// Isolation (ADR-0009): a service worker scoped to this page's folder adds the headers
+// that make the page cross-origin isolated. Each test has a fresh context, so a first visit.
+
+/** Counts the main frame's loads, so a test can check the page reloaded only once. */
+function countLoads(page: Page) {
+  const loads = { count: 0 };
+  page.on('load', () => loads.count++);
+  return loads;
+}
+
+test('the first visit reloads once and the page is isolated, and Python still runs', async ({
+  page,
+}) => {
+  test.setTimeout(slow);
+  const loads = countLoads(page);
+  await page.goto('run-python/');
+  await run(page, 'print(6 * 7)');
+  await expect.poll(() => printed(page), { timeout: slow }).toContain('42');
+  expect(loads.count).toBe(2);
+  expect(
+    await page.evaluate(() => crossOriginIsolated && typeof SharedArrayBuffer === 'function'),
+  ).toBe(true);
+  await expect(page.getByText(notes.noIsolation)).toHaveCount(0);
+  const scopes = await page.evaluate(async () =>
+    (await navigator.serviceWorker.getRegistrations()).map((registration) => registration.scope),
+  );
+  expect(scopes).toEqual([new URL('./', page.url()).href]);
+  expect(scopes[0]).toMatch(/\/run-python\/$/);
+});
+
+test('other pages are not touched by the service worker', async ({ page }) => {
+  test.setTimeout(slow);
+  await page.goto('run-python/');
+  await expect(page.getByLabel(tool.areaLabel, { exact: true })).toBeVisible({ timeout: slow });
+  expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
+  for (const address of ['./', 'vim-practice/']) {
+    await page.goto(address);
+    expect(
+      await page.evaluate(() => ({
+        controlled: navigator.serviceWorker.controller !== null,
+        isolated: crossOriginIsolated,
+      })),
+      address,
+    ).toEqual({ controlled: false, isolated: false });
+  }
+});
+
+test.describe('with service workers blocked', () => {
+  test.use({ serviceWorkers: 'block' });
+
+  test('the page says what it cannot do, does not reload, and Run still works', async ({
+    page,
+  }) => {
+    test.setTimeout(slow);
+    const loads = countLoads(page);
+    await page.goto('run-python/');
+    await expect(page.getByText(notes.noIsolation)).toBeVisible({ timeout: slow });
+    await run(page, 'print("still here")');
+    await expect.poll(() => printed(page), { timeout: slow }).toContain('still here');
+    expect(loads.count).toBe(1);
+  });
 });
