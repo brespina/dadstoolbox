@@ -40,4 +40,8 @@ def run_program(source):
         traceback.print_exception(type(error), error, trace, file=sys.stderr)
         return "missingModule" if missing else "error"
     finally:
+        # Python holds back a line with no newline yet: send it now, so it is part of this
+        # Run, and not shown after "Done." or in the next Run.
+        sys.stdout.flush()
+        sys.stderr.flush()
         linecache.cache.pop("main.py", None)

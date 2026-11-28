@@ -117,6 +117,12 @@ describe('the Python helper', () => {
     expect(err).toBe('went wrong\n');
   });
 
+  it('leaves nothing waiting in Python when a line has no newline', () => {
+    expect(run('print("x", end="")')).toEqual({ outcome: 'ok', out: 'x', err: '' });
+    expect(run('import sys\nsys.stdout.write("a")\n1/0').out).toBe('a');
+    expect(run('print("fine")').out).toBe('fine\n');
+  });
+
   it('works again after an error', () => {
     run('1/0');
     expect(run('print("fine")')).toEqual({ outcome: 'ok', out: 'fine\n', err: '' });
