@@ -9,17 +9,25 @@ import { pyodideFolder } from '../../src/tools/run-python/files';
 const { notes } = tool;
 const slow = 120_000;
 
+/** Replaces the Program in the editor (the editor adds its own indent when typed into). */
+async function writeProgram(page: Page, program: string) {
+  await page.getByLabel(tool.areaLabel, { exact: true }).click();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press('Delete');
+  await page.keyboard.insertText(program);
+}
+
 /** Waits for Python to load, types a Program, and presses Run. */
 async function run(page: Page, program: string) {
   const runButton = page.getByRole('button', { name: notes.run, exact: true });
   await expect(runButton).toBeEnabled({ timeout: slow });
-  await page.getByLabel(tool.areaLabel, { exact: true }).fill(program);
+  await writeProgram(page, program);
   await runButton.click();
 }
 
 /** The text in the editor, line by line (CodeMirror draws each line as an element). */
 const programOf = async (page: Page) =>
-  (await page.locator('.cm-content .cm-line').allInnerTexts()).join('\n');
+  (await page.locator('.cm-content .cm-line').allTextContents()).join('\n');
 const consoleOf = (page: Page) => page.getByRole('log', { name: notes.consoleLabel });
 const printed = (page: Page) =>
   consoleOf(page).evaluate((element) => (element as HTMLElement).innerText);
@@ -104,7 +112,7 @@ test('20,000 lines leave the page responsive and the Console holds the last 5,00
   expect(lines.filter((line) => line === notes.linesRemoved)).toHaveLength(1);
   // The page still answers: Run is ready again and the editor takes typing.
   await expect(page.getByRole('button', { name: notes.run, exact: true })).toBeEnabled();
-  await page.getByLabel(tool.areaLabel, { exact: true }).fill('print("still here")');
+  await writeProgram(page, 'print("still here")');
   await expect.poll(() => programOf(page)).toBe('print("still here")');
 });
 

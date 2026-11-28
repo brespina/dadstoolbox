@@ -9,7 +9,7 @@ const slow = 120_000;
 
 const editorOf = (page: Page) => page.getByLabel(tool.areaLabel, { exact: true });
 const linesOf = (page: Page) => page.locator('.cm-content .cm-line');
-const programOf = async (page: Page) => (await linesOf(page).allInnerTexts()).join('\n');
+const programOf = async (page: Page) => (await linesOf(page).allTextContents()).join('\n');
 
 /** Opens the page, waits for the editor, and clears it ready for typing. */
 async function openEmpty(page: Page) {
