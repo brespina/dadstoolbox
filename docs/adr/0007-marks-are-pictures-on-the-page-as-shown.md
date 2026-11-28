@@ -20,3 +20,7 @@ The decision stands, built from #109. One detail the text left open: a Mark's `x
 ## Note, 2026-11-27
 
 The line of words is built (#112), as the decision said: a Text Mark is `{ kind: 'text', text, page, x, y, width }`, painted in the device's own sans-serif (`system-ui`) in the ink, so any script the device can show is shown as typed. Today's date is not a kind: it is a Text Mark whose words are the device's short date (`toLocaleDateString()`) from the moment it is added. Each Mark's picture and shape follow from what it shows, so editing a Text Mark's words changes its shape; the letters keep their size, so the Mark's width follows the words and its height holds. A Text Mark with no words puts nothing on its page and counts as nothing placed.
+
+## Note, 2026-11-27 (typed Signature and blue ink, #113)
+
+The typed Signature is built, as the decision said: the Signature in the options is `{ kind: 'drawn', strokes }` or `{ kind: 'typed', words, font }`, whichever way the person chose last, and is painted by the same canvas path as Text, in Dancing Script (`@fontsource/dancing-script`, OFL-1.1) with the device's own sans-serif after it, so a letter the font lacks is shown as typed. The font's woff2 is bundled and served from the Site; it is added to the page with `FontFace` only once "Type it instead" is chosen, and painting waits for it. The ink is a page option, black (the default) or blue, and applies to every Mark.

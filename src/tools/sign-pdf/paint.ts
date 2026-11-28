@@ -146,13 +146,7 @@ export function shapeOf(mark: Mark, { signature }: Pick<Options, 'signature'>): 
 }
 
 /** Paints words in the ink, the Mark's whole picture, `width` × `height` pixels. */
-async function paintWords(
-  words: string,
-  font: string,
-  ink: Ink,
-  width: number,
-  height: number,
-) {
+async function paintWords(words: string, font: string, ink: Ink, width: number, height: number) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;

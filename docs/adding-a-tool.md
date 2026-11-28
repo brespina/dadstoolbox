@@ -448,8 +448,12 @@ PDF's pages ([ADR-0006](adr/0006-pdf-pages-are-shown-with-pdfjs.md),
 that builds on it:
 
 - **The options.** The Signature (see the glossary) and the ink are page options, set by
-  the pad in `Options.svelte`: drawn strokes are lists of `[x, y]` points as fractions of
-  the pad, whose shape is `padShape`. The Marks are the file option `marks`, set by the page
+  `Options.svelte`. The Signature is `{ kind: 'drawn', strokes }` (lists of `[x, y]` points
+  as fractions of the pad, whose shape is `padShape`) or `{ kind: 'typed', words, font }`
+  (`font` is `signatureFont`, Dancing Script), whichever way the person chose last: "Type
+  it instead" swaps the pad for a box, and each way keeps what it held while the other
+  shows. The ink is `black` (the default) or `blue` (`inks` in `declaration.ts`) and
+  applies to every Mark. The Marks are the file option `marks`, set by the page
   editor in `FileOptions.svelte`. Everything is plain data and nothing is stored.
 - **The Mark** (`declaration.ts`) is `{ kind, page, x, y, width }`, a Signature (`kind:
   'signature'`) or a Text Mark (`kind: 'text'`, with its `text`, kept exactly as typed):
@@ -489,8 +493,13 @@ that builds on it:
   inch of the Mark's size on the page, longest side at most 2000 pixels; the editor uses
   the same painter to show the Mark, and `shapeOf` (the same shape, worked out at once) to
   lay a Mark out before its picture is painted. Text is measured and painted at one size and
-  scaled to the Mark, in the device's `system-ui, sans-serif`, left to right or right to
-  left by its first letter. `paintOnCanvas` is the browser's own painting, so the
+  scaled to the Mark, in the device's `system-ui, sans-serif` (a typed Signature: Dancing
+  Script, then the same device font for letters it lacks), left to right or right to left
+  by its first letter. The font (`signature-font.ts`) is bundled with `?url` and loaded
+  with `FontFace` by `loadSignatureFont()` only once "Type it instead" is chosen; the
+  options take typed words only after it has loaded, and `paintOnCanvas` waits for it, so
+  the editor's `shapeOf` and `run` measure the same letters. Never import the package's
+  CSS: its `@font-face` would fetch the file eagerly. `paintOnCanvas` is the browser's own painting, so the
   Tool runs with `worker: false`; `run.test.ts` passes a stand-in. `pictures-on.ts` reads
   back where a saved PDF's pictures landed, for tests.
 - **The shared check** (`can-sign.ts`). `openToSign(bytes)` opens the PDF with pdf-lib,

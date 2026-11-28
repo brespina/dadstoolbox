@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { degrees, PDFDocument, StandardFonts } from 'pdf-lib';
 import { test, expect } from './fixtures';
 import { tool } from '../../src/tools/sign-pdf/declaration';
@@ -913,3 +913,199 @@ for (const [locale, expected] of [
     });
   });
 }
+
+/** The Dancing Script file: any request for it, by its name. */
+const isTypedFont = (url: string) => /dancing-script.*\.woff2/.test(url);
+
+/** The mean colour of a picture's solid pixels, or null if it has none. */
+const inkOf = (picture: Locator) =>
+  picture.evaluate(async (image: HTMLImageElement) => {
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d')!;
+    context.drawImage(image, 0, 0);
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    const sum = [0, 0, 0];
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3]! < 250) continue;
+      for (const channel of [0, 1, 2]) sum[channel]! += data[i + channel]!;
+      count++;
+    }
+    return count === 0 ? null : sum.map((total) => Math.round(total / count));
+  });
+
+const typeInstead = (page: Page) =>
+  page.getByRole('button', { name: notes.typeItInstead, exact: true });
+const typedBox = (page: Page) => page.getByRole('textbox', { name: notes.typedLabel });
+
+test('Type it instead loads the font only then, and a typed Signature is placed, signed and saved', async ({
+  page,
+}) => {
+  const fontRequests: string[] = [];
+  page.context().on('request', (request) => {
+    if (isTypedFont(request.url())) fontRequests.push(request.url());
+  });
+  await page.goto('sign-pdf/');
+  await expect(page.getByRole('img', { name: notes.padLabel })).toBeVisible();
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  await addTo(page, 1).click();
+  await expect(markOn(page, 1)).toBeVisible();
+  // Nothing has asked for the font yet, and a Signature is still wanted.
+  expect(fontRequests).toEqual([]);
+  await expect(page.getByText(tool.notes.noSignature!, { exact: true })).toBeVisible();
+
+  await typeInstead(page).click();
+  await expect(typedBox(page)).toBeFocused();
+  await expect(page.getByRole('img', { name: notes.padLabel })).toHaveCount(0);
+  // Words are still wanted: the box is empty.
+  await expect(page.getByText(tool.notes.noSignature!, { exact: true })).toBeVisible();
+  await expect(start(page)).toBeDisabled();
+  expect(fontRequests).toHaveLength(1);
+  expect(new URL(fontRequests[0]!).origin).toBe(new URL(page.url()).origin);
+
+  await page.keyboard.type('Ada Lovelace');
+  await expect(typedBox(page)).toHaveValue('Ada Lovelace');
+  await expect(start(page)).toBeEnabled();
+  await expect(markOn(page, 1).locator('img')).toHaveCount(1);
+  // The font is the page's own, loaded, for its box and for painting.
+  expect(
+    await page.evaluate(() =>
+      [...document.fonts].some(
+        (face) => face.family.includes('Dancing Script') && face.status === 'loaded',
+      ),
+    ),
+  ).toBe(true);
+  // The box does not suggest, fill in or spell-check the Signature.
+  await expect(typedBox(page)).toHaveAttribute('autocomplete', 'off');
+
+  const shown = await placeOnPageOne(page, markOn(page, 1).locator('img'));
+  const [picture, ...more] = picturesOn((await savedPdf(page)).getPage(0));
+  expect(more).toEqual([]);
+  expectSavedAt(picture!, shown);
+  // Words are wider than they are high.
+  expect(picture!.width).toBeGreaterThan(picture!.height * 2);
+  // Still one request for the font, and the browser lock was never hit.
+  expect(fontRequests).toHaveLength(1);
+  expect(await page.evaluate(() => (window as unknown as { blocked: string[] }).blocked)).toEqual(
+    [],
+  );
+});
+
+test('Draw it instead brings the pad back with its lines, and the Signature is the way chosen last', async ({
+  page,
+}) => {
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await choose(page, [sample]);
+  await tapPageOne(page, 0.5, 0.5);
+  await expect(start(page)).toBeEnabled();
+
+  await typeInstead(page).click();
+  // Typing is the Signature now, and it is empty.
+  await expect(page.getByText(tool.notes.noSignature!, { exact: true })).toBeVisible();
+  await expect(start(page)).toBeDisabled();
+  await typedBox(page).fill('Ada');
+  await expect(start(page)).toBeEnabled();
+
+  await page.getByRole('button', { name: notes.drawItInstead, exact: true }).click();
+  await expect(page.getByRole('img', { name: notes.padLabel })).toBeVisible();
+  await expect(typedBox(page)).toHaveCount(0);
+  // The lines drawn before are still there, and are the Signature again.
+  await expect.poll(() => padHasInk(page)).toBe(true);
+  await expect(start(page)).toBeEnabled();
+
+  // And the words typed before come back.
+  await typeInstead(page).click();
+  await expect(typedBox(page)).toHaveValue('Ada');
+});
+
+test('words in other scripts are kept as typed in a typed Signature', async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await typeInstead(page).click();
+  await typedBox(page).fill('Zoë サイン توقيع');
+  await choose(page, [sample]);
+  await tapPageOne(page, 0.5, 0.5);
+  await expect(typedBox(page)).toHaveValue('Zoë サイン توقيع');
+  await expect(markOn(page, 1).locator('img')).toHaveCount(1);
+  const picture = picturesOn((await savedPdf(page)).getPage(0));
+  expect(picture).toHaveLength(1);
+});
+
+test('ink is black unless Blue is chosen, and blue shows on a drawn Signature, a typed one and Text', async ({
+  page,
+}) => {
+  await page.goto('sign-pdf/');
+  const radio = (name: string) => page.getByRole('radio', { name, exact: true });
+  await expect(radio(notes.inkBlack!)).toBeChecked();
+  await expect(radio(notes.inkBlue!)).not.toBeChecked();
+  await drawSignature(page);
+  await choose(page, [sample]);
+  await tapPageOne(page, 0.5, 0.3);
+  const drawnMark = markOn(page, 1).locator('img');
+  await expect(drawnMark).toHaveCount(1);
+  await expect.poll(() => inkOf(drawnMark)).toEqual([0, 0, 0]);
+
+  // Blue repaints the Mark already placed.
+  await radio(notes.inkBlue!).check();
+  const blue = [26, 63, 176];
+  await expect.poll(() => inkOf(drawnMark)).toEqual(blue);
+  // The pad shows it too.
+  expect(
+    await page.getByRole('img', { name: notes.padLabel }).evaluate((canvas: HTMLCanvasElement) => {
+      const { data } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
+      const solid = Array.from({ length: data.length / 4 }, (_, i) => i * 4).find(
+        (i) => data[i + 3]! === 255,
+      );
+      return solid === undefined ? null : [data[solid]!, data[solid + 1]!, data[solid + 2]!];
+    }),
+  ).toEqual(blue);
+
+  // A typed Signature, in the same ink: every Signature Mark follows it.
+  await typeInstead(page).click();
+  await typedBox(page).fill('Ada');
+  await expect(typedBox(page)).toHaveCSS('color', 'rgb(26, 63, 176)');
+  await expect(drawnMark).toHaveCount(1);
+  await expect.poll(() => inkOf(drawnMark)).toEqual(blue);
+
+  // Text, in the same ink.
+  await page.getByRole('radio', { name: 'Text', exact: true }).check();
+  await addTo(page, 1).click();
+  await page.keyboard.type('Ada Lovelace');
+  const textMark = page.getByRole('button', { name: 'Text on page 1', exact: true }).locator('img');
+  await expect(textMark).toHaveCount(1);
+  await expect.poll(() => inkOf(textMark)).toEqual(blue);
+  await expect(start(page)).toBeEnabled();
+});
+
+test('no Signature, drawn or typed, is stored anywhere', async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await typeInstead(page).click();
+  await typedBox(page).fill('Ada Lovelace');
+  await choose(page, [sample]);
+  await tapPageOne(page, 0.5, 0.5);
+  await expect(start(page)).toBeEnabled();
+  const stored = () =>
+    page.evaluate(async () => ({
+      local: localStorage.length,
+      session: sessionStorage.length,
+      cookie: document.cookie,
+      databases: (await indexedDB.databases()).length,
+      caches: (await caches.keys()).length,
+      hash: location.hash + location.search,
+    }));
+  const none = { local: 0, session: 0, cookie: '', databases: 0, caches: 0, hash: '' };
+  expect(await stored()).toEqual(none);
+
+  // A new visit starts empty: no pad lines, no words.
+  await page.reload();
+  await expect(page.getByRole('img', { name: notes.padLabel })).toBeVisible();
+  expect(await padHasInk(page)).toBe(false);
+  await typeInstead(page).click();
+  await expect(typedBox(page)).toHaveValue('');
+  expect(await stored()).toEqual(none);
+});
