@@ -25,7 +25,7 @@ The results from one press of a Tool's start button. Earlier Batches stay on the
 _Avoid_: Run, job, session
 
 **Promise**:
-What the Site guarantees every visitor: no name, email or account asked for, no ads, no trackers or visitor counters, and a person's files are never kept or sent anywhere.
+What the Site guarantees every visitor: no name, email or account asked for, no ads, no trackers or visitor counters, and a person's files are never kept or sent anywhere. The one thing a Tool may hold is what a person chooses to Keep, in their own browser only.
 _Avoid_: Privacy policy, guarantee
 
 **Style**:
@@ -33,7 +33,7 @@ How a QR code looks: its colours, its background or none, its dot shape and its 
 _Avoid_: Theme, design, skin
 
 **Practice Tool**:
-A Tool where a person practises a skill on the page, such as the Typing test. Nothing is made, saved or kept. Practice Tools sit in the Practice Category.
+A Tool where a person practises a skill on the page, such as the Typing test or Run Python. It has no files to choose and no results to save. It keeps nothing, except that Run Python lets a person Keep their Program. Practice Tools sit in the Practice Category.
 _Avoid_: Game, trainer, exercise
 
 **Layout**:
@@ -55,3 +55,15 @@ _Avoid_: E-signature, digital signature, autograph
 **Mark**:
 Something Sign a PDF puts on one page of a PDF: a Signature, or a short line of words (Text, such as a printed name; Today's date is a Text Mark filled with the device's short date), each with its own place and size on that page. A page can hold any number of Marks. A PDF's own form fields are not Marks.
 _Avoid_: Stamp, annotation, field, item
+
+**Program**:
+The Python a person writes, or chooses from a `.py` file, in Run Python's editor. A starter Program is there the first time. A Program only runs when the person presses Run.
+_Avoid_: Script, Code, Project
+
+**Console**:
+The part of Run Python's page where a Program's output appears as it happens, and where a Program that asks for typing waits for the person to answer. Python's own error messages appear there too.
+_Avoid_: Terminal, Output window, Shell
+
+**Keep**:
+A person's choice, on Run Python, to have their browser hold their Program on their own device between visits. It is off by default ("Never keep") and can be changed at any time; turning it off deletes what was kept. What is kept is never sent anywhere.
+_Avoid_: Save (saving writes a file), Remember, Store, Sync

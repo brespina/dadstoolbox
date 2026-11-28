@@ -1,0 +1,15 @@
+# Typing into a program and Stop need the page to be isolated, by a service worker on the Tool's page only
+
+`input()` must stop Python until the visitor types, and Stop must end a program that never returns. Both need the Python worker to wait on, and be woken through, shared memory (`SharedArrayBuffer` and `Atomics`), which a browser only allows on a page that is cross-origin isolated. GitHub Pages cannot send the two headers that needs (`Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`), so a small service worker of our own, using the technique of coi-serviceworker, adds them. We chose this over JSPI (Pyodide waiting on a promise), because Safari only has it from version 27 (September 2026), so iPhones on older iOS would have no `input()`. We chose it over a service worker that holds a request open (no way to stop a program, and browsers end service workers when they choose), and over rewriting `input()` as `await` (it breaks any function that calls `input()`).
+
+## Consequences
+
+- The service worker file is served from the Tool's own path (`/dadstoolbox/run-python/…`). A service worker's scope is its folder, so it controls that page and nothing else: no other page of the Site, and no other project on `bwandii.io`.
+- On a first visit the page shows "Getting ready…", registers the service worker, and reloads once **before the editor appears**, so nothing typed is lost. A guard stops a second reload when isolation still has not started (it keeps one flag in the tab's session storage; it holds nothing about the visitor and goes when the tab closes).
+- Every response inside the scope gets the two headers. The Site loads nothing from other origins, so `require-corp` breaks nothing. Safari has no `credentialless` mode, so `require-corp` is the only choice.
+- **Where isolation does not start** (service workers off, some private windows, in-app browsers): the page says so in one plain line; programs without `input()` still run; `input()` prints a plain reason and raises `EOFError`; Stop ends the program by dropping the Python worker and starting a fresh one at once, so it is ready while the visitor edits (it took 9 seconds on a laptop, longer on a phone). We chose this over refusing the Tool, which would shut out a visitor who only wants `print(2 + 2)`, and over building JSPI as well now: it is a second code path for a share of visitors we can't count (ADR-0003 allows no counters). If feedback shows many visitors need it, it is a later spec.
+- With isolation, Stop writes 2 into Pyodide's interrupt buffer: Python gets a `KeyboardInterrupt` and nothing reloads. A program that catches it is ended the same way as without isolation, after 3 seconds.
+- If the Tool is ever removed, the file at that path must become a service worker that unregisters itself, so visitors are not left with a dead one.
+- Unverified until built: this together with a blob worker on iPhone Safari. The real-phone ticket checks it.
+
+Planned in spec #123 (Run Python).
