@@ -551,6 +551,7 @@ with Pyodide ([ADR-0008](adr/0008-python-runs-in-the-browser-with-pyodide.md)). 
 | `messages.ts`                   | **The message protocol** between page and worker, and `parseToWorker` / `parseFromWorker`, which let in nothing else.                                                          |
 | `runner.ts`                     | **The page's side of a Run.** States `gettingReady`, `ready`, `running`, `failed`; takes the worker (`makeWorker`) and a `ConsoleSink` as arguments, so Vitest passes fakes. |
 | `python-worker.ts`              | The worker. Loads Pyodide by the absolute address the page sends, runs each Program in a fresh namespace, and streams output as `out` messages.                               |
+| `helper.py`                     | **The Python helper**, loaded with `?raw` and run once by the worker. `run_program(source)` compiles the Program as `main.py`, runs it in a fresh namespace, catches the error and prints the traceback from the Program's own first frame (the page's frames cut). It returns `ok`, `error` or `missingModule`. `helper.test.ts` runs it under Node with the same `pyodide` package. |
 | `files.ts`                      | The pinned Pyodide version and the Site folder its files are served from (`files.test.ts` keeps it equal to the installed package).                                           |
 | `src/site/pyodide-files.ts`     | Build integration, like `pdfjs-files.ts`: serves and copies the five Pyodide files to `run-python/pyodide/<version>/`. They are not committed.                                |
 
@@ -563,6 +564,15 @@ the editor's colours are the `--code-*` tokens in `src/styles/base.css` (light a
 at least 4.5 : 1 on its background); change a colour there, not in `code-editor.ts`. Tab
 indents, so the page says in `notes.leaveEditor` that Escape, then Tab, moves on.
 Playwright's locators and axe both look inside an open shadow root.
+
+**What the Console says.** The worker sends `done` with an `outcome`; the runner turns it into the
+page's own words (`notes.done`, `notes.onlyBuiltIn`), written to the Console with the stream
+`note`, which a Program cannot send (`parseFromWorker` refuses it). "Done." follows only an
+`ok` Run. A `missingModule` Run gets Python's own message, then the plain line, and no
+"Done.". The worker calls the helper directly and not `runPythonAsync`, which would add
+Pyodide's frames and its hint about `micropip`; the helper strips such a hint again for
+`ModuleNotFoundError`, and no network is ever tried. Python's own messages are English and
+are not scanned for banned words; the page's words in `notes` are.
 
 **To extend a Run:** add a message type to `messages.ts` (with a case in its parse function
 and a line in `messages.test.ts`), handle it in `python-worker.ts`, and give `runner.ts` a

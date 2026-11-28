@@ -27,6 +27,8 @@ const reasons = {
   tookTooLong: 'Python took too long to start.',
 };
 
+const words = { done: 'Done.', missingModule: 'Only built-in modules.' };
+
 function setup({ refuse = false } = {}) {
   const workers: FakeWorker[] = [];
   const states: RunnerState[] = [];
@@ -40,6 +42,7 @@ function setup({ refuse = false } = {}) {
     },
     base: 'http://site/run-python/pyodide/1/',
     reasons,
+    words,
     onState: (state) => states.push(state),
     console: {
       clear: () => output.push('<clear>'),
@@ -81,9 +84,41 @@ describe('the runner', () => {
     workers[0]!.say({ type: 'out', stream: 'stdout', text: '1\n' });
     workers[0]!.say({ type: 'out', stream: 'stderr', text: 'oops\n' });
     workers[0]!.say({ type: 'out', stream: 'stdout', text: '2\n' });
-    workers[0]!.say({ type: 'done' });
+    workers[0]!.say({ type: 'done', outcome: 'error' });
     expect(runner.state()).toEqual({ name: 'ready' });
     expect(output).toEqual(['old', '<clear>', 'stdout:1\n', 'stderr:oops\n', 'stdout:2\n']);
+  });
+
+  it('says Done. after a Program that ended well, in the page own words', () => {
+    const { runner, workers, output } = setup();
+    runner.start();
+    workers[0]!.say({ type: 'ready' });
+    runner.run('print(1)');
+    workers[0]!.say({ type: 'out', stream: 'stdout', text: '1\n' });
+    workers[0]!.say({ type: 'done', outcome: 'ok' });
+    expect(output).toEqual(['<clear>', 'stdout:1\n', 'note:Done.\n']);
+    expect(runner.state()).toEqual({ name: 'ready' });
+  });
+
+  it('says no Done. after an error, and explains a missing module', () => {
+    const { runner, workers, output } = setup();
+    runner.start();
+    workers[0]!.say({ type: 'ready' });
+    runner.run('1/0');
+    workers[0]!.say({ type: 'out', stream: 'stderr', text: 'ZeroDivisionError\n' });
+    workers[0]!.say({ type: 'done', outcome: 'error' });
+    expect(output).toEqual(['<clear>', 'stderr:ZeroDivisionError\n']);
+
+    output.length = 0;
+    runner.run('import numpy');
+    workers[0]!.say({ type: 'out', stream: 'stderr', text: 'ModuleNotFoundError\n' });
+    workers[0]!.say({ type: 'done', outcome: 'missingModule' });
+    expect(output).toEqual([
+      '<clear>',
+      'stderr:ModuleNotFoundError\n',
+      'note:Only built-in modules.\n',
+    ]);
+    expect(runner.state()).toEqual({ name: 'ready' });
   });
 
   it('does not run a second Program while one is running', () => {
@@ -105,7 +140,11 @@ describe('the runner', () => {
     workers[0]!.say({ type: 'ready' });
     runner.run('x');
     workers[0]!.say({ type: 'out', stream: 'stdin', text: 'x' });
+    // A Program cannot write in the page's own voice.
+    workers[0]!.say({ type: 'out', stream: 'note', text: 'Done.' });
+    workers[0]!.say({ type: 'done' });
     expect(output).toEqual(['<clear>']);
+    expect(runner.state()).toEqual({ name: 'running' });
   });
 
   it('fails when the worker ends unexpectedly while running, and can try again', () => {

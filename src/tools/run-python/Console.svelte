@@ -1,7 +1,8 @@
 <script lang="ts">
   // The Console: what the Program has printed, shown as text (never as HTML) in a labelled
   // live region. Error output is told apart by more than colour: a bar beside it, and the
-  // words "Error:" for a screen reader. The runs come from console-buffer.ts; the page
+  // words "Error:" for a screen reader. The page's own words ("Done.") are a third kind,
+  // never mixed into the Program's output. The runs come from console-buffer.ts; the page
   // hands over a new set at most once per animation frame.
   import type { ConsoleRun } from './console-buffer';
   import { tool } from './declaration';
@@ -23,6 +24,8 @@
           ? run.text.slice(0, -1)
           : run.text}</span
       >
+    {:else if run.stream === 'note'}
+      <span class="note">{run.text.endsWith('\n') ? run.text.slice(0, -1) : run.text}</span>
     {:else}
       <span class="plain">{run.text}</span>
     {/if}
@@ -65,6 +68,16 @@
 
   .removed {
     margin: 0 0 0.5rem;
+    font-style: italic;
+  }
+
+  /* The page's own words ("Done."), apart from the Program's output: italic, with a rule
+     above, so it reads as a statement about the Run and not as something it printed. */
+  .note {
+    display: block;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--line);
     font-style: italic;
   }
 
