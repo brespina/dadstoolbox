@@ -16,3 +16,7 @@ The decision stands, with Vim practice as the second Practice Tool. Two details 
 
 - A Practice Tool's folder may hold smaller Svelte parts its `Practice.svelte` uses (the Typing test has `SettingsBar.svelte`, `Keyboard.svelte` and `WpmChart.svelte`). `Practice.svelte` is still the one page component.
 - What both practice pages share lives in `src/practice/`: the seeded random source, the settings controls, which key presses count (`keys.ts`), the start hint, the results' big numbers and the restart button. Their shared words are in `text.practice`.
+
+## Note, 2026-11-27
+
+The decision stands, with Run Python as a later Practice Tool. It widens the definition: it Saves a `.py` file and lets a person Keep their Program, which is the one exception to "keeps nothing" (ADR-0012, ADR-0011).

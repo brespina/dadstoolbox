@@ -11,3 +11,7 @@ Sign a PDF has to show a PDF's pages so a person can tap where a Mark goes. We c
 - It is credited on the credits page like every library.
 
 Planned in spec #108 (Sign a PDF), built from #109.
+
+## Note, 2026-11-27
+
+The reasoning stands. Run Python needs `wasm-unsafe-eval`, and gets it on its own page only, not on every page (ADR-0008).
