@@ -53,5 +53,5 @@ A person's name as they sign it, drawn with a finger or mouse, for Sign a PDF to
 _Avoid_: E-signature, digital signature, autograph
 
 **Mark**:
-Something Sign a PDF puts on one page of a PDF: a Signature, with its own place and size on that page (#112 adds a short line of words, such as a printed name or today's date). A page can hold any number of Marks. A PDF's own form fields are not Marks.
+Something Sign a PDF puts on one page of a PDF: a Signature, or a short line of words (Text, such as a printed name; Today's date is a Text Mark filled with the device's short date), each with its own place and size on that page. A page can hold any number of Marks. A PDF's own form fields are not Marks.
 _Avoid_: Stamp, annotation, field, item

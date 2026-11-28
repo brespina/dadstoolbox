@@ -4,7 +4,7 @@
 // (ADR-0007); its height is never stored, it follows from the picture's shape.
 
 import { isShortcut } from '../../practice/keys';
-import type { Mark } from './declaration';
+import type { Mark, TextMark } from './declaration';
 
 /**
  * The two shapes that give a Mark's height: its picture's (width ÷ height) and the page's
@@ -90,8 +90,13 @@ export function resize(mark: Mark, way: 'smaller' | 'bigger', fit: Fit): Mark {
   );
 }
 
-/** A new Mark's width: a third of the page for a Signature. #112 adds the other kinds. */
-export function startingWidth(_kind: Mark['kind']): number {
+/** What the person can add: a Signature, some Text, or Today's date (a Text Mark). */
+export type Choice = 'signature' | 'text' | 'date';
+
+/** A new Mark's width: a third of the page for a Signature, a quarter for Text, a fifth for a date. */
+export function startingWidth(choice: Choice): number {
+  if (choice === 'text') return 0.25;
+  if (choice === 'date') return 0.2;
   return 1 / 3;
 }
 
@@ -101,16 +106,48 @@ export interface Point {
   y: number;
 }
 
-/** A new Mark of this kind on `page`, centred on `point` (a tap), kept inside the page. */
-export function placeCentred(kind: Mark['kind'], page: number, point: Point, fit: Fit): Mark {
-  const width = startingWidth(kind);
-  const height = heightOf({ width }, fit);
-  return keepInside({ kind, page, x: point.x - width / 2, y: point.y - height / 2, width }, fit);
+/** A new Mark of this choice at the page's corner, before it is placed. Only Text has `words`. */
+export function startingMark(choice: Choice, page: number, words = ''): Mark {
+  const place = { page, x: 0, y: 0, width: startingWidth(choice) };
+  return choice === 'signature'
+    ? { kind: 'signature', ...place }
+    : { kind: 'text', text: words, ...place };
+}
+
+/**
+ * A new Mark of this choice on `page`, centred on `point` (a tap), kept inside the page.
+ * `fit` is for the new Mark's own picture, so it already knows the words.
+ */
+export function placeCentred(
+  choice: Choice,
+  page: number,
+  point: Point,
+  fit: Fit,
+  words = '',
+): Mark {
+  const start = startingMark(choice, page, words);
+  const height = heightOf(start, fit);
+  return keepInside({ ...start, x: point.x - start.width / 2, y: point.y - height / 2 }, fit);
 }
 
 /** Where "Add to page" puts a new Mark: centred across, and four fifths of the way down. */
-export function placeLowerMiddle(kind: Mark['kind'], page: number, fit: Fit): Mark {
-  return placeCentred(kind, page, { x: 0.5, y: 0.8 }, fit);
+export function placeLowerMiddle(choice: Choice, page: number, fit: Fit, words = ''): Mark {
+  return placeCentred(choice, page, { x: 0.5, y: 0.8 }, fit, words);
+}
+
+/**
+ * A Text Mark with new words. The letters keep their size, so the Mark grows and shrinks
+ * across with the words (its height stays, its width follows the new shape), within the
+ * smallest size and the page, then kept inside the page. `before` and `after` are the
+ * Mark's fit with its old words and with the new.
+ */
+export function withWords(mark: TextMark, text: string, before: Fit, after: Fit): TextMark {
+  const width = between(
+    mark.width * (after.markAspect / before.markAspect),
+    smallest,
+    widest(after),
+  );
+  return keepInside({ ...mark, text, width }, after) as TextMark;
 }
 
 /**

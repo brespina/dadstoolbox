@@ -49,6 +49,15 @@ const near = (box: { x: number; y: number; width: number; height: number }) => (
   turn: 0,
 });
 
+const words = (text: string, page = 1): Mark => ({
+  kind: 'text',
+  text,
+  page,
+  x: 0.1,
+  y: 0.2,
+  width: 0.5,
+});
+
 describe('Sign a PDF', () => {
   it('saves one PDF, named "signed", with the same pages and the picture where it was tapped', async () => {
     const { paint } = standIn();
@@ -216,5 +225,71 @@ describe('Sign a PDF', () => {
     const failure = await makeRun(paint)(notPdf, signed([mark])).catch((e: unknown) => e);
     expect(failure).toBeInstanceOf(Error);
     expect(failure).not.toBeInstanceOf(ToolFailure);
+  });
+
+  describe('a Text Mark', () => {
+    it('lands as a picture on its page, and the painter is asked for its words', async () => {
+      const { paint, asked } = standIn();
+      const [result] = await makeRun(paint)(sample('sample.pdf'), signed([words('Ana Diaz', 2)]));
+      const doc = await PDFDocument.load(await result!.blob.arrayBuffer());
+      expect(picturesOn(doc.getPage(0))).toEqual([]);
+      expect(picturesOn(doc.getPage(1))).toEqual([near({ x: 30, y: 85, width: 150, height: 75 })]);
+      expect(asked.map(({ mark }) => mark)).toEqual([words('Ana Diaz', 2)]);
+    });
+
+    it.each(['サイン', 'توقيع', 'שלום', ' Ana  Diaz ', '😀 x'])(
+      'gives words in any script to the painter unchanged: %j',
+      async (text) => {
+        const { paint, asked } = standIn();
+        await makeRun(paint)(sample('sample.pdf'), signed([words(text)]));
+        expect(asked.map(({ mark }) => (mark.kind === 'text' ? mark.text : null))).toEqual([text]);
+      },
+    );
+
+    it('leaves out a Text Mark with no words, or only spaces, and keeps the rest', async () => {
+      const { paint, asked } = standIn();
+      const marks = [words(''), words('   '), words('Ana'), words('\t\n')];
+      const [result] = await makeRun(paint)(sample('sample.pdf'), signed(marks));
+      const doc = await PDFDocument.load(await result!.blob.arrayBuffer());
+      expect(picturesOn(doc.getPage(0))).toHaveLength(1);
+      expect(asked).toHaveLength(1);
+    });
+
+    it('is painted with the same ink as the Signature', async () => {
+      const { paint, asked } = standIn();
+      await makeRun(paint)(sample('sample.pdf'), signed([words('Ana')]));
+      expect(asked.map(({ ink }) => ink)).toEqual(['black']);
+    });
+  });
+
+  describe('what start waits for', () => {
+    const problem = (marks: Mark[], signature = drawn) =>
+      tool.optionsProblem({ ...tool.defaultOptions, signature, marks });
+    const none = tool.defaultOptions.signature;
+    const mark: Mark = { kind: 'signature', page: 1, x: 0, y: 0, width: 0.3 };
+
+    it('asks for a signature or some text when nothing is placed', () => {
+      expect(problem([])).toBe('Put your signature or some text on a page first.');
+      expect(problem([])).toBe(tool.notes.nothingPlaced);
+    });
+
+    it('counts a Text Mark with no words, or only spaces, as nothing placed', () => {
+      expect(problem([words('')])).toBe(tool.notes.nothingPlaced);
+      expect(problem([words('  ')])).toBe(tool.notes.nothingPlaced);
+    });
+
+    it('is satisfied by Text alone, with no Signature drawn', () => {
+      expect(problem([words('Ana')], none)).toBeUndefined();
+    });
+
+    it('still wants a Signature for a Signature Mark, even beside Text', () => {
+      expect(problem([mark, words('Ana')], none)).toBe(tool.notes.noSignature);
+      expect(problem([mark, words('Ana')])).toBeUndefined();
+    });
+
+    it('does not throw for a Mark that has no words at all', () => {
+      const bare = { kind: 'text', page: 1, x: 0, y: 0, width: 0.3 } as unknown as Mark;
+      expect(problem([bare])).toBe(tool.notes.nothingPlaced);
+    });
   });
 });

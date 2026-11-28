@@ -24,15 +24,30 @@ export const padShape = 3;
  * Something put on one page (see the glossary). `page` counts from 1. `x` and `y` are the
  * top-left corner and `width` the width, each a fraction from 0 to 1 of the page as it is
  * shown, with `y` measured down from the top. There is no stored height: it always follows
- * from the picture's shape (ADR-0007). #112 adds Text Marks, with their words.
+ * from the picture's shape (ADR-0007).
  */
-export interface Mark {
-  kind: 'signature';
+interface Placed {
   page: number;
   x: number;
   y: number;
   width: number;
 }
+
+/** The person's Signature, painted from the page's options. */
+export interface SignatureMark extends Placed {
+  kind: 'signature';
+}
+
+/**
+ * A short line of words, kept exactly as typed (any script). Today's date is not a kind of
+ * its own: it is a Text Mark filled with the device's short date when it is added.
+ */
+export interface TextMark extends Placed {
+  kind: 'text';
+  text: string;
+}
+
+export type Mark = SignatureMark | TextMark;
 
 export interface Options {
   signature: Signature;
@@ -44,9 +59,14 @@ export interface Options {
 /** Whether the person has drawn a Signature yet. */
 export const hasSignature = (signature: Signature) => signature.strokes.length > 0;
 
-// Signature-only for now: #112 makes the first "Put your signature or some text on a page
-// first.", and #113 makes the second "Draw or type your signature first." (spec #108).
-const nothingPlaced = 'Put your signature on a page first.';
+/** Whether there are words to paint: a line of nothing or only spaces is nothing placed. */
+export const hasWords = (text: unknown) => typeof text === 'string' && text.trim() !== '';
+
+/** Whether a Mark puts anything on its page: a Text Mark with no words does not. */
+export const isFilled = (mark: Mark) => mark.kind !== 'text' || hasWords(mark.text);
+
+// #113 makes the second "Draw or type your signature first." (spec #108).
+const nothingPlaced = 'Put your signature or some text on a page first.';
 const noSignature = 'Draw your signature first.';
 
 export const tool = defineTool({
@@ -78,7 +98,7 @@ export const tool = defineTool({
     // On each chosen PDF's Ready row, over its pages.
     howToPlace:
       'Choose what to add, then tap a page to put it there, or use Add to page. Drag it to move it. On a keyboard, arrows move it (Shift for bigger steps), plus and minus resize it, and Delete removes it.',
-    // The choice of what to add. #112 adds Text and Today's date.
+    // The choice of what to add: Signature, Text and Today's date.
     addLegend: 'Add',
     // {page} is the page number and {name} the PDF's file name.
     pageLabel: 'Page {page} of {name}',
@@ -86,6 +106,10 @@ export const tool = defineTool({
     // What a Mark is called, by kind: its name on the page, before a Signature is drawn,
     // and in its label.
     kindSignature: 'Signature',
+    kindText: 'Text',
+    kindDate: "Today's date",
+    // A Text Mark's box, named like the buttons beside it by `controlLabel`.
+    wordsLabel: 'Words',
     // {kind} is the kind's name above.
     markLabel: '{kind} on page {page}',
     smaller: 'Smaller',
@@ -105,7 +129,7 @@ export const tool = defineTool({
   } as Options,
   fileOptions: ['marks'],
   optionsProblem: ({ signature, marks }) => {
-    if (marks.length === 0) return nothingPlaced;
+    if (!marks.some(isFilled)) return nothingPlaced;
     if (marks.some((mark) => mark.kind === 'signature') && !hasSignature(signature))
       return noSignature;
     return undefined;

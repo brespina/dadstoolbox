@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Mark } from './declaration';
+import type { Mark, TextMark } from './declaration';
 import {
   actionFor,
   dragTo,
@@ -11,6 +11,7 @@ import {
   resize,
   smallest,
   startingWidth,
+  withWords,
 } from './marks';
 
 // A page 300 × 200 points (1.5 as wide as it is high), and a Signature three times as
@@ -205,6 +206,78 @@ describe('placing a new Mark', () => {
     // Centred across; its middle four fifths of the way down.
     expect(placed.x + placed.width / 2).toBeCloseTo(0.5, 10);
     expect(placed.y + heightOf(placed, fit) / 2).toBeCloseTo(0.8, 10);
+  });
+});
+
+describe("placing Text and Today's date", () => {
+  it('starts each choice its own width: a Signature a third, Text a quarter, a date a fifth', () => {
+    expect(startingWidth('text')).toBeCloseTo(0.25, 10);
+    expect(startingWidth('date')).toBeCloseTo(0.2, 10);
+  });
+
+  it('makes a Text Mark with its words, kept as given, and a Signature with none', () => {
+    const text = placeCentred('text', 2, { x: 0.5, y: 0.5 }, fit, '  Ana  Diaz ');
+    expect(text).toMatchObject({ kind: 'text', text: '  Ana  Diaz ', page: 2 });
+    expect(text.width).toBeCloseTo(0.25, 10);
+    expect(Object.keys(placeCentred('signature', 2, { x: 0.5, y: 0.5 }, fit))).not.toContain(
+      'text',
+    );
+  });
+
+  it("makes Today's date a Text Mark holding the date it was given", () => {
+    const date = placeLowerMiddle('date', 1, fit, '04/03/2026');
+    expect(date).toMatchObject({ kind: 'text', text: '04/03/2026', page: 1 });
+    expect(date.width).toBeCloseTo(0.2, 10);
+  });
+
+  it('starts a Text Mark with no words by default', () => {
+    expect(placeLowerMiddle('text', 1, fit)).toMatchObject({ kind: 'text', text: '' });
+  });
+});
+
+describe("changing a Text Mark's words", () => {
+  const was = { markAspect: 4, pageAspect: 1.5 };
+  const text = (x: number, y: number, width: number): TextMark => ({
+    kind: 'text',
+    text: 'Ana',
+    page: 1,
+    x,
+    y,
+    width,
+  });
+
+  it('keeps the size of the letters: the width follows the words, the height stays', () => {
+    const now = { markAspect: 8, pageAspect: 1.5 };
+    const changed = withWords(text(0.1, 0.2, 0.2), 'Ana Diaz', was, now);
+    expect(changed.text).toBe('Ana Diaz');
+    expect(changed.width).toBeCloseTo(0.4, 10);
+    expect(heightOf(changed, now)).toBeCloseTo(heightOf(text(0, 0, 0.2), was), 10);
+    expect(changed).toMatchObject({ x: 0.1, y: 0.2 });
+  });
+
+  it('shrinks the Mark for fewer words', () => {
+    const now = { markAspect: 2, pageAspect: 1.5 };
+    expect(withWords(text(0.1, 0.2, 0.2), 'A', was, now).width).toBeCloseTo(0.1, 10);
+  });
+
+  it('keeps words that run past the right edge inside the page', () => {
+    const now = { markAspect: 8, pageAspect: 1.5 };
+    const changed = withWords(text(0.7, 0.2, 0.2), 'Ana Diaz', was, now);
+    expect(changed.x + changed.width).toBeCloseTo(1, 10);
+  });
+
+  it('never makes the Mark narrower than the smallest size, or wider than the page', () => {
+    const tiny = { markAspect: 0.5, pageAspect: 1.5 };
+    expect(withWords(text(0.1, 0.2, 0.2), 'i', was, tiny).width).toBe(smallest);
+    const huge = { markAspect: 400, pageAspect: 1.5 };
+    expect(withWords(text(0, 0.2, 0.2), 'long', was, huge).width).toBe(1);
+  });
+
+  it('keeps words exactly as typed, in any script', () => {
+    const now = { markAspect: 4, pageAspect: 1.5 };
+    for (const words of ['サイン', 'توقيع', ' a  b ']) {
+      expect(withWords(text(0.1, 0.2, 0.2), words, was, now).text).toBe(words);
+    }
   });
 });
 
