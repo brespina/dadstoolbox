@@ -7,6 +7,7 @@
 // and turn what comes back in `onMessage` into a state change or a Console call.
 
 import type { Stream } from './console-buffer';
+import { createInputBuffer, sendLine } from './input-channel';
 import { parseFromWorker, type ToWorker } from './messages';
 
 /** What the runner needs from a Worker, so a test can pass a stand-in. */
@@ -36,9 +37,16 @@ export interface RunnerOptions {
   base: string;
   /** The plain reasons the page shows when Python is not running. */
   reasons: { didNotStart: string; stopped: string; tookTooLong: string };
-  /** The page's own words at the end of a Run: after a good one, and after a missing module. */
-  words: { done: string; missingModule: string };
+  /**
+   * The page's own words: at the end of a Run (after a good one, and after a missing
+   * module), and when input() can't wait for typing here.
+   */
+  words: { done: string; missingModule: string; noInput: string };
+  /** Whether the page is cross-origin isolated, so the Program can wait for typing (ADR-0009). */
+  isolated?: boolean;
   onState: (state: RunnerState) => void;
+  /** Whether a Program waits for a typed line: the page shows its typing field while true. */
+  onInput: (waiting: boolean) => void;
   console: ConsoleSink;
 }
 
@@ -47,6 +55,8 @@ export interface Runner {
   start(): void;
   /** Clears the Console and runs a Program. Does nothing unless Python is ready. */
   run(code: string): void;
+  /** Sends the typed line to the waiting Program, and shows it in the Console as a line. */
+  answer(line: string): void;
   /** After a failure: starts Python again with a new worker. */
   retry(): void;
   /** Ends the worker, when the page goes away. */
@@ -61,13 +71,23 @@ export function createRunner(options: RunnerOptions): Runner {
   let state: RunnerState = { name: 'gettingReady' };
   let worker: WorkerLike | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // The memory shared with the worker for input(); absent where the page is not isolated.
+  let inputBuffer: SharedArrayBuffer | undefined;
+  let waiting = false;
 
   function setState(next: RunnerState) {
     state = next;
     options.onState(next);
   }
 
+  function setWaiting(next: boolean) {
+    if (waiting === next) return;
+    waiting = next;
+    options.onInput(next);
+  }
+
   function stopWorker() {
+    setWaiting(false);
     clearTimeout(timer);
     timer = undefined;
     if (worker) {
@@ -99,8 +119,16 @@ export function createRunner(options: RunnerOptions): Runner {
       case 'out':
         if (state.name === 'running') options.console.write(message.text, message.stream);
         return;
+      case 'input':
+        // Only a Program that is running, on a page that gave it somewhere to wait.
+        if (state.name === 'running' && inputBuffer) setWaiting(true);
+        return;
+      case 'inputUnavailable':
+        if (state.name === 'running') options.console.write(`${options.words.noInput}\n`, 'note');
+        return;
       case 'done':
         if (state.name !== 'running') return;
+        setWaiting(false);
         // The page's words go to the Console as `note`, apart from the Program's output.
         if (message.outcome === 'ok') options.console.write(`${options.words.done}\n`, 'note');
         else if (message.outcome === 'missingModule')
@@ -128,7 +156,13 @@ export function createRunner(options: RunnerOptions): Runner {
     created.onerror = unexpectedEnd;
     created.onmessageerror = unexpectedEnd;
     timer = setTimeout(() => fail(options.reasons.tookTooLong), readyTimeoutMs);
-    created.postMessage({ type: 'init', base: options.base });
+    inputBuffer =
+      options.isolated && typeof SharedArrayBuffer === 'function' ? createInputBuffer() : undefined;
+    created.postMessage(
+      inputBuffer
+        ? { type: 'init', base: options.base, input: inputBuffer }
+        : { type: 'init', base: options.base },
+    );
   }
 
   return {
@@ -138,6 +172,13 @@ export function createRunner(options: RunnerOptions): Runner {
       options.console.clear();
       setState({ name: 'running' });
       worker.postMessage({ type: 'run', code });
+    },
+    answer(line) {
+      if (!waiting || !inputBuffer) return;
+      // Like a terminal, the answer follows the prompt on the same line.
+      options.console.write(`${line}\n`, 'stdout');
+      setWaiting(false);
+      sendLine(inputBuffer, line);
     },
     retry() {
       if (state.name !== 'failed') return;

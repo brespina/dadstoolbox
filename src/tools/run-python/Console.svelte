@@ -4,12 +4,34 @@
   // words "Error:" for a screen reader. The page's own words ("Done.") are a third kind,
   // never mixed into the Program's output. The runs come from console-buffer.ts; the page
   // hands over a new set at most once per animation frame.
+  //
+  // While the Program waits in input(), a one-line typing field follows the last output,
+  // focused. Enter sends the line (`onanswer`); the page then removes the field.
   import type { ConsoleRun } from './console-buffer';
   import { tool } from './declaration';
 
   const { notes } = tool;
 
-  let { runs, removed }: { runs: ConsoleRun[]; removed: boolean } = $props();
+  let {
+    runs,
+    removed,
+    waiting = false,
+    onanswer,
+  }: {
+    runs: ConsoleRun[];
+    removed: boolean;
+    /** The Program waits for a typed line: show the typing field. */
+    waiting?: boolean;
+    onanswer: (line: string) => void;
+  } = $props();
+
+  // Longest answer, in letters. Four bytes each at most, so it fits the channel's buffer.
+  const longest = 2000;
+
+  let answer: HTMLInputElement | undefined = $state();
+
+  // The field is new each time the Program waits, so it is focused when it appears.
+  $effect(() => answer?.focus());
 </script>
 
 <!-- tabindex: the Console scrolls, so the keyboard must be able to reach it. -->
@@ -32,6 +54,27 @@
   {:else}
     <span class="empty" aria-hidden="true">{notes.consoleEmpty}</span>
   {/each}
+  {#if waiting}
+    <form
+      class="typing"
+      onsubmit={(event) => {
+        event.preventDefault();
+        onanswer(answer?.value ?? '');
+      }}
+    >
+      <input
+        bind:this={answer}
+        type="text"
+        aria-label={notes.typeAnswer}
+        maxlength={longest}
+        enterkeyhint="send"
+        autocapitalize="off"
+        autocorrect="off"
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </form>
+  {/if}
 </div>
 
 <style>
@@ -54,6 +97,34 @@
   .error {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+  }
+
+  /* On the line of the last output when it has room (a prompt such as "Name: "), or
+     under it. 2.75rem is the least height a finger can hit. */
+  .typing {
+    display: inline-block;
+    box-sizing: border-box;
+    width: min(100%, 24rem);
+    vertical-align: middle;
+  }
+
+  .typing input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0 0.75rem;
+    border: 2px solid var(--muted);
+    border-radius: 0.5rem;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    /* 16 px or more: iPhone Safari zooms the page in on a smaller field. */
+    font-size: 1rem;
+  }
+
+  .typing input:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
   }
 
   .console:focus-visible {
