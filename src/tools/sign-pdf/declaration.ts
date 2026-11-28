@@ -7,14 +7,20 @@ import { defineTool } from '../types';
  */
 export type Stroke = [x: number, y: number][];
 
+/** The handwriting-style font a typed Signature is painted in (served from the Site). */
+export const signatureFont = 'Dancing Script';
+
 /**
  * The person's Signature (see the glossary), as plain data so options still compare as
- * text. Never stored. #113 adds a typed one.
+ * text. Never stored. Either strokes drawn on the pad or words typed in `font`, whichever
+ * was chosen last.
  */
-export type Signature = { kind: 'drawn'; strokes: Stroke[] };
+export type Signature =
+  | { kind: 'drawn'; strokes: Stroke[] }
+  | { kind: 'typed'; words: string; font: typeof signatureFont };
 
-/** The ink every Mark is painted in, by name. #113 adds blue. */
-export const inks = { black: '#000000' } as const;
+/** The ink every Mark is painted in, by name: a pen's black or blue, dark enough to print. */
+export const inks = { black: '#000000', blue: '#1a3fb0' } as const;
 export type Ink = keyof typeof inks;
 
 /** The drawing pad's shape: its width ÷ its height. */
@@ -56,18 +62,18 @@ export interface Options {
   marks: Mark[];
 }
 
-/** Whether the person has drawn a Signature yet. */
-export const hasSignature = (signature: Signature) => signature.strokes.length > 0;
-
 /** Whether there are words to paint: a line of nothing or only spaces is nothing placed. */
 export const hasWords = (text: unknown) => typeof text === 'string' && text.trim() !== '';
+
+/** Whether the person has drawn or typed a Signature yet. */
+export const hasSignature = (signature: Signature) =>
+  signature.kind === 'typed' ? hasWords(signature.words) : signature.strokes.length > 0;
 
 /** Whether a Mark puts anything on its page: a Text Mark with no words does not. */
 export const isFilled = (mark: Mark) => mark.kind !== 'text' || hasWords(mark.text);
 
-// #113 makes the second "Draw or type your signature first." (spec #108).
 const nothingPlaced = 'Put your signature or some text on a page first.';
-const noSignature = 'Draw your signature first.';
+const noSignature = 'Draw or type your signature first.';
 
 export const tool = defineTool({
   address: 'sign-pdf',
@@ -95,6 +101,15 @@ export const tool = defineTool({
     padHint: 'Draw it with your finger or mouse.',
     padLabel: 'Signature pad',
     clear: 'Clear',
+    // Beside the pad: swaps it for a box to type the Signature in, and back.
+    typeItInstead: 'Type it instead',
+    drawItInstead: 'Draw it instead',
+    typedHint: 'Type your name.',
+    typedLabel: 'Your signature, typed',
+    // The ink for every Mark: the Signature and Text.
+    inkLegend: 'Ink',
+    inkBlack: 'Black',
+    inkBlue: 'Blue',
     // On each chosen PDF's Ready row, over its pages.
     howToPlace:
       'Choose what to add, then tap a page to put it there, or use Add to page. Drag it to move it. On a keyboard, arrows move it (Shift for bigger steps), plus and minus resize it, and Delete removes it.',
