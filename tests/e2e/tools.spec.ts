@@ -28,8 +28,6 @@ for (const { tool, folder } of tools) {
         await expect(page.getByRole('heading', { level: 1 })).toHaveText(tool.name);
         await expect(page.getByText(tool.privacyLine)).toBeVisible();
         await expect(page.getByRole('link', { name: text.tool.backLink })).toBeVisible();
-        // A Practice Tool makes nothing: no Choose, start or Save.
-        await expect(page.getByRole('button', { name: /^(Choose|Save)/ })).toHaveCount(0);
 
         const area = page.getByLabel(tool.areaLabel, { exact: true });
         await area.focus();

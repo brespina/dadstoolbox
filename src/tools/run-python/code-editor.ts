@@ -4,7 +4,13 @@
 // by another Tool's page; ProgramEditor.svelte is the only door.
 import { EditorState } from '@codemirror/state';
 import { EditorView, drawSelection, keymap, lineNumbers } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+  isolateHistory,
+} from '@codemirror/commands';
 import { HighlightStyle, indentUnit, syntaxHighlighting } from '@codemirror/language';
 import { python } from '@codemirror/lang-python';
 import { tags } from '@lezer/highlight';
@@ -99,7 +105,12 @@ export function mountCodeEditor(options: {
   return {
     text: () => view.state.doc.toString(),
     setText(text) {
-      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
+      // One undoable change, kept apart from any typing just before it, so Undo brings
+      // the old Program back whole.
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: text },
+        annotations: isolateHistory.of('full'),
+      });
     },
     focus: () => view.focus(),
     destroy: () => view.destroy(),
