@@ -3,9 +3,15 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadPyodide } from 'pyodide';
 import helper from './helper.py?raw';
+import { createInputBuffer, createStdin, sendLine } from './input-channel';
 
 let output = { out: '', err: '' };
 let runProgram: (code: string) => string;
+/** What the Program had printed each time it waited for typing. */
+let shownWhenAsked: string[] = [];
+/** The lines the next input() calls will get, as the page would send them. */
+let typed: string[] = [];
+let withBuffer = true;
 
 beforeAll(async () => {
   const pyodide = await loadPyodide({ fullStdLib: false });
@@ -25,11 +31,26 @@ beforeAll(async () => {
   const namespace = pyodide.globals.get('dict')();
   pyodide.runPython(helper, { globals: namespace });
   runProgram = namespace.get('run_program');
+  // The worker's wiring for input() (Python's own input() sends what was printed before it
+  // waits, which these tests check), with the page's answer sent as soon as it is asked.
+  const buffer = createInputBuffer();
+  const stdin = (usable: SharedArrayBuffer | undefined) =>
+    createStdin(usable, {
+      waiting: () => {
+        shownWhenAsked.push(output.out);
+        sendLine(buffer, typed.shift() ?? '');
+      },
+      unavailable: () => shownWhenAsked.push(output.out),
+    });
+  const withInput = stdin(buffer);
+  const withoutInput = stdin(undefined);
+  pyodide.setStdin({ stdin: () => (withBuffer ? withInput() : withoutInput()) });
 }, 120_000);
 
 /** Runs a Program and returns what it ended with and what it printed. */
 function run(code: string) {
   output = { out: '', err: '' };
+  shownWhenAsked = [];
   const outcome = runProgram(code);
   return { outcome, ...output };
 }
@@ -126,5 +147,42 @@ describe('the Python helper', () => {
   it('works again after an error', () => {
     run('1/0');
     expect(run('print("fine")')).toEqual({ outcome: 'ok', out: 'fine\n', err: '' });
+  });
+});
+
+describe('input() in a Program', () => {
+  it('shows the prompt first, then takes the typed line', () => {
+    typed = ['Ada'];
+    withBuffer = true;
+    const result = run('name = input("Name: ")\nprint("Hello,", name)');
+    expect(shownWhenAsked).toEqual(['Name: ']);
+    expect(result).toEqual({ outcome: 'ok', out: 'Name: Hello, Ada\n', err: '' });
+  });
+
+  it('shows a prompt printed without a newline before it waits', () => {
+    typed = ['Ada'];
+    run('print("Name: ", end="")\nname = input()');
+    expect(shownWhenAsked).toEqual(['Name: ']);
+  });
+
+  it('takes three lines in a loop', () => {
+    typed = ['a', 'b', 'c'];
+    const { out } = run('for i in range(3):\n    print(i, input())');
+    expect(out).toBe('0 a\n1 b\n2 c\n');
+  });
+
+  it('takes an empty line as an empty answer', () => {
+    typed = [''];
+    expect(run('print(repr(input()))').out).toBe("''\n");
+  });
+
+  it('without a place to wait, ends with EOFError after saying so', () => {
+    withBuffer = false;
+    const { outcome, err } = run('print("before")\ninput("Name: ")');
+    withBuffer = true;
+    expect(outcome).toBe('error');
+    expect(shownWhenAsked).toEqual(['before\nName: ']);
+    expect(err).toContain('File "main.py", line 2, in <module>');
+    expect(err.endsWith('EOFError: EOF when reading a line\n')).toBe(true);
   });
 });

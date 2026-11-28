@@ -29,6 +29,8 @@
   let state: RunnerState = $state.raw({ name: 'gettingReady' });
   let runs: ConsoleRun[] = $state.raw([]);
   let removed = $state(false);
+  // The Program waits for a typed line, so the Console shows its typing field.
+  let waiting = $state(false);
   let runner: Runner | undefined;
 
   const buffer = createConsoleBuffer();
@@ -54,8 +56,10 @@
         stopped: notes.stopped,
         tookTooLong: notes.tookTooLong,
       },
-      words: { done: notes.done, missingModule: notes.onlyBuiltIn },
+      words: { done: notes.done, missingModule: notes.onlyBuiltIn, noInput: notes.noInput },
+      isolated,
       onState: (next) => (state = next),
+      onInput: (is) => (waiting = is),
       console: {
         clear() {
           buffer.clear();
@@ -99,7 +103,7 @@
   <p class="limit">{notes.noIsolation}</p>
 {/if}
 
-<Console {runs} {removed} />
+<Console {runs} {removed} {waiting} onanswer={(line) => runner?.answer(line)} />
 
 <style>
   .bar {
