@@ -14,12 +14,16 @@
 
   let Page: Component<{ isolated: boolean }> | undefined = $state.raw();
   let isolated = $state(false);
+  // True until isolation settles; a first visit reloads meanwhile. The page tests wait
+  // for `data-isolating` to go before their end-of-test checks.
+  let isolating = $state(true);
 
   onMount(() => {
     // sitePath always ends in "/", so the file name goes after it.
     void isolate(sitePath('run-python') + 'coi-sw.js')
       .then((result) => {
         isolated = result === 'isolated';
+        isolating = false;
         return import('./RunPython.svelte');
       })
       .then((module) => (Page = module.default as Component<{ isolated: boolean }>));
@@ -29,5 +33,5 @@
 {#if Page}
   <Page {isolated} />
 {:else}
-  <p role="status">{text.tool.gettingReady}</p>
+  <p role="status" data-isolating={isolating ? '' : undefined}>{text.tool.gettingReady}</p>
 {/if}

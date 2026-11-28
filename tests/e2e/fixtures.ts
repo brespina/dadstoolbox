@@ -23,6 +23,10 @@ export const test = base.extend<{ siteChecks: void }>({
 
       await use();
 
+      // Run Python reloads once on a first visit to isolate itself; let that finish.
+      await expect(page.locator('[data-isolating]')).toHaveCount(0, { timeout: 30_000 });
+      await page.waitForLoadState('load');
+
       expect(outside, 'requests that left the Site').toEqual([]);
 
       expectBrowserLock(
