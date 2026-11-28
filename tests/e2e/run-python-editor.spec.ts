@@ -2,6 +2,7 @@
 // tests wait for the editor, not for Python, except the last, which presses Run.
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
+import { selectAllKey, undoKey, redoKey } from './editor-keys';
 import { tool } from '../../src/tools/run-python/declaration';
 
 const { notes } = tool;
@@ -16,7 +17,7 @@ async function openEmpty(page: Page) {
   await page.goto('run-python/');
   await expect(editorOf(page)).toBeVisible({ timeout: slow });
   await editorOf(page).click();
-  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press(await selectAllKey(page));
   await page.keyboard.press('Delete');
 }
 
@@ -67,9 +68,9 @@ test('a block indents the next line; Shift+Tab, undo and redo work', async ({ pa
   expect(await programOf(page)).toBe('for i in range(3):\nprint(i)');
   await page.waitForTimeout(600);
 
-  await page.keyboard.press('ControlOrMeta+z');
+  await page.keyboard.press(await undoKey(page));
   expect(await programOf(page)).toBe('for i in range(3):\n    print(i)');
-  await page.keyboard.press('ControlOrMeta+y');
+  await page.keyboard.press(await redoKey(page));
   expect(await programOf(page)).toBe('for i in range(3):\nprint(i)');
 });
 

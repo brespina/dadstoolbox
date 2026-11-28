@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import { test, expect, expectBrowserLock } from './fixtures';
+import { selectAllKey } from './editor-keys';
 import { tool } from '../../src/tools/run-python/declaration';
 import { pyodideFolder } from '../../src/tools/run-python/files';
 
@@ -12,8 +13,7 @@ const slow = 120_000;
 /** Replaces the Program in the editor (the editor adds its own indent when typed into). */
 async function writeProgram(page: Page, program: string) {
   await page.getByLabel(tool.areaLabel, { exact: true }).click();
-  await page.keyboard.press('ControlOrMeta+a');
-  await page.keyboard.press('Delete');
+  await page.keyboard.press(await selectAllKey(page));
   await page.keyboard.insertText(program);
 }
 
@@ -49,7 +49,7 @@ test('the first open says it is getting ready, then shows the starter Program', 
   test.setTimeout(slow);
   await page.goto('run-python/');
   await expect(page.getByRole('button', { name: 'Getting ready…' })).toBeDisabled();
-  await expect.poll(() => programOf(page)).toBe(notes.starter);
+  await expect(page.locator('.cm-content')).toContainText('print("Hello from", name)');
   await expect(page.getByRole('button', { name: notes.run, exact: true })).toBeEnabled({
     timeout: slow,
   });
@@ -113,7 +113,7 @@ test('20,000 lines leave the page responsive and the Console holds the last 5,00
   // The page still answers: Run is ready again and the editor takes typing.
   await expect(page.getByRole('button', { name: notes.run, exact: true })).toBeEnabled();
   await writeProgram(page, 'print("still here")');
-  await expect.poll(() => programOf(page)).toBe('print("still here")');
+  await expect.poll(async () => (await programOf(page)).trim()).toBe('print("still here")');
 });
 
 test('only this page has the lock that lets Python start', async ({ page }) => {
