@@ -11,6 +11,8 @@ describe('messages from the worker', () => {
       { type: 'done', outcome: 'error' },
       { type: 'done', outcome: 'missingModule' },
       { type: 'failed', message: 'It did not start.' },
+      { type: 'input' },
+      { type: 'inputUnavailable' },
     ]) {
       expect(parseFromWorker(message)).toEqual(message);
     }
@@ -50,6 +52,19 @@ describe('messages from the worker', () => {
 });
 
 describe('messages to the worker', () => {
+  it('accepts init with the typing buffer, and without it', () => {
+    const input = new SharedArrayBuffer(16);
+    expect(parseToWorker({ type: 'init', base: 'http://x/', input })).toEqual({
+      type: 'init',
+      base: 'http://x/',
+      input,
+    });
+    expect(parseToWorker({ type: 'init', base: 'http://x/', input: 'no' })).toEqual({
+      type: 'init',
+      base: 'http://x/',
+    });
+  });
+
   it('accepts init and run', () => {
     expect(parseToWorker({ type: 'init', base: 'http://x/pyodide/' })).toEqual({
       type: 'init',

@@ -40,6 +40,11 @@ export const tool = definePracticeTool({
     stopped: 'Python stopped unexpectedly.',
     tookTooLong: 'Python is taking too long to start.',
     tryAgain: 'Try again',
+    // The typing field that appears in the Console when the Program calls input().
+    typeAnswer: 'Type your answer',
+    // In the Console, when the Program calls input() where this browser can't wait for typing.
+    noInput:
+      "input() doesn't work here. This browser can't wait for you to type. Programs that don't use input() still work.",
     // Shown near Run when this browser can't make the page wait for typing (ADR-0009).
     noIsolation:
       "This browser can't ask you to type while a program runs. Programs that don't use input() still work.",

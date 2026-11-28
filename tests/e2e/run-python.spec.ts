@@ -297,3 +297,109 @@ test.describe('with service workers blocked', () => {
     expect(loads.count).toBe(1);
   });
 });
+
+// input(): the Program waits, and the Console shows a typing field (ADR-0009). Needs the
+// isolated page, which each test reaches with its one reload on a first visit.
+
+const answerField = (page: Page) => page.getByLabel(notes.typeAnswer, { exact: true });
+
+test('input() shows the prompt, then the field takes focus and the answer reaches the Program', async ({
+  page,
+}) => {
+  test.setTimeout(slow);
+  await page.goto('run-python/');
+  await run(page, 'name = input("Name: ")\nprint("Hello,", name)');
+  // The prompt shows before anything is typed, and the field waits right after it.
+  await expect(answerField(page)).toBeFocused({ timeout: slow });
+  expect(await printed(page)).toContain('Name: ');
+  await expect(consoleOf(page)).not.toContainText('Hello');
+  await page.keyboard.type('Ada');
+  await page.keyboard.press('Enter');
+  await expect(consoleOf(page)).toContainText('Hello, Ada');
+  // The answer is a normal line after the prompt, and the field is gone.
+  expect(await printed(page)).toContain('Name: Ada\nHello, Ada');
+  await expect(answerField(page)).toHaveCount(0);
+  await expect(consoleOf(page).locator('.note')).toHaveText(notes.done);
+  await expect(page.getByRole('button', { name: notes.run, exact: true })).toBeEnabled();
+});
+
+test('a prompt printed without a newline shows before the visitor types', async ({ page }) => {
+  test.setTimeout(slow);
+  await page.goto('run-python/');
+  await run(page, 'print("Name: ", end="")\ninput()');
+  await expect(answerField(page)).toBeVisible({ timeout: slow });
+  expect(await printed(page)).toContain('Name: ');
+  await answerField(page).fill('x');
+  await answerField(page).press('Enter');
+  await expect(consoleOf(page).locator('.note')).toHaveText(notes.done);
+});
+
+test('three input() calls in a loop each wait again', async ({ page }) => {
+  test.setTimeout(slow);
+  await page.goto('run-python/');
+  await run(page, 'for i in range(3):\n    print("got", input("Number: "))');
+  for (const word of ['one', 'two', 'three']) {
+    await expect(answerField(page)).toBeVisible({ timeout: slow });
+    await answerField(page).fill(word);
+    await answerField(page).press('Enter');
+    await expect(consoleOf(page)).toContainText(`got ${word}`);
+  }
+  await expect(consoleOf(page).locator('.note')).toHaveText(notes.done);
+  const lines = (await printed(page)).split('\n').filter((line) => line !== '');
+  expect(lines).toEqual([
+    'Number: one',
+    'got one',
+    'Number: two',
+    'got two',
+    'Number: three',
+    'got three',
+    notes.done,
+  ]);
+});
+
+test('the typing field is a phone-sized, labelled field that fits 375 px', async ({ page }) => {
+  test.setTimeout(slow);
+  await page.setViewportSize({ width: 375, height: 700 });
+  await page.goto('run-python/');
+  await run(
+    page,
+    'print("A long prompt, long enough to need a line of its own: ", end="")\ninput()',
+  );
+  const field = answerField(page);
+  await expect(field).toBeVisible({ timeout: slow });
+  expect((await field.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  for (const [name, value] of Object.entries({
+    enterkeyhint: 'send',
+    autocapitalize: 'off',
+    autocorrect: 'off',
+    spellcheck: 'false',
+  })) {
+    await expect(field, name).toHaveAttribute(name, value);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  // The fixture's accessibility checks (light and dark) run with the field showing.
+});
+
+test.describe('input() with service workers blocked', () => {
+  test.use({ serviceWorkers: 'block' });
+
+  test('says why in plain words, then shows the EOFError traceback', async ({ page }) => {
+    test.setTimeout(slow);
+    await page.goto('run-python/');
+    await run(page, 'print("start")\nname = input("Name: ")\nprint("never")');
+    await expect(consoleOf(page).locator('.note')).toHaveText(notes.noInput, { timeout: slow });
+    await expect(consoleOf(page)).toContainText('EOFError');
+    const shown = await printed(page);
+    expect(shown).toContain('File "main.py", line 2, in <module>');
+    expect(shown).not.toContain('never');
+    expect(shown.indexOf(notes.noInput)).toBeLessThan(shown.indexOf('EOFError'));
+    await expect(answerField(page)).toHaveCount(0);
+    await expect(consoleOf(page)).not.toContainText(notes.done);
+    // A Program without input() still runs.
+    await run(page, 'print("fine")');
+    await expect(consoleOf(page)).toContainText('fine');
+    await expect(consoleOf(page).locator('.note')).toHaveText(notes.done);
+  });
+});

@@ -3,15 +3,16 @@
 // browser lock, so a Program cannot send anything beyond the Site (ADR-0010). Any Tool
 // that runs a visitor's own program must do the same.
 //
-// It is one self-contained file: it imports only `messages.ts` (and types), and loads
+// It is one self-contained file: it imports only `messages.ts` and `input-channel.ts` (and types), and loads
 // Pyodide by the absolute address the page sends in `init`. A blob worker has no address
 // of its own to resolve a relative one against. It loads no package (ADR-0008).
 //
 // Seams: each message the page sends has a case in `onMessage`; `runProgram` is the one
-// place a Program runs, and helper.py is the Python it calls (tracebacks, #126), so
-// input() (#128) work changes those.
+// place a Program runs, and helper.py is the Python it calls (tracebacks, #126).
+// input() waits in `createStdin` (input-channel.ts), set up in `start`.
 
 import type { PyodideAPI } from 'pyodide';
+import { createStdin } from './input-channel';
 import { parseToWorker, type FromWorker, type Outcome } from './messages';
 import helper from './helper.py?raw';
 
@@ -46,7 +47,7 @@ function streamTo(stream: 'stdout' | 'stderr') {
 const stdout = streamTo('stdout');
 const stderr = streamTo('stderr');
 
-async function start(base: string) {
+async function start(base: string, input: SharedArrayBuffer | undefined) {
   const { loadPyodide } = (await import(/* @vite-ignore */ `${base}pyodide.mjs`)) as {
     loadPyodide: typeof import('pyodide').loadPyodide;
   };
@@ -57,6 +58,13 @@ async function start(base: string) {
   });
   pyodide.setStdout({ write: (bytes: Uint8Array) => stdout.write(bytes) });
   pyodide.setStderr({ write: (bytes: Uint8Array) => stderr.write(bytes) });
+  // input() waits for the page to send a line, or ends with EOFError where it can't.
+  pyodide.setStdin({
+    stdin: createStdin(input, {
+      waiting: () => scope.postMessage({ type: 'input' }),
+      unavailable: () => scope.postMessage({ type: 'inputUnavailable' }),
+    }),
+  });
   const namespace = pyodide.globals.get('dict')();
   pyodide.runPython(helper, { globals: namespace });
   runInPython = namespace.get('run_program');
@@ -84,7 +92,7 @@ scope.onmessage = (event) => {
   switch (message.type) {
     case 'init':
       if (!pyodide) {
-        start(message.base).catch((error: unknown) =>
+        start(message.base, message.input).catch((error: unknown) =>
           scope.postMessage({ type: 'failed', message: String(error) }),
         );
       }

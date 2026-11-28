@@ -552,6 +552,7 @@ with Pyodide ([ADR-0008](adr/0008-python-runs-in-the-browser-with-pyodide.md)). 
 | `runner.ts`                     | **The page's side of a Run.** States `gettingReady`, `ready`, `running`, `failed`; takes the worker (`makeWorker`) and a `ConsoleSink` as arguments, so Vitest passes fakes. |
 | `python-worker.ts`              | The worker. Loads Pyodide by the absolute address the page sends, runs each Program in a fresh namespace, and streams output as `out` messages.                               |
 | `helper.py`                     | **The Python helper**, loaded with `?raw` and run once by the worker. `run_program(source)` compiles the Program as `main.py`, runs it in a fresh namespace, catches the error and prints the traceback from the Program's own first frame (the page's frames cut). It returns `ok`, `error` or `missingModule`. `helper.test.ts` runs it under Node with the same `pyodide` package. |
+| `input-channel.ts`              | **The typing channel** for `input()`: an 8 KB `SharedArrayBuffer` (state, length, the line as UTF-8) the page writes into with `sendLine` and the worker waits on with `waitForLine`. `createStdin` is the function the worker gives Pyodide. Vitest-tested. |
 | `files.ts`                      | The pinned Pyodide version and the Site folder its files are served from (`files.test.ts` keeps it equal to the installed package).                                           |
 | `src/site/pyodide-files.ts`     | Build integration, like `pdfjs-files.ts`: serves and copies the five Pyodide files to `run-python/pyodide/<version>/`. They are not committed.                                |
 
@@ -611,7 +612,19 @@ Run works as before. RunPython.svelte gets `isolated` as a prop. **To remove it*
 Tool goes): keep the file at the same address and make it a service worker that
 unregisters itself and reloads its pages; the comment at its top has the code.
 
-Tests: Vitest for `console-buffer`, `messages`, `runner` (with a fake worker), `isolation` and `files`;
+**Typing (`input()`).** When isolated, the runner makes the `SharedArrayBuffer` and sends it
+in `init`. The worker's stdin function (`createStdin`) tells the page `input`, then blocks
+in `Atomics.wait`. The runner shows the Console's typing field (`onInput(true)`); Enter
+calls `runner.answer(line)`, which echoes the line to the Console as ordinary output,
+writes it into the buffer, wakes the worker and removes the field. Python's own `input()`
+sends the prompt before it reads, so a prompt such as `print("Name: ", end="")` shows
+first (`helper.test.ts` checks this); Pyodide's stdin function runs with Python locked
+out, so it cannot flush for itself. Where the page is not isolated, no buffer is sent:
+the worker says `inputUnavailable`, the runner writes `notes.noInput` as a page line, and
+`input()` ends with `EOFError`, so the traceback follows. Stop (#129) adds a state to the
+same buffer for waking a waiting Program.
+
+Tests: Vitest for `console-buffer`, `messages`, `runner` (with a fake worker), `input-channel`, `isolation` and `files`;
 `tests/e2e/run-python.spec.ts` for the real thing, with a longer timeout because Python
 takes 10 to 20 seconds to load.
 
