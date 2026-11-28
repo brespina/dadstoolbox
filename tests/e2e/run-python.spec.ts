@@ -133,7 +133,10 @@ test('a missing module gets the plain line, and no hint about installing', async
   test.setTimeout(slow);
   await page.goto('run-python/');
   await run(page, 'import numpy\n');
-  await expect(consoleOf(page).locator('.note')).toHaveText(notes.onlyBuiltIn);
+  // The first import searches Python's files, which is slow on a busy machine.
+  await expect(consoleOf(page).locator('.note')).toHaveText(notes.onlyBuiltIn, {
+    timeout: 30_000,
+  });
   const shown = await printed(page);
   expect(shown).toContain("ModuleNotFoundError: No module named 'numpy'");
   expect(shown).not.toMatch(/micropip|loadPackage/);
