@@ -15,6 +15,12 @@
   },
   "dependencies": {
     "@astrojs/svelte": "^9.1.2",
+    "@codemirror/commands": "6.11.2",
+    "@codemirror/lang-python": "6.2.1",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.44.2",
+    "@lezer/highlight": "1.2.5",
     "astro": "^7.4.4",
     "comlink": "4.4.2",
     "gifenc": "1.0.3",
