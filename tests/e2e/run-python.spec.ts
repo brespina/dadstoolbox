@@ -133,6 +133,7 @@ test("another Tool's page does not load Python", async ({ page }) => {
 });
 
 test("Python's files are served with the types the browser needs", async ({ page }) => {
+  await page.goto('run-python/');
   const types = { 'pyodide.asm.wasm': 'application/wasm', 'pyodide.mjs': 'text/javascript' };
   for (const [name, type] of Object.entries(types)) {
     const response = await page.request.get(`${pyodideFolder}/${name}`);
