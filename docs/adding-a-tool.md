@@ -552,7 +552,7 @@ with Pyodide ([ADR-0008](adr/0008-python-runs-in-the-browser-with-pyodide.md)). 
 | `runner.ts`                     | **The page's side of a Run.** States `gettingReady`, `ready`, `running`, `failed`; takes the worker (`makeWorker`) and a `ConsoleSink` as arguments, so Vitest passes fakes. |
 | `python-worker.ts`              | The worker. Loads Pyodide by the absolute address the page sends, runs each Program in a fresh namespace, and streams output as `out` messages.                               |
 | `helper.py`                     | **The Python helper**, loaded with `?raw` and run once by the worker. `run_program(source)` compiles the Program as `main.py`, runs it in a fresh namespace, catches the error and prints the traceback from the Program's own first frame (the page's frames cut). It returns `ok`, `error` or `missingModule`. `helper.test.ts` runs it under Node with the same `pyodide` package. |
-| `files.ts`                      | The pinned Pyodide version and the Site folder its files are served from (`files.test.ts` keeps it equal to the installed package).                                           |
+| `files.ts`                      | The pinned Pyodide version and the Site folder its files are served from (`files.test.ts` keeps it equal to the installed package). Also, pure, the Program's own file: `readProgram` (strict UTF-8, no NUL bytes, 500 KB cap, each refusal a plain reason from `notes`) and `programFileName` (the chosen file's name made safe, always `.py`, else `my-program.py`). |
 | `src/site/pyodide-files.ts`     | Build integration, like `pdfjs-files.ts`: serves and copies the five Pyodide files to `run-python/pyodide/<version>/`. They are not committed.                                |
 
 **The editor lives in a shadow root.** CodeMirror adds its styles as a `<style>` element, and
@@ -564,6 +564,18 @@ the editor's colours are the `--code-*` tokens in `src/styles/base.css` (light a
 at least 4.5 : 1 on its background); change a colour there, not in `code-editor.ts`. Tab
 indents, so the page says in `notes.leaveEditor` that Escape, then Tab, moves on.
 Playwright's locators and axe both look inside an open shadow root.
+
+**Choose and Save** (#131). Two buttons above the editor. **Choose a .py file** presses a hidden
+`<input type="file">` (`accept` lists `.py` and the text types, because phones differ); the
+text goes through `readProgram` and into the editor with `ProgramEditor`'s `value`, which
+`code-editor.ts` `setText` applies as one change marked `isolateHistory`, so Ctrl+Z / Undo
+brings the old Program back whole (no confirmation box). The input is cleared after each
+choice, so the same file can be chosen twice. A refused file leaves the Program alone and
+puts its reason in a `role="status"` line. A file over the cap is refused from `file.size`
+without being read. **Save** hands the editor's text to `saveFiles` (`src/site/save.ts`) as
+`programFileName(chosen name)`. The page tests (`run-python-files.spec.ts`) switch sharing
+off, as `tools.spec.ts` does, to check the saved file. `tools.spec.ts` exempts this Tool
+from "a Practice Tool has no Choose or Save button".
 
 **What the Console says.** The worker sends `done` with an `outcome`; the runner turns it into the
 page's own words (`notes.done`, `notes.onlyBuiltIn`), written to the Console with the stream
@@ -612,7 +624,7 @@ Tool goes): keep the file at the same address and make it a service worker that
 unregisters itself and reloads its pages; the comment at its top has the code.
 
 Tests: Vitest for `console-buffer`, `messages`, `runner` (with a fake worker), `isolation` and `files`;
-`tests/e2e/run-python.spec.ts` for the real thing, with a longer timeout because Python
+`tests/e2e/run-python.spec.ts` for the real thing (and `run-python-files.spec.ts` for Choose and Save), with a longer timeout because Python
 takes 10 to 20 seconds to load.
 
 ## Words on the page
