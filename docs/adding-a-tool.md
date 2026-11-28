@@ -576,7 +576,21 @@ that this page has it and the home page and other Tools do not. Without it Pyodi
 for ever and says nothing, so the runner gives up after 3 minutes and shows a reason with
 a "Try again" button.
 
-Tests: Vitest for `console-buffer`, `messages`, `runner` (with a fake worker) and `files`;
+**Isolation** ([ADR-0009](adr/0009-typing-and-stop-need-isolation-from-a-service-worker.md)).
+`input()` and Stop need `SharedArrayBuffer`, so the page must be cross-origin isolated,
+which takes two headers GitHub Pages can't send. `public/run-python/coi-sw.js` is a small
+service worker that adds them. It is served from `/dadstoolbox/run-python/`, so its scope
+is that folder only (no `Service-Worker-Allowed` header, no wider `scope`); no other page
+registers it or is controlled by it. `isolation.ts` decides (pure, Vitest-tested):
+isolated; register and reload once; or unavailable. `Practice.svelte` runs it first,
+showing only "Getting ready…", so the one reload on a first visit comes before the editor
+and loses nothing typed. A flag in the tab's session storage stops a second reload; when
+isolation still has not started, the page says so in one line (`notes.noIsolation`) and
+Run works as before. RunPython.svelte gets `isolated` as a prop. **To remove it** (if the
+Tool goes): keep the file at the same address and make it a service worker that
+unregisters itself and reloads its pages; the comment at its top has the code.
+
+Tests: Vitest for `console-buffer`, `messages`, `runner` (with a fake worker), `isolation` and `files`;
 `tests/e2e/run-python.spec.ts` for the real thing, with a longer timeout because Python
 takes 10 to 20 seconds to load.
 
