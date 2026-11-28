@@ -9,9 +9,9 @@
 
 import type { ProgramStream } from './console-buffer';
 
-export type Outcome = 'ok' | 'error' | 'missingModule';
+export type Outcome = 'ok' | 'error' | 'missingModule' | 'stopped';
 
-const outcomes: readonly unknown[] = ['ok', 'error', 'missingModule'];
+const outcomes: readonly unknown[] = ['ok', 'error', 'missingModule', 'stopped'];
 
 /** Page to worker. */
 export type ToWorker =

@@ -7,10 +7,12 @@
 //
 //   state 0 (idle)   the worker is waiting, or has not asked yet
 //   state 1 (line)   the page has written a line for the worker to take
+//   state 2 (stop)   the page pressed Stop: the worker wakes with no line, and Python ends
+//                    the Program with KeyboardInterrupt (see `createStdin`)
 //
-// #129 (Stop) builds on this: it needs a third state, written and notified like
-// `sendLine` does, for the worker to wake with and end the Program; `waitForLine` is where
-// it would read it.
+// Stop also writes 2 into Pyodide's own interrupt buffer (interrupt-channel.ts), which
+// ends a Program that is running Python. That buffer cannot wake a worker blocked in
+// `Atomics.wait`, so the state above does.
 //
 // Pyodide's stdin function runs with Python's lock released, so it cannot call Python. It
 // need not flush the prompt: Python's own input() sends what was printed before it reads
@@ -22,6 +24,10 @@ const headerBytes = 8;
 
 const idle = 0;
 const lineReady = 1;
+const stopRequested = 2;
+
+/** How often a wait looks again at the interrupt, in case a wake was missed. */
+const lookEveryMs = 100;
 
 export const createInputBuffer = () => new SharedArrayBuffer(inputBytes);
 
@@ -37,10 +43,36 @@ export function sendLine(buffer: SharedArrayBuffer, line: string) {
   Atomics.notify(header, 0);
 }
 
-/** The worker's side: blocks until the page sends a line, and returns it. */
-export function waitForLine(buffer: SharedArrayBuffer): string {
+/** The page's side of Stop: wakes a worker that waits for a line, which then gets none. */
+export function sendStop(buffer: SharedArrayBuffer) {
   const header = new Int32Array(buffer, 0, 2);
-  while (Atomics.load(header, 0) === idle) Atomics.wait(header, 0, idle);
+  Atomics.store(header, 0, stopRequested);
+  Atomics.notify(header, 0);
+}
+
+/** Puts the buffer back to waiting for a line. The page does it before each Run. */
+export function resetInput(buffer: SharedArrayBuffer) {
+  Atomics.store(new Int32Array(buffer, 0, 2), 0, idle);
+}
+
+/**
+ * The worker's side: blocks until the page sends a line, and returns it. Returns nothing
+ * when Stop woke it, or when `interrupted` says the interrupt is set (it is asked every
+ * 100 ms, so a missed wake costs a moment and no more).
+ */
+export function waitForLine(
+  buffer: SharedArrayBuffer,
+  interrupted: () => boolean = () => false,
+): string | undefined {
+  const header = new Int32Array(buffer, 0, 2);
+  while (Atomics.load(header, 0) === idle) {
+    if (interrupted()) return undefined;
+    Atomics.wait(header, 0, idle, lookEveryMs);
+  }
+  if (Atomics.load(header, 0) === stopRequested) {
+    Atomics.store(header, 0, idle);
+    return undefined;
+  }
   const length = Atomics.load(header, 1);
   // `slice` copies out of shared memory: TextDecoder refuses a view on it.
   const bytes = new Uint8Array(buffer, headerBytes, length).slice();
@@ -53,6 +85,14 @@ export interface StdinHooks {
   waiting(): void;
   /** Tells the page this browser cannot wait for typing. */
   unavailable(): void;
+  /** True while the page's interrupt is set (Pyodide's interrupt buffer holds 2). */
+  interrupted?(): boolean;
+  /**
+   * Stop woke the wait. Python ends the Program here: the worker calls
+   * `pyodide.checkInterrupt()`, which raises KeyboardInterrupt out of input(). It is the
+   * only Python call a stdin function can make (the rest are refused without the lock).
+   */
+  stopped?(): void;
 }
 
 /**
@@ -66,6 +106,12 @@ export function createStdin(buffer: SharedArrayBuffer | undefined, hooks: StdinH
       return undefined;
     }
     hooks.waiting();
-    return waitForLine(buffer);
+    const line = waitForLine(buffer, hooks.interrupted);
+    if (line === undefined) {
+      hooks.stopped?.();
+      // Not reached when Python raised: otherwise the end of input, and the interrupt
+      // that is still set ends the Program a moment later.
+    }
+    return line;
   };
 }
