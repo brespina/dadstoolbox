@@ -3,7 +3,7 @@
 // the Console. It takes the worker as an argument (`makeWorker`), so Vitest passes a
 // fake; Practice.svelte passes the real blob worker.
 //
-// Seams for later tickets: add the message in messages.ts, send it from a new method here,
+// Seams for the tickets after this one (#126 to #129): add the message in messages.ts, send it from a new method here,
 // and turn what comes back in `onMessage` into a state change or a Console call.
 
 import type { Stream } from './console-buffer';
@@ -108,7 +108,14 @@ export function createRunner(options: RunnerOptions): Runner {
 
   function begin() {
     setState({ name: 'gettingReady' });
-    const created = options.makeWorker();
+    let created: WorkerLike;
+    try {
+      created = options.makeWorker();
+    } catch {
+      // The browser refused to start the worker at all.
+      fail(options.reasons.didNotStart);
+      return;
+    }
     worker = created;
     created.onmessage = (event) => onMessage(event.data);
     created.onerror = unexpectedEnd;

@@ -27,7 +27,7 @@
       <span class="plain">{run.text}</span>
     {/if}
   {:else}
-    <span class="empty">{notes.consoleEmpty}</span>
+    <span class="empty" aria-hidden="true">{notes.consoleEmpty}</span>
   {/each}
 </div>
 

@@ -1,8 +1,8 @@
 <script lang="ts">
   // Run Python's page: a small shell. PracticeToolPage.svelte imports every Practice
   // page into every Practice Tool's page, so the large parts (the runner, the worker,
-  // later the editor) load with `import()` only once this page is open, under "Getting
-  // ready…" (ADR-0012). Python itself loads later still, inside the worker.
+  // the editor in #130) load with `import()` only once this page is open, under "Getting
+  // ready…" (ADR-0005). Python itself loads later still, inside the worker.
   import { onMount, type Component } from 'svelte';
   import { text } from '../../text';
 

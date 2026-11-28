@@ -27,12 +27,13 @@ const reasons = {
   tookTooLong: 'Python took too long to start.',
 };
 
-function setup() {
+function setup({ refuse = false } = {}) {
   const workers: FakeWorker[] = [];
   const states: RunnerState[] = [];
   const output: string[] = [];
   const runner = createRunner({
     makeWorker: () => {
+      if (refuse) throw new Error('SecurityError');
       const worker = new FakeWorker();
       workers.push(worker);
       return worker;
@@ -127,6 +128,12 @@ describe('the runner', () => {
     const { runner, workers } = setup();
     runner.start();
     workers[0]!.onerror?.({});
+    expect(runner.state()).toEqual({ name: 'failed', reason: reasons.didNotStart });
+  });
+
+  it('fails with a plain reason when the browser will not start the worker', () => {
+    const { runner } = setup({ refuse: true });
+    runner.start();
     expect(runner.state()).toEqual({ name: 'failed', reason: reasons.didNotStart });
   });
 

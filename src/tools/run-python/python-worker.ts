@@ -8,7 +8,7 @@
 // of its own to resolve a relative one against. It loads no package (ADR-0008).
 //
 // Seams: each message the page sends has a case in `onMessage`; `runProgram` is the one
-// place a Program runs, so the traceback and input() tickets change only that.
+// place a Program runs, so the traceback (#126) and input() (#128) work changes only that.
 
 import type { PyodideAPI } from 'pyodide';
 import { parseToWorker, type FromWorker } from './messages';
@@ -64,7 +64,7 @@ async function runProgram(python: PyodideAPI, code: string) {
     await python.runPythonAsync(code, { globals: namespace, filename: 'main.py', dedent: false });
   } catch (error) {
     // For now the error goes to the Console as Python wrote it; tracebacks are made
-    // friendlier in their own ticket.
+    // friendlier in #126.
     stderr.write(new TextEncoder().encode(`${(error as Error).message}\n`));
   } finally {
     namespace.destroy();

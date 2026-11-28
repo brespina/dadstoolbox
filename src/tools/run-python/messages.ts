@@ -3,7 +3,7 @@
 // treats the page's the same way). Each side calls its parse function on every message
 // and ignores what comes back `undefined`.
 //
-// To add a message (Stop, input and the rest of Run Python's tickets): add its type here,
+// To add a message (input() is #128, Stop is #129): add its type here,
 // give it a case in the matching parse function and a line in messages.test.ts, then
 // handle it in python-worker.ts and runner.ts. Nothing else needs to know.
 

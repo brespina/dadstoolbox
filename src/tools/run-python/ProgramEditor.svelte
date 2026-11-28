@@ -1,6 +1,6 @@
 <script lang="ts">
   // Where the visitor writes their Program. This is the editor seam: the rest of the page
-  // knows only this interface, so a better editor (CodeMirror) can replace the inside of
+  // knows only this interface, so a better editor (CodeMirror, #130) can replace the inside of
   // this file without touching anything else.
   //
   // - `value`: the Program's text, in.

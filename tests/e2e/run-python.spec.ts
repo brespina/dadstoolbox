@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import { test, expect, expectBrowserLock } from './fixtures';
 import { tool } from '../../src/tools/run-python/declaration';
+import { pyodideFolder } from '../../src/tools/run-python/files';
 
 const { notes } = tool;
 const slow = 120_000;
@@ -129,4 +130,13 @@ test("another Tool's page does not load Python", async ({ page }) => {
   await expect(page.getByLabel('Move the cursor with Vim keys', { exact: true })).toBeVisible();
   await page.waitForLoadState('networkidle');
   expect(asked.filter((url) => /pyodide|python/i.test(url))).toEqual([]);
+});
+
+test("Python's files are served with the types the browser needs", async ({ page }) => {
+  const types = { 'pyodide.asm.wasm': 'application/wasm', 'pyodide.mjs': 'text/javascript' };
+  for (const [name, type] of Object.entries(types)) {
+    const response = await page.request.get(`${pyodideFolder}/${name}`);
+    expect(response.ok(), name).toBe(true);
+    expect(response.headers()['content-type'], name).toContain(type);
+  }
 });
