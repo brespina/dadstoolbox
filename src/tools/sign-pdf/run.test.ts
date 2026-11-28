@@ -4,7 +4,7 @@ import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import { ToolFailure } from '../types';
 import { openToSign } from './can-sign';
-import { tool, type Mark, type Options } from './declaration';
+import { signatureFont, tool, type Mark, type Options } from './declaration';
 import { makeRun } from './run';
 import type { PaintMark } from './paint';
 import { picturesOn } from './pictures-on';
@@ -25,6 +25,12 @@ const drawn: Options['signature'] = {
   ],
 };
 
+const typed = (words: string): Options['signature'] => ({
+  kind: 'typed',
+  words,
+  font: signatureFont,
+});
+
 const signed = (marks: Mark[]): Options => ({ ...tool.defaultOptions, signature: drawn, marks });
 
 /**
@@ -32,11 +38,17 @@ const signed = (marks: Mark[]): Options => ({ ...tool.defaultOptions, signature:
  * and each request is noted so the test can check what was asked for.
  */
 function standIn() {
-  const asked: { mark: Mark; ink: string; width: number; height: number }[] = [];
+  const asked: {
+    mark: Mark;
+    ink: string;
+    signature: Options['signature'];
+    width: number;
+    height: number;
+  }[] = [];
   const paint: PaintMark = async (mark, options) => ({
     shape: 2,
     paint: async (width, height) => {
-      asked.push({ mark, ink: options.ink, width, height });
+      asked.push({ mark, ink: options.ink, signature: options.signature, width, height });
       return new Uint8Array(PNG.sync.write(new PNG({ width, height })));
     },
   });
@@ -47,6 +59,15 @@ function standIn() {
 const near = (box: { x: number; y: number; width: number; height: number }) => ({
   ...Object.fromEntries(Object.entries(box).map(([k, v]) => [k, expect.closeTo(v, 3)])),
   turn: 0,
+});
+
+const words = (text: string, page = 1): Mark => ({
+  kind: 'text',
+  text,
+  page,
+  x: 0.1,
+  y: 0.2,
+  width: 0.5,
 });
 
 describe('Sign a PDF', () => {
@@ -144,7 +165,7 @@ describe('Sign a PDF', () => {
     const mark: Mark = { kind: 'signature', page: 1, x: 0, y: 0, width: 0.5 };
     await makeRun(paint)(sample('sample.pdf'), signed([mark]));
     // 150 × 75 points is 2 1/12 × 1 1/24 inches.
-    expect(asked).toEqual([{ mark, ink: 'black', width: 625, height: 313 }]);
+    expect(asked).toEqual([{ mark, ink: 'black', signature: drawn, width: 625, height: 313 }]);
   });
 
   it('paints no side longer than 2000 pixels', async () => {
@@ -216,5 +237,126 @@ describe('Sign a PDF', () => {
     const failure = await makeRun(paint)(notPdf, signed([mark])).catch((e: unknown) => e);
     expect(failure).toBeInstanceOf(Error);
     expect(failure).not.toBeInstanceOf(ToolFailure);
+  });
+
+  describe('a Text Mark', () => {
+    it('lands as a picture on its page, and the painter is asked for its words', async () => {
+      const { paint, asked } = standIn();
+      const [result] = await makeRun(paint)(sample('sample.pdf'), signed([words('Ana Diaz', 2)]));
+      const doc = await PDFDocument.load(await result!.blob.arrayBuffer());
+      expect(picturesOn(doc.getPage(0))).toEqual([]);
+      expect(picturesOn(doc.getPage(1))).toEqual([near({ x: 30, y: 85, width: 150, height: 75 })]);
+      expect(asked.map(({ mark }) => mark)).toEqual([words('Ana Diaz', 2)]);
+    });
+
+    it.each(['サイン', 'توقيع', 'שלום', ' Ana  Diaz ', '😀 x'])(
+      'gives words in any script to the painter unchanged: %j',
+      async (text) => {
+        const { paint, asked } = standIn();
+        await makeRun(paint)(sample('sample.pdf'), signed([words(text)]));
+        expect(asked.map(({ mark }) => (mark.kind === 'text' ? mark.text : null))).toEqual([text]);
+      },
+    );
+
+    it('leaves out a Text Mark with no words, or only spaces, and keeps the rest', async () => {
+      const { paint, asked } = standIn();
+      const marks = [words(''), words('   '), words('Ana'), words('\t\n')];
+      const [result] = await makeRun(paint)(sample('sample.pdf'), signed(marks));
+      const doc = await PDFDocument.load(await result!.blob.arrayBuffer());
+      expect(picturesOn(doc.getPage(0))).toHaveLength(1);
+      expect(asked).toHaveLength(1);
+    });
+
+    it("is painted in the page's ink, black by default", async () => {
+      const { paint, asked } = standIn();
+      await makeRun(paint)(sample('sample.pdf'), signed([words('Ana')]));
+      expect(asked.map(({ ink }) => ink)).toEqual(['black']);
+    });
+  });
+
+  describe('a typed Signature', () => {
+    const mark: Mark = { kind: 'signature', page: 1, x: 0.1, y: 0.2, width: 0.5 };
+    const typedOptions = (words: string, ink: Options['ink'] = 'black'): Options => ({
+      ...tool.defaultOptions,
+      signature: typed(words),
+      ink,
+      marks: [mark],
+    });
+
+    it('lands as a picture on its page, and the painter is given the words and the font', async () => {
+      const { paint, asked } = standIn();
+      const [result] = await makeRun(paint)(sample('sample.pdf'), typedOptions('Ada Lovelace'));
+      const doc = await PDFDocument.load(await result!.blob.arrayBuffer());
+      expect(picturesOn(doc.getPage(0))).toHaveLength(1);
+      expect(asked.map((one) => one.signature)).toEqual([
+        { kind: 'typed', words: 'Ada Lovelace', font: 'Dancing Script' },
+      ]);
+    });
+
+    it.each(['サイン', 'توقيع', 'Zoë Łukasz', ' Ana  Diaz ', '😀 x'])(
+      'gives words in any script to the painter unchanged: %j',
+      async (words) => {
+        const { paint, asked } = standIn();
+        await makeRun(paint)(sample('sample.pdf'), typedOptions(words));
+        expect(asked.map((one) => one.signature)).toEqual([typed(words)]);
+      },
+    );
+  });
+
+  describe('ink', () => {
+    it('reaches the painter for every Mark: a drawn Signature, a typed one and Text', async () => {
+      const { paint, asked } = standIn();
+      const options = (signature: Options['signature'], marks: Mark[]): Options => ({
+        ...tool.defaultOptions,
+        signature,
+        ink: 'blue',
+        marks,
+      });
+      const sign: Mark = { kind: 'signature', page: 1, x: 0.1, y: 0.2, width: 0.3 };
+      await makeRun(paint)(sample('sample.pdf'), options(drawn, [sign, words('Ana')]));
+      await makeRun(paint)(sample('sample.pdf'), options(typed('Ana'), [sign]));
+      expect(asked.map(({ ink }) => ink)).toEqual(['blue', 'blue', 'blue']);
+    });
+  });
+
+  describe('what start waits for', () => {
+    const problem = (marks: Mark[], signature: Options['signature'] = drawn) =>
+      tool.optionsProblem({ ...tool.defaultOptions, signature, marks });
+    const none: Options['signature'] = tool.defaultOptions.signature;
+    const mark: Mark = { kind: 'signature', page: 1, x: 0, y: 0, width: 0.3 };
+
+    it('asks for a signature or some text when nothing is placed', () => {
+      expect(problem([])).toBe('Put your signature or some text on a page first.');
+      expect(problem([])).toBe(tool.notes.nothingPlaced);
+    });
+
+    it('counts a Text Mark with no words, or only spaces, as nothing placed', () => {
+      expect(problem([words('')])).toBe(tool.notes.nothingPlaced);
+      expect(problem([words('  ')])).toBe(tool.notes.nothingPlaced);
+    });
+
+    it('is satisfied by Text alone, with no Signature drawn', () => {
+      expect(problem([words('Ana')], none)).toBeUndefined();
+    });
+
+    it('still wants a Signature for a Signature Mark, even beside Text', () => {
+      expect(problem([mark, words('Ana')], none)).toBe(tool.notes.noSignature);
+      expect(problem([mark, words('Ana')])).toBeUndefined();
+    });
+
+    it('asks to draw or type a signature when a Signature Mark has none', () => {
+      expect(problem([mark], none)).toBe('Draw or type your signature first.');
+    });
+
+    it('is satisfied by typed words, and wants them when they are only spaces', () => {
+      expect(problem([mark], typed('Ada'))).toBeUndefined();
+      expect(problem([mark], typed('   '))).toBe(tool.notes.noSignature);
+      expect(problem([mark], typed(''))).toBe(tool.notes.noSignature);
+    });
+
+    it('does not throw for a Mark that has no words at all', () => {
+      const bare = { kind: 'text', page: 1, x: 0, y: 0, width: 0.3 } as unknown as Mark;
+      expect(problem([bare])).toBe(tool.notes.nothingPlaced);
+    });
   });
 });

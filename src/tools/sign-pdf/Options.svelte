@@ -1,14 +1,38 @@
 <script lang="ts">
-  // The Signature pad, shown above Choose. A finger or mouse draws on it without
-  // scrolling the page. Strokes go into the options as plain numbers, once each line is
-  // finished, and are never stored anywhere.
+  // The Signature and the ink, shown above Choose. A finger or mouse draws on the pad
+  // without scrolling the page; "Type it instead" swaps the pad for a box to type in. Strokes
+  // go into the options as plain numbers, once each line is finished, and typed words as
+  // they are typed. The options hold one or the other, whichever was chosen last. Nothing
+  // here is stored anywhere.
+  import { tick } from 'svelte';
+  import ChoiceGroup from '../../practice/ChoiceGroup.svelte';
+  import { text } from '../../text';
   import type { OptionsProps } from '../types';
-  import { tool, type Options, type Stroke } from './declaration';
+  import { inks, signatureFont, tool, type Options, type Stroke } from './declaration';
   import { traceStrokes } from './paint';
+  import { loadSignatureFont } from './signature-font';
 
   let { options = $bindable() }: OptionsProps<Options> = $props();
 
   const notes = tool.notes as Record<string, string>;
+  const uid = $props.id();
+  const inkChoices: { value: Options['ink']; label: string }[] = [
+    { value: 'black', label: notes.inkBlack! },
+    { value: 'blue', label: notes.inkBlue! },
+  ];
+  // The box to type in shows instead of the pad while the Signature is typed. Each way keeps
+  // what it holds while the other shows, so swapping back loses nothing; only the way shown
+  // is the Signature.
+  const typing = $derived(options.signature.kind === 'typed');
+  // The font is on its way, the first time "Type it instead" is chosen.
+  let fontComing = $state(false);
+  let keptStrokes: Stroke[] = [];
+  let keptWords = '';
+  const typedSignature = (words: string) =>
+    ({ kind: 'typed', words, font: signatureFont }) as const;
+  /** The drawn Signature's lines, or none while it is typed. */
+  const strokes = () => (options.signature.kind === 'drawn' ? options.signature.strokes : []);
+  let typedBox: HTMLInputElement | undefined = $state();
   let canvas: HTMLCanvasElement | undefined = $state();
   // The line being drawn now, before it joins the options.
   let drawing: Stroke | null = $state.raw(null);
@@ -34,8 +58,7 @@
     const context = canvas.getContext('2d')!;
     // Strokes are traced in pad widths.
     context.scale(pixels.width, pixels.width);
-    const strokes = options.signature.strokes;
-    traceStrokes(context, drawing ? [...strokes, drawing] : strokes, options.ink);
+    traceStrokes(context, drawing ? [...strokes(), drawing] : strokes(), options.ink);
   });
 
   /** Where the pointer is, as fractions of the pad, kept short. */
@@ -61,7 +84,7 @@
 
   function finish() {
     if (!drawing) return;
-    options.signature = { kind: 'drawn', strokes: [...options.signature.strokes, drawing] };
+    options.signature = { kind: 'drawn', strokes: [...strokes(), drawing] };
     drawing = null;
   }
 
@@ -69,22 +92,81 @@
     drawing = null;
     options.signature = { kind: 'drawn', strokes: [] };
   }
+
+  /**
+   * Swaps the pad and the box. The font loads the first time the box is wanted ("Getting
+   * ready…" shows meanwhile), and the words only join the options once it has loaded, or
+   * failed to: measuring them sooner would use the device's own letters, and the Mark would
+   * be laid out in a shape the saved PDF doesn't have.
+   */
+  async function swap() {
+    drawing = null;
+    if (options.signature.kind === 'typed') {
+      options.signature = { kind: 'drawn', strokes: keptStrokes };
+      return;
+    }
+    fontComing = true;
+    await loadSignatureFont();
+    fontComing = false;
+    // A second tap while the font came has swapped already.
+    if (options.signature.kind === 'typed') return;
+    keptStrokes = options.signature.strokes;
+    options.signature = typedSignature(keptWords);
+    await tick();
+    typedBox?.focus();
+  }
+
+  function typed(event: Event & { currentTarget: HTMLInputElement }) {
+    keptWords = event.currentTarget.value;
+    options.signature = typedSignature(keptWords);
+  }
 </script>
 
 <section class="signature" aria-labelledby="signature-heading">
   <h2 id="signature-heading">{notes.signatureHeading}</h2>
-  <p class="hint">{notes.padHint}</p>
-  <canvas
-    bind:this={canvas}
-    class="pad"
-    role="img"
-    aria-label={notes.padLabel}
-    onpointerdown={start}
-    onpointermove={move}
-    onpointerup={finish}
-    onpointercancel={finish}
-  ></canvas>
-  <button type="button" class="small-button" onclick={clear}>{notes.clear}</button>
+  <p class="hint">{typing ? notes.typedHint : notes.padHint}</p>
+  {#if typing}
+    <!-- Typed words are kept exactly as typed; each script sets its own direction. -->
+    <input
+      bind:this={typedBox}
+      class="typed"
+      type="text"
+      dir="auto"
+      maxlength="60"
+      autocomplete="off"
+      autocapitalize="words"
+      spellcheck="false"
+      aria-label={notes.typedLabel}
+      value={options.signature.kind === 'typed' ? options.signature.words : ''}
+      oninput={typed}
+      style:color={inks[options.ink]}
+    />
+  {:else}
+    <canvas
+      bind:this={canvas}
+      class="pad"
+      role="img"
+      aria-label={notes.padLabel}
+      onpointerdown={start}
+      onpointermove={move}
+      onpointerup={finish}
+      onpointercancel={finish}
+    ></canvas>
+  {/if}
+  <div class="buttons">
+    {#if !typing}
+      <button type="button" class="small-button" onclick={clear}>{notes.clear}</button>
+    {/if}
+    <button type="button" class="small-button" onclick={swap} aria-busy={fontComing}>
+      {typing ? notes.drawItInstead : fontComing ? text.tool.gettingReady : notes.typeItInstead}
+    </button>
+  </div>
+  <ChoiceGroup
+    legend={notes.inkLegend!}
+    name={`${uid}-ink`}
+    choices={inkChoices}
+    bind:value={options.ink}
+  />
 </section>
 
 <style>
@@ -111,6 +193,25 @@
     /* A finger draws here instead of scrolling the page. */
     touch-action: none;
     cursor: crosshair;
+  }
+
+  /* The typed Signature, in its font and the ink, 16px or more so iPhones don't zoom. */
+  .typed {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 3.5rem;
+    padding: 0.25rem 0.75rem;
+    border: 2px solid var(--line);
+    border-radius: 0.5rem;
+    background: #fff;
+    font-family: 'Dancing Script', system-ui, sans-serif;
+    font-size: 2rem;
+  }
+
+  .buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   /* At least 44 x 44 px to tap, like the shared page's small buttons. */

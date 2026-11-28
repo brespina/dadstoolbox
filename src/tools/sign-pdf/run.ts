@@ -4,7 +4,7 @@
 import { degrees, PDFNumber, type PDFArray, type PDFDocument, type PDFPage } from 'pdf-lib';
 import type { ToolRun } from '../types';
 import { openToSign } from './can-sign';
-import type { Mark, Options } from './declaration';
+import { isFilled, type Mark, type Options } from './declaration';
 import { keepInside } from './marks';
 import { placeOnPage, shownSize, type PageBoxes } from './page-geometry';
 import { paintOnCanvas, type PaintMark } from './paint';
@@ -74,7 +74,8 @@ async function drawMark(doc: PDFDocument, mark: Mark, options: Options, paint: P
 export function makeRun(paint: PaintMark): ToolRun<Options> {
   return async (file, options) => {
     const doc = await openToSign(await file.arrayBuffer());
-    for (const mark of options.marks) await drawMark(doc, mark, options, paint);
+    // A Text Mark with no words has nothing to paint.
+    for (const mark of options.marks.filter(isFilled)) await drawMark(doc, mark, options, paint);
     // Never getForm() (it drops XFA data), and leave filled fields exactly as they were.
     const bytes = await doc.save({ updateFieldAppearances: false, addDefaultPage: false });
     return [
