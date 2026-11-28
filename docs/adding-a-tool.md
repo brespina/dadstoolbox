@@ -549,10 +549,11 @@ with Pyodide ([ADR-0008](adr/0008-python-runs-in-the-browser-with-pyodide.md)). 
 | `Console.svelte`                | Draws the Console: a labelled live region (`role="log"`), text only (never HTML). Error runs get a bar and a hidden "Error:" for screen readers.                              |
 | `console-buffer.ts`             | Pure. The lines, partial lines, the 5,000-line cap and the one "older lines removed" note. Tested with Vitest.                                                                  |
 | `messages.ts`                   | **The message protocol** between page and worker, and `parseToWorker` / `parseFromWorker`, which let in nothing else.                                                          |
-| `runner.ts`                     | **The page's side of a Run.** States `gettingReady`, `ready`, `running`, `failed`; takes the worker (`makeWorker`) and a `ConsoleSink` as arguments, so Vitest passes fakes. |
+| `runner.ts`                     | **The page's side of a Run.** States `gettingReady`, `ready`, `running`, `stopping`, `failed`; takes the worker (`makeWorker`) and a `ConsoleSink` as arguments, so Vitest passes fakes. |
 | `python-worker.ts`              | The worker. Loads Pyodide by the absolute address the page sends, runs each Program in a fresh namespace, and streams output as `out` messages.                               |
 | `helper.py`                     | **The Python helper**, loaded with `?raw` and run once by the worker. `run_program(source)` compiles the Program as `main.py`, runs it in a fresh namespace, catches the error and prints the traceback from the Program's own first frame (the page's frames cut). It returns `ok`, `error` or `missingModule`. `helper.test.ts` runs it under Node with the same `pyodide` package. |
 | `input-channel.ts`              | **The typing channel** for `input()`: an 8 KB `SharedArrayBuffer` (state, length, the line as UTF-8) the page writes into with `sendLine` and the worker waits on with `waitForLine`. `createStdin` is the function the worker gives Pyodide. Vitest-tested. |
+| `interrupt-channel.ts`          | **The interrupt buffer** for Stop: one shared byte the page writes 2 into and Pyodide reads (`setInterruptBuffer`). Vitest-tested.                                           |
 | `files.ts`                      | The pinned Pyodide version and the Site folder its files are served from (`files.test.ts` keeps it equal to the installed package).                                           |
 | `src/site/pyodide-files.ts`     | Build integration, like `pdfjs-files.ts`: serves and copies the five Pyodide files to `run-python/pyodide/<version>/`. They are not committed.                                |
 
@@ -621,10 +622,42 @@ sends the prompt before it reads, so a prompt such as `print("Name: ", end="")` 
 first (`helper.test.ts` checks this); Pyodide's stdin function runs with Python locked
 out, so it cannot flush for itself. Where the page is not isolated, no buffer is sent:
 the worker says `inputUnavailable`, the runner writes `notes.noInput` as a page line, and
-`input()` ends with `EOFError`, so the traceback follows. Stop (#129) adds a state to the
-same buffer for waking a waiting Program.
+`input()` ends with `EOFError`, so the traceback follows.
 
-Tests: Vitest for `console-buffer`, `messages`, `runner` (with a fake worker), `input-channel`, `isolation` and `files`;
+**Stop** ([ADR-0009](adr/0009-typing-and-stop-need-isolation-from-a-service-worker.md)). While a
+Program runs, Run is greyed ("Running…") and Stop is available; otherwise Stop is greyed.
+`runner.stop()` works by whether the runner holds the shared buffers:
+
+- *With isolation* it writes 2 into Pyodide's interrupt buffer (`interrupt-channel.ts`, a second
+  `SharedArrayBuffer` sent in `init`; the worker gives it to `setInterruptBuffer`). Python raises
+  `KeyboardInterrupt` at its next check and `helper.py` returns the outcome `stopped`, which the
+  Console shows as "Stopped." in place of a traceback. Nothing reloads. The state is `stopping`
+  until the worker answers `done`; any `done` then (even `ok`, from a Program that caught the
+  interrupt and ended) shows "Stopped.", not "Done.".
+- A Program waiting in `input()` is blocked in `Atomics.wait`, which the interrupt buffer cannot
+  wake. So if the Program waits, Stop also writes the third state (2) into the typing buffer and
+  notifies it; `waitForLine` returns nothing, and the worker's stdin function calls
+  `pyodide.checkInterrupt()`, which raises `KeyboardInterrupt` out of `input()` (the one Python
+  call a stdin function may make; others raise `NoGilError`). The wait also looks at the interrupt
+  buffer every 100 ms, in case a wake is missed. The runner clears both buffers before each Run,
+  so a Stop that came late leaves nothing behind.
+- If the worker is still running 3 seconds after Stop (`stopGraceMs`: a Program that catches the
+  interrupt in a loop), or *without isolation*, the runner ends the worker (`terminate()`),
+  writes "Stopped.", and starts a fresh worker at once (`begin(true)`), so its 10 to 20 seconds
+  of loading happen while the visitor edits. The state is `gettingReady` with `restarted` set:
+  Run stays pressable, and a press keeps the Program (`queued`, button "Getting ready…") and
+  runs it when Python is ready. On the first load Run stays greyed.
+
+**A worker that dies on its own** (`onerror`, `onmessageerror`, or the worker's `failed`
+message, which it sends when Pyodide itself breaks rather than the Program) while a Program
+runs or stops: the Console gets one plain line (`notes.died`), the worker is dropped, a fresh
+one starts, and Run works again. An idle worker that dies is replaced quietly. A worker that
+dies before Python is ready, including a replacement, is a `failed` state with "Try again", so
+a worker that dies at once cannot loop. Python itself ends `[0] * 10**10` with `OverflowError`
+and a Program that fills memory with `MemoryError`, so no Program a visitor can write kills the
+worker on demand: only the runner's fake-worker tests cover this path.
+
+Tests: Vitest for `console-buffer`, `messages`, `runner` (with a fake worker), `input-channel`, `interrupt-channel`, `isolation` and `files`;
 `tests/e2e/run-python.spec.ts` for the real thing, with a longer timeout because Python
 takes 10 to 20 seconds to load.
 

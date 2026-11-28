@@ -114,7 +114,7 @@ test('a Program that catches the interrupt is ended within about 10 seconds of S
   expect(Date.now() - pressed).toBeLessThan(10_000);
   // A fresh Python loads meanwhile; Run is there when the visitor wants it.
   await run(page, 'print("after")');
-  await expect(consoleOf(page)).toContainText('after');
+  await expect(consoleOf(page)).toContainText('after', { timeout: slow });
 });
 
 test.describe('without isolation', () => {
