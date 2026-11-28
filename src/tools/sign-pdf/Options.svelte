@@ -6,6 +6,7 @@
   // here is stored anywhere.
   import { tick } from 'svelte';
   import ChoiceGroup from '../../practice/ChoiceGroup.svelte';
+  import { text } from '../../text';
   import type { OptionsProps } from '../types';
   import { inks, signatureFont, tool, type Options, type Stroke } from './declaration';
   import { traceStrokes } from './paint';
@@ -19,12 +20,19 @@
     { value: 'black', label: notes.inkBlack! },
     { value: 'blue', label: notes.inkBlue! },
   ];
-  // Whether the box to type in shows instead of the pad. Each way keeps what it holds while
-  // the other shows, so swapping back loses nothing; only the way shown is the Signature.
-  let typing = $state(false);
+  // The box to type in shows instead of the pad while the Signature is typed. Each way keeps
+  // what it holds while the other shows, so swapping back loses nothing; only the way shown
+  // is the Signature.
+  const typing = $derived(options.signature.kind === 'typed');
+  // The font is on its way, the first time "Type it instead" is chosen.
+  let fontComing = $state(false);
   let keptStrokes: Stroke[] = [];
   let keptWords = '';
-  let box: HTMLInputElement | undefined = $state();
+  const typedSignature = (words: string) =>
+    ({ kind: 'typed', words, font: signatureFont }) as const;
+  /** The drawn Signature's lines, or none while it is typed. */
+  const strokes = () => (options.signature.kind === 'drawn' ? options.signature.strokes : []);
+  let typedBox: HTMLInputElement | undefined = $state();
   let canvas: HTMLCanvasElement | undefined = $state();
   // The line being drawn now, before it joins the options.
   let drawing: Stroke | null = $state.raw(null);
@@ -50,8 +58,7 @@
     const context = canvas.getContext('2d')!;
     // Strokes are traced in pad widths.
     context.scale(pixels.width, pixels.width);
-    const strokes = options.signature.kind === 'drawn' ? options.signature.strokes : [];
-    traceStrokes(context, drawing ? [...strokes, drawing] : strokes, options.ink);
+    traceStrokes(context, drawing ? [...strokes(), drawing] : strokes(), options.ink);
   });
 
   /** Where the pointer is, as fractions of the pad, kept short. */
@@ -77,8 +84,7 @@
 
   function finish() {
     if (!drawing) return;
-    const strokes = options.signature.kind === 'drawn' ? options.signature.strokes : [];
-    options.signature = { kind: 'drawn', strokes: [...strokes, drawing] };
+    options.signature = { kind: 'drawn', strokes: [...strokes(), drawing] };
     drawing = null;
   }
 
@@ -88,28 +94,31 @@
   }
 
   /**
-   * Swaps the pad and the box. The font loads the first time the box is wanted, and the
-   * words only join the options once it has: measuring them sooner would use the device's
-   * own letters, and the Mark would be laid out in a shape the saved PDF doesn't have.
+   * Swaps the pad and the box. The font loads the first time the box is wanted ("Getting
+   * ready…" shows meanwhile), and the words only join the options once it has loaded, or
+   * failed to: measuring them sooner would use the device's own letters, and the Mark would
+   * be laid out in a shape the saved PDF doesn't have.
    */
   async function swap() {
     drawing = null;
-    if (typing) {
-      typing = false;
+    if (options.signature.kind === 'typed') {
       options.signature = { kind: 'drawn', strokes: keptStrokes };
       return;
     }
+    fontComing = true;
     await loadSignatureFont();
-    if (options.signature.kind === 'drawn') keptStrokes = options.signature.strokes;
-    typing = true;
-    options.signature = { kind: 'typed', words: keptWords, font: signatureFont };
+    fontComing = false;
+    // A second tap while the font came has swapped already.
+    if (options.signature.kind === 'typed') return;
+    keptStrokes = options.signature.strokes;
+    options.signature = typedSignature(keptWords);
     await tick();
-    box?.focus();
+    typedBox?.focus();
   }
 
   function typed(event: Event & { currentTarget: HTMLInputElement }) {
     keptWords = event.currentTarget.value;
-    options.signature = { kind: 'typed', words: keptWords, font: signatureFont };
+    options.signature = typedSignature(keptWords);
   }
 </script>
 
@@ -119,7 +128,7 @@
   {#if typing}
     <!-- Typed words are kept exactly as typed; each script sets its own direction. -->
     <input
-      bind:this={box}
+      bind:this={typedBox}
       class="typed"
       type="text"
       dir="auto"
@@ -148,8 +157,8 @@
     {#if !typing}
       <button type="button" class="small-button" onclick={clear}>{notes.clear}</button>
     {/if}
-    <button type="button" class="small-button" onclick={swap}>
-      {typing ? notes.drawItInstead : notes.typeItInstead}
+    <button type="button" class="small-button" onclick={swap} aria-busy={fontComing}>
+      {typing ? notes.drawItInstead : fontComing ? text.tool.gettingReady : notes.typeItInstead}
     </button>
   </div>
   <ChoiceGroup
