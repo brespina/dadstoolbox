@@ -3,24 +3,25 @@
 // treats the page's the same way). Each side calls its parse function on every message
 // and ignores what comes back `undefined`.
 //
-// To add a message (Stop is #129): add its type here,
+// To add a message: add its type here,
 // give it a case in the matching parse function and a line in messages.test.ts, then
 // handle it in python-worker.ts and runner.ts. Nothing else needs to know.
 
 import type { ProgramStream } from './console-buffer';
 
-export type Outcome = 'ok' | 'error' | 'missingModule';
+export type Outcome = 'ok' | 'error' | 'missingModule' | 'stopped';
 
-const outcomes: readonly unknown[] = ['ok', 'error', 'missingModule'];
+const outcomes: readonly unknown[] = ['ok', 'error', 'missingModule', 'stopped'];
 
 /** Page to worker. */
 export type ToWorker =
   /**
    * Start Python. `base` is the absolute address of the folder holding Pyodide's files.
    * `input` is the memory shared with the page for input() (input-channel.ts); the page
-   * leaves it out where the browser can't share memory.
+   * leaves it out where the browser can't share memory. `interrupt` is Pyodide's interrupt
+   * buffer (interrupt-channel.ts), for Stop; it comes and goes with `input`.
    */
-  | { type: 'init'; base: string; input?: SharedArrayBuffer }
+  | { type: 'init'; base: string; input?: SharedArrayBuffer; interrupt?: SharedArrayBuffer }
   /** Run a Program in a fresh namespace. */
   | { type: 'run'; code: string };
 
@@ -30,7 +31,7 @@ export type FromWorker =
   | { type: 'ready' }
   /** A piece of what the Program printed. */
   | { type: 'out'; stream: ProgramStream; text: string }
-  /** The Program has ended. `outcome` is how: well, with an error, or with an error about a missing module. */
+  /** The Program has ended. `outcome` is how: well, with an error, or with an error about a missing module, or by Stop (or a Program that raises KeyboardInterrupt). */
   | { type: 'done'; outcome: Outcome }
   /** The Program called input() and waits for a line from the page's `input` memory. */
   | { type: 'input' }
@@ -73,9 +74,13 @@ export function parseToWorker(data: unknown): ToWorker | undefined {
   switch (data.type) {
     case 'init':
       if (typeof data.base !== 'string') return undefined;
-      return typeof SharedArrayBuffer === 'function' && data.input instanceof SharedArrayBuffer
-        ? { type: 'init', base: data.base, input: data.input }
-        : { type: 'init', base: data.base };
+      if (typeof SharedArrayBuffer !== 'function') return { type: 'init', base: data.base };
+      return {
+        type: 'init',
+        base: data.base,
+        ...(data.input instanceof SharedArrayBuffer && { input: data.input }),
+        ...(data.interrupt instanceof SharedArrayBuffer && { interrupt: data.interrupt }),
+      };
     case 'run':
       return typeof data.code === 'string' ? { type: 'run', code: data.code } : undefined;
     default:

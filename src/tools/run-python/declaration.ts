@@ -24,6 +24,7 @@ export const tool = definePracticeTool({
     leaveEditor: 'To leave the editor with the keyboard, press Escape, then Tab.',
     run: 'Run',
     running: 'Running…',
+    stop: 'Stop',
     // The label of the Console, which holds what the Program prints.
     consoleLabel: 'Console',
     consoleEmpty: 'What your program prints appears here.',
@@ -35,6 +36,10 @@ export const tool = definePracticeTool({
     errorMark: 'Error: ',
     // Shown once at the top of the Console when older lines have been dropped.
     linesRemoved: 'Older lines were removed to keep the page quick.',
+    // In the Console, after Stop (in place of a traceback for the interrupt).
+    stoppedLine: 'Stopped.',
+    // In the Console, when Python ended on its own, as when a program uses all the memory.
+    died: 'The program stopped working. It may have used too much memory. Press Run to try again.',
     // Choose a .py file in, Save the Program out. {name} is the chosen file's name.
     choose: 'Choose a .py file',
     save: 'Save',
@@ -53,7 +58,6 @@ export const tool = definePracticeTool({
     cannotKeep: "This browser won't keep your program here.",
     // Why Python is not running, with a button to start it again.
     didNotStart: 'Python could not start on this page.',
-    stopped: 'Python stopped unexpectedly.',
     tookTooLong: 'Python is taking too long to start.',
     tryAgain: 'Try again',
     // The typing field that appears in the Console when the Program calls input().

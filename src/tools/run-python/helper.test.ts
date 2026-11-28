@@ -3,7 +3,8 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadPyodide } from 'pyodide';
 import helper from './helper.py?raw';
-import { createInputBuffer, createStdin, sendLine } from './input-channel';
+import { createInputBuffer, createStdin, sendLine, sendStop } from './input-channel';
+import { createInterruptBuffer, requestInterrupt } from './interrupt-channel';
 
 let output = { out: '', err: '' };
 let runProgram: (code: string) => string;
@@ -12,6 +13,9 @@ let shownWhenAsked: string[] = [];
 /** The lines the next input() calls will get, as the page would send them. */
 let typed: string[] = [];
 let withBuffer = true;
+/** What the page does the next time the Program waits for typing: a line, or Stop. */
+let stopAtInput = false;
+const interrupt = createInterruptBuffer();
 
 beforeAll(async () => {
   const pyodide = await loadPyodide({ fullStdLib: false });
@@ -33,13 +37,19 @@ beforeAll(async () => {
   runProgram = namespace.get('run_program');
   // The worker's wiring for input() (Python's own input() sends what was printed before it
   // waits, which these tests check), with the page's answer sent as soon as it is asked.
+  pyodide.setInterruptBuffer(new Uint8Array(interrupt));
   const buffer = createInputBuffer();
   const stdin = (usable: SharedArrayBuffer | undefined) =>
     createStdin(usable, {
       waiting: () => {
         shownWhenAsked.push(output.out);
-        sendLine(buffer, typed.shift() ?? '');
+        if (stopAtInput) {
+          // Stop writes the interrupt first, then wakes the wait.
+          requestInterrupt(interrupt);
+          sendStop(buffer);
+        } else sendLine(buffer, typed.shift() ?? '');
       },
+      stopped: () => pyodide.checkInterrupt(),
       unavailable: () => shownWhenAsked.push(output.out),
     });
   const withInput = stdin(buffer);
@@ -184,5 +194,37 @@ describe('input() in a Program', () => {
     expect(shownWhenAsked).toEqual(['before\nName: ']);
     expect(err).toContain('File "main.py", line 2, in <module>');
     expect(err.endsWith('EOFError: EOF when reading a line\n')).toBe(true);
+  });
+});
+
+describe('Stop', () => {
+  it('ends a Program that never ends, with no traceback', () => {
+    requestInterrupt(interrupt);
+    expect(run('while True:\n    pass')).toEqual({ outcome: 'stopped', out: '', err: '' });
+    expect(run('print("fine")')).toEqual({ outcome: 'ok', out: 'fine\n', err: '' });
+  });
+
+  it('ends a Program that waits at input()', () => {
+    stopAtInput = true;
+    const result = run('print("Name: ", end="")\nname = input()\nprint("never")');
+    stopAtInput = false;
+    expect(result).toEqual({ outcome: 'stopped', out: 'Name: ', err: '' });
+    expect(run('print("fine")').outcome).toBe('ok');
+  });
+
+  it('can be caught like Ctrl-C in Python, and the Program carries on', () => {
+    stopAtInput = true;
+    const result = run('try:\n    input()\nexcept KeyboardInterrupt:\n    print("caught")');
+    stopAtInput = false;
+    expect(result).toEqual({ outcome: 'ok', out: 'caught\n', err: '' });
+  });
+
+  it('shows a traceback for an error that comes after the interrupt was caught', () => {
+    requestInterrupt(interrupt);
+    const { outcome, err } = run(
+      'try:\n    while True:\n        pass\nexcept KeyboardInterrupt:\n    1 / 0',
+    );
+    expect(outcome).toBe('error');
+    expect(err).toContain('ZeroDivisionError');
   });
 });

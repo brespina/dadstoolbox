@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createInputBuffer, createStdin, inputBytes, sendLine, waitForLine } from './input-channel';
+import {
+  createInputBuffer,
+  createStdin,
+  inputBytes,
+  sendLine,
+  sendStop,
+  waitForLine,
+} from './input-channel';
 
 describe('the typing channel', () => {
   it('carries a line from the page to the one waiting for it', () => {
@@ -45,7 +52,65 @@ describe('the typing channel', () => {
   });
 });
 
+describe('Stop, for a Program waiting at input()', () => {
+  it('wakes a wait with nothing, and the next line is not lost', () => {
+    const buffer = createInputBuffer();
+    sendStop(buffer);
+    expect(waitForLine(buffer)).toBeUndefined();
+    // The stop was taken: it does not end the next wait as well.
+    sendLine(buffer, 'Ada');
+    expect(waitForLine(buffer)).toBe('Ada');
+  });
+
+  it('wakes a wait that is already blocked', async () => {
+    const buffer = createInputBuffer();
+    const { Worker } = await import('node:worker_threads');
+    const worker = new Worker(
+      `const { workerData, parentPort } = require('node:worker_threads');
+       const header = new Int32Array(workerData, 0, 2);
+       parentPort.postMessage('waiting');
+       while (Atomics.load(header, 0) === 0) Atomics.wait(header, 0, 0);
+       parentPort.postMessage('woke with state ' + Atomics.load(header, 0));`,
+      { eval: true, workerData: buffer },
+    );
+    const said = new Promise<string[]>((resolve) => {
+      const messages: string[] = [];
+      worker.on('message', (message: string) => {
+        messages.push(message);
+        if (messages.length === 2) resolve(messages);
+      });
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    sendStop(buffer);
+    expect(await said).toEqual(['waiting', 'woke with state 2']);
+    await worker.terminate();
+  });
+
+  it('ends a wait when the interrupt is seen, even if the wake was missed', () => {
+    const buffer = createInputBuffer();
+    let looks = 0;
+    expect(waitForLine(buffer, () => ++looks >= 2)).toBeUndefined();
+    expect(looks).toBe(2);
+  });
+});
+
 describe('the worker side of input()', () => {
+  it('lets Python end the Program when Stop comes while it waits', () => {
+    const buffer = createInputBuffer();
+    const calls: string[] = [];
+    const stdin = createStdin(buffer, {
+      waiting: () => {
+        calls.push('waiting');
+        sendStop(buffer);
+      },
+      unavailable: () => calls.push('unavailable'),
+      // Python raises KeyboardInterrupt here; if it did not, the end of input follows.
+      stopped: () => calls.push('stopped'),
+    });
+    expect(stdin()).toBeUndefined();
+    expect(calls).toEqual(['waiting', 'stopped']);
+  });
+
   it('says it is waiting, then returns the line', () => {
     const buffer = createInputBuffer();
     const calls: string[] = [];

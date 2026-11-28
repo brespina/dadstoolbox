@@ -2,7 +2,7 @@
   // The Run Python page proper, loaded by Practice.svelte once the page is open. It
   // starts Python in its blob worker, holds the Program, and shows the Console.
   //
-  // - runner.ts keeps the state (getting ready, ready, running, failed) and talks to the
+  // - runner.ts keeps the state (getting ready, ready, running, stopping, failed) and talks to the
   //   worker; this file only turns it into buttons and words.
   // - The Console is console-buffer.ts. Output is added to it as it comes and drawn at most
   //   once per animation frame, so a Program that prints a great deal leaves the page quick.
@@ -67,10 +67,15 @@
       makeWorker: () => new PythonWorker(),
       reasons: {
         didNotStart: notes.didNotStart,
-        stopped: notes.stopped,
         tookTooLong: notes.tookTooLong,
       },
-      words: { done: notes.done, missingModule: notes.onlyBuiltIn, noInput: notes.noInput },
+      words: {
+        done: notes.done,
+        missingModule: notes.onlyBuiltIn,
+        noInput: notes.noInput,
+        stopped: notes.stoppedLine,
+        died: notes.died,
+      },
       isolated,
       onState: (next) => (state = next),
       onInput: (is) => (waiting = is),
@@ -91,6 +96,13 @@
       cancelAnimationFrame(frame);
     };
   });
+
+  // On the first load Run waits, greyed. After Stop or a death a fresh Python loads while the
+  // visitor edits: Run stays pressable, and once pressed it says "Getting ready…" and runs
+  // the Program as soon as Python is ready.
+  const waitingForPython = $derived(
+    state.name === 'gettingReady' && (!state.restarted || !!state.queued),
+  );
 
   /** Puts the chosen file's text in the editor, or says why not and leaves the Program. */
   async function onChoose(event: Event) {
@@ -131,11 +143,14 @@
   }
 
   const runLabel = $derived(
-    state.name === 'gettingReady'
+    waitingForPython
       ? text.tool.gettingReady
-      : state.name === 'running'
+      : state.name === 'running' || state.name === 'stopping'
         ? notes.running
         : notes.run,
+  );
+  const canRun = $derived(
+    state.name === 'ready' || (state.name === 'gettingReady' && !!state.restarted && !state.queued),
   );
 </script>
 
@@ -158,8 +173,11 @@
 <ProgramEditor value={program} onchange={(value) => (program = value)} />
 
 <div class="bar">
-  <button type="button" disabled={state.name !== 'ready'} onclick={() => runner?.run(program)}>
+  <button type="button" disabled={!canRun} onclick={() => runner?.run(program)}>
     {runLabel}
+  </button>
+  <button type="button" disabled={state.name !== 'running'} onclick={() => runner?.stop()}>
+    {notes.stop}
   </button>
   {#if state.name === 'failed'}
     <p class="problem" role="alert">{state.reason}</p>

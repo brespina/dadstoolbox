@@ -1,6 +1,6 @@
 # The helper the worker runs once, when Python has loaded. It is Python, so it is tested
 # under Node by helper.test.ts. The worker calls `run_program(source)` for each Run; it
-# returns what the Run ended with: "ok", "error" or "missingModule".
+# returns what the Run ended with: "ok", "error", "missingModule" or "stopped".
 #
 # It compiles the Program as "main.py", runs it in a namespace of its own, and catches the
 # error itself. Calling this directly (not through Pyodide's runPythonAsync) is what keeps
@@ -25,6 +25,9 @@ def run_program(source):
         if not isinstance(exit.code, int):
             print(exit.code, file=sys.stderr)
         return "error"
+    except KeyboardInterrupt:
+        # Stop (ADR-0009): the page says "Stopped." in place of a traceback.
+        return "stopped"
     except BaseException as error:
         missing = isinstance(error, ModuleNotFoundError)
         if missing:
