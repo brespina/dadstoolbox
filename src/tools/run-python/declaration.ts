@@ -35,6 +35,14 @@ export const tool = definePracticeTool({
     errorMark: 'Error: ',
     // Shown once at the top of the Console when older lines have been dropped.
     linesRemoved: 'Older lines were removed to keep the page quick.',
+    // Choose a .py file in, Save the Program out. {name} is the chosen file's name.
+    choose: 'Choose a .py file',
+    save: 'Save',
+    chosen: 'Opened {name}. Undo brings your last program back.',
+    // Why a chosen file was not used; the Program stays as it was.
+    notAProgram: "That file isn't a program. Choose a .py file.",
+    tooBig: 'That file is too big for a program.',
+    couldNotRead: 'That file could not be read. Try choosing it again.',
     // Why Python is not running, with a button to start it again.
     didNotStart: 'Python could not start on this page.',
     stopped: 'Python stopped unexpectedly.',
