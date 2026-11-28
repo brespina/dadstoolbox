@@ -7,7 +7,9 @@ describe('messages from the worker', () => {
       { type: 'ready' },
       { type: 'out', stream: 'stdout', text: 'hi\n' },
       { type: 'out', stream: 'stderr', text: '' },
-      { type: 'done' },
+      { type: 'done', outcome: 'ok' },
+      { type: 'done', outcome: 'error' },
+      { type: 'done', outcome: 'missingModule' },
       { type: 'failed', message: 'It did not start.' },
     ]) {
       expect(parseFromWorker(message)).toEqual(message);
@@ -25,6 +27,10 @@ describe('messages from the worker', () => {
       { type: 'html', html: '<b>hi</b>' },
       { type: 'out' },
       { type: 'out', stream: 'stdin', text: 'x' },
+      // The page's own words are not something a Program can send.
+      { type: 'out', stream: 'note', text: 'Done.' },
+      { type: 'done' },
+      { type: 'done', outcome: 'fine' },
       { type: 'out', stream: 'stdout', text: 5 },
       { type: 'failed' },
       { type: 'failed', message: {} },
@@ -36,7 +42,10 @@ describe('messages from the worker', () => {
   });
 
   it('drops fields it does not know', () => {
-    expect(parseFromWorker({ type: 'done', extra: 1 })).toEqual({ type: 'done' });
+    expect(parseFromWorker({ type: 'done', outcome: 'ok', extra: 1 })).toEqual({
+      type: 'done',
+      outcome: 'ok',
+    });
   });
 });
 

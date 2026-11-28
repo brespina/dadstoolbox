@@ -37,6 +37,16 @@ describe('console buffer', () => {
     ]);
   });
 
+  it("puts the page's own words on a line of their own, after an open line", () => {
+    const buffer = createConsoleBuffer();
+    buffer.write('a', 'stdout');
+    buffer.write('Done.\n', 'note');
+    expect(buffer.runs()).toEqual([
+      { text: 'a\n', stream: 'stdout' },
+      { text: 'Done.\n', stream: 'note' },
+    ]);
+  });
+
   it('groups neighbouring lines of one stream into runs', () => {
     const buffer = createConsoleBuffer();
     buffer.write('a\nb\n', 'stdout');

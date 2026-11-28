@@ -25,6 +25,10 @@ export const tool = definePracticeTool({
     // The label of the Console, which holds what the Program prints.
     consoleLabel: 'Console',
     consoleEmpty: 'What your program prints appears here.',
+    // The page's own words at the end of a Run, apart from what the Program prints.
+    done: 'Done.',
+    // After Python's own message about a missing module.
+    onlyBuiltIn: "Only Python's built-in modules work here.",
     // Read out in front of a line of error output, so it is not told apart by colour alone.
     errorMark: 'Error: ',
     // Shown once at the top of the Console when older lines have been dropped.

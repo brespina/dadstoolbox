@@ -9,7 +9,11 @@
 // The Console keeps the last `maxLines` lines. When it drops older ones, `removed()` is
 // true until the next `clear()`, and the page shows one note about it.
 
-export type Stream = 'stdout' | 'stderr';
+/** What a Program writes to. */
+export type ProgramStream = 'stdout' | 'stderr';
+
+/** Where a line came from: the Program, or the page itself ("Done."), which a Program can't fake. */
+export type Stream = ProgramStream | 'note';
 
 export interface ConsoleLine {
   text: string;
