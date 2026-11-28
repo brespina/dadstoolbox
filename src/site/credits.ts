@@ -178,6 +178,22 @@ export const credits: Credit[] = [
     ...github('GoogleChromeLabs/comlink', 'v4.4.2', 'LICENSE'),
   },
   {
+    name: 'Pyodide',
+    package: 'pyodide',
+    version: '314.0.8',
+    license: 'MPL-2.0',
+    does: 'Runs the Python programs you write on Run Python, on your device.',
+    ...github('pyodide/pyodide', '314.0.8', 'LICENSE'),
+  },
+  {
+    name: 'CPython',
+    partOf: 'pyodide',
+    version: '3.14.2',
+    license: 'PSF-2.0',
+    does: 'Python itself, which Pyodide brings with it.',
+    ...github('python/cpython', 'v3.14.2', 'LICENSE'),
+  },
+  {
     name: 'Svelte',
     package: 'svelte',
     version: '5.57.3',

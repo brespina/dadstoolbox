@@ -1,0 +1,13 @@
+---
+import ToolLayout from '../layouts/ToolLayout.astro';
+
+// Python's WebAssembly needs 'wasm-unsafe-eval' in the browser lock (ADR-0008). Only this
+// page gets it: never widen the lock in src/site/csp.ts, which every page shares. It goes
+// in as a source of script-src, so it joins Astro's own script hashes in one directive
+// (a second script-src directive would be ignored by the browser).
+// Adding any source drops Astro's own default 'self', so 'self' is added back here.
+Astro.csp?.insertScriptResource("'self'");
+Astro.csp?.insertScriptResource("'wasm-unsafe-eval'");
+---
+
+<ToolLayout address="run-python" />
