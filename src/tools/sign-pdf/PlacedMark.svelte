@@ -6,7 +6,7 @@
   // Mark is placed by percent of it.
   import type { Snippet } from 'svelte';
   import type { Mark } from './declaration';
-  import { actionFor, dragTo, nudge, resize, type Fit, type Point } from './marks';
+  import { actionFor, dragTo, heightOf, nudge, resize, type Fit, type Point } from './marks';
 
   let {
     id,
@@ -104,7 +104,7 @@
   style:left={`${mark.x * 100}%`}
   style:top={`${mark.y * 100}%`}
   style:width={`${mark.width * 100}%`}
-  style:aspect-ratio={fit.markAspect}
+  style:height={`${heightOf(mark, fit) * 100}%`}
   aria-label={label}
   aria-pressed={chosen}
   onclick={onchoose}
@@ -125,15 +125,16 @@
     align-items: center;
     justify-content: center;
     padding: 0;
-    /* No border: WebKit counts a button's border outside its aspect ratio, which would
-       make the Mark taller than its picture's shape gives. Edges are drawn as outlines,
-       inside the Mark, so the page's edge doesn't clip them. */
+    /* No border, so the box is exactly the place's. Edges are drawn as outlines, inside
+       the Mark, so the page's edge doesn't clip them. */
     border: 0;
     outline: 2px dashed transparent;
     outline-offset: -2px;
     background: transparent;
     /* Small words on a big page are still a target a finger can find (WCAG 2.5.8). The
-       box grows below and right of its picture, which stays where the Mark's place puts it. */
+       box grows below and right of its picture, which stays where the Mark's place puts it.
+       The height is set from the picture's shape, not by `aspect-ratio`: WebKit would turn a
+       smallest height into a smallest width through the ratio. */
     min-width: 24px;
     min-height: 24px;
     cursor: grab;

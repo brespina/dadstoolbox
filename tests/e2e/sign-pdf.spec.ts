@@ -374,8 +374,9 @@ test('a Mark stays inside the page, and its size has a smallest and a largest', 
   expect(largest.y).toBeGreaterThanOrEqual(-0.001);
   expect(largest.y + largest.height).toBeLessThanOrEqual(1.001);
   for (let i = 0; i < 60; i++) await page.keyboard.press('-');
-  const smallest = await placeOnPageOne(page, mark);
-  expect(smallest.width).toBeCloseTo(0.05, 2);
+  // A twentieth of the page wide, though a Mark's tap area is never under 24 px.
+  const smallest = await mark.evaluate((element) => parseFloat(element.style.width) / 100);
+  expect(smallest).toBeCloseTo(0.05, 3);
 });
 
 test('Smaller, Bigger and Remove are at least 44 px, and named for their Mark', async ({
