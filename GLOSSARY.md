@@ -25,7 +25,7 @@ The results from one press of a Tool's start button. Earlier Batches stay on the
 _Avoid_: Run, job, session
 
 **Promise**:
-What the Site guarantees every visitor: no name, email or account asked for, no ads, no trackers or visitor counters, and a person's files are never kept or sent anywhere. The one thing a Tool may hold is what a person chooses to Keep, in their own browser only.
+What the Site guarantees every visitor: no name, email or account asked for, no ads, no trackers or visitor counters, and a person's files are never kept or sent anywhere. The one thing a Tool may hold is what a person chooses to Keep (Run Python's Program), in their own browser only, and it is never sent anywhere.
 _Avoid_: Privacy policy, guarantee
 
 **Style**:

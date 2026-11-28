@@ -43,6 +43,14 @@ export const tool = definePracticeTool({
     notAProgram: "That file isn't a program. Choose a .py file.",
     tooBig: 'That file is too big for a program.',
     couldNotRead: 'That file could not be read. Try choosing it again.',
+    // Keep (#132, ADR-0011): the choice above the editor, and what each option does.
+    keepLegend: 'Keeping your program',
+    neverKeep: 'Never keep',
+    keepProgram: 'Keep my program in this browser',
+    neverKeepWords: 'Your program is gone when you close this page. Use Save to keep a file.',
+    keepWords: 'Your program stays in this browser only. It is never sent anywhere.',
+    // Shown when Keep was chosen but the browser would not store it; the choice goes back.
+    cannotKeep: "This browser won't keep your program here.",
     // Why Python is not running, with a button to start it again.
     didNotStart: 'Python could not start on this page.',
     stopped: 'Python stopped unexpectedly.',

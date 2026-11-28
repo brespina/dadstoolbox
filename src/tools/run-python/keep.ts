@@ -25,6 +25,15 @@ export type KeepChoice = 'never' | 'keep';
 /** The part of `localStorage` Keep uses. */
 export type KeepStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
+/** The browser's `localStorage`, or nothing when it is missing or refuses to be opened. */
+export function browserStore(): KeepStore | undefined {
+  try {
+    return globalThis.localStorage ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** True for text a Program can be: no NUL byte, and no more than the cap in UTF-8. */
 function fitsProgram(value: unknown): value is string {
   return (

@@ -16,6 +16,8 @@
   import PythonWorker from './python-worker?worker&inline';
   import Console from './Console.svelte';
   import ProgramEditor from './ProgramEditor.svelte';
+  import KeepChoice from './KeepChoice.svelte';
+  import { browserStore, openKept } from './keep';
   import { createConsoleBuffer, type ConsoleRun } from './console-buffer';
   import { tool } from './declaration';
   import { pyodideFolder, programFileName, readProgram, tooBigToRead } from './files';
@@ -26,7 +28,11 @@
   /** Whether the page is cross-origin isolated (Practice.svelte decides, ADR-0009). */
   const { isolated = false }: { isolated?: boolean } = $props();
 
-  let program = $state(notes.starter);
+  // What the visitor chose to Keep, if anything, goes in the editor in place of the starter
+  // (and is never run). keep.ts checks it first (ADR-0011).
+  const store = browserStore();
+  const kept = openKept(store);
+  let program = $state(kept.program ?? notes.starter);
   let state: RunnerState = $state.raw({ name: 'gettingReady' });
   let runs: ConsoleRun[] = $state.raw([]);
   let removed = $state(false);
@@ -142,6 +148,8 @@
   <button type="button" onclick={onSave}>{notes.save}</button>
 </div>
 <p class="status" class:problem={fileStatus.problem} role="status">{fileStatus.words}</p>
+
+<KeepChoice {program} initial={kept.choice} {store} />
 
 <ProgramEditor value={program} onchange={(value) => (program = value)} />
 
