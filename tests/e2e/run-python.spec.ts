@@ -90,7 +90,8 @@ test('20,000 lines leave the page responsive and the Console holds the last 5,00
   await page.goto('run-python/');
   await run(page, 'for i in range(20000):\n    print("line", i)');
   await expect(consoleOf(page)).toContainText('line 19999', { timeout: 60_000 });
-  const lines = (await printed(page)).trimEnd().split('\n');
+  // The note is a paragraph, so a blank line follows it in the page's text.
+  const lines = (await printed(page)).split('\n').filter((line) => line !== '');
   // One note, then 5,000 lines.
   expect(lines[0]).toBe(notes.linesRemoved);
   expect(lines.slice(1)).toHaveLength(5000);
@@ -99,9 +100,7 @@ test('20,000 lines leave the page responsive and the Console holds the last 5,00
   // The page still answers: Run is ready again and the editor takes typing.
   await expect(page.getByRole('button', { name: notes.run, exact: true })).toBeEnabled();
   await page.getByLabel(tool.areaLabel, { exact: true }).fill('print("still here")');
-  await expect(page.getByLabel(tool.areaLabel, { exact: true })).toHaveValue(
-    'print("still here")',
-  );
+  await expect(page.getByLabel(tool.areaLabel, { exact: true })).toHaveValue('print("still here")');
 });
 
 test('only this page has the lock that lets Python start', async ({ page }) => {

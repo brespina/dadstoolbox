@@ -26,8 +26,7 @@
   spellcheck="false"
   autocapitalize="off"
   autocomplete="off"
-  oninput={(event) => onchange(event.currentTarget.value)}
-></textarea>
+  oninput={(event) => onchange(event.currentTarget.value)}></textarea>
 
 <style>
   textarea {

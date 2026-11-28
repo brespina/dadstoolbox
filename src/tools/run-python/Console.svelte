@@ -24,7 +24,7 @@
           : run.text}</span
       >
     {:else}
-      {run.text}
+      <span class="plain">{run.text}</span>
     {/if}
   {:else}
     <span class="empty">{notes.consoleEmpty}</span>
@@ -43,6 +43,12 @@
     background: var(--surface);
     color: var(--text);
     font: 0.9375rem / 1.5 var(--mono);
+  }
+
+  /* Only the Program's own text keeps its spaces and newlines, so the markup's own
+     whitespace between the pieces never shows. */
+  .plain,
+  .error {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
