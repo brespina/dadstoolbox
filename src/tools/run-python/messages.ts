@@ -7,7 +7,11 @@
 // give it a case in the matching parse function and a line in messages.test.ts, then
 // handle it in python-worker.ts and runner.ts. Nothing else needs to know.
 
-import type { Stream } from './console-buffer';
+import type { ProgramStream } from './console-buffer';
+
+export type Outcome = 'ok' | 'error' | 'missingModule';
+
+const outcomes: readonly unknown[] = ['ok', 'error', 'missingModule'];
 
 /** Page to worker. */
 export type ToWorker =
@@ -21,9 +25,9 @@ export type FromWorker =
   /** Python has loaded and can run a Program. */
   | { type: 'ready' }
   /** A piece of what the Program printed. */
-  | { type: 'out'; stream: Stream; text: string }
-  /** The Program has ended, however it ended. */
-  | { type: 'done' }
+  | { type: 'out'; stream: ProgramStream; text: string }
+  /** The Program has ended. `outcome` is how: well, with an error, or with an error about a missing module. */
+  | { type: 'done'; outcome: Outcome }
   /** Python could not start or broke. `message` is for the page to show or log. */
   | { type: 'failed'; message: string };
 
@@ -34,8 +38,11 @@ export function parseFromWorker(data: unknown): FromWorker | undefined {
   if (!isObject(data)) return undefined;
   switch (data.type) {
     case 'ready':
+      return { type: 'ready' };
     case 'done':
-      return { type: data.type };
+      return outcomes.includes(data.outcome)
+        ? { type: 'done', outcome: data.outcome as Outcome }
+        : undefined;
     case 'out':
       if ((data.stream !== 'stdout' && data.stream !== 'stderr') || typeof data.text !== 'string')
         return undefined;

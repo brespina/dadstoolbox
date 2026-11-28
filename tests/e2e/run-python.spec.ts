@@ -53,8 +53,10 @@ test('run the starter Program and see its output, in order', async ({ page }) =>
   await expect(runButton).toBeEnabled({ timeout: slow });
   await runButton.click();
   await expect(consoleOf(page)).toContainText('Counting: 3');
+  // "Done." is the page's own line after the Program's output.
+  await expect(consoleOf(page).locator('.note')).toHaveText(notes.done);
   expect((await printed(page)).trim()).toBe(
-    'Hello from Python\nCounting: 1\nCounting: 2\nCounting: 3',
+    `Hello from Python\nCounting: 1\nCounting: 2\nCounting: 3\n${notes.done}`,
   );
   await expect(runButton).toBeEnabled();
 });
@@ -83,6 +85,68 @@ test('a partial line stays on its line, and an error is marked as one', async ({
   await expect(consoleOf(page).locator('.error .visually-hidden').first()).toHaveText(
     notes.errorMark,
   );
+});
+
+test("an error shows Python's traceback pointing at the Program, and no Done.", async ({
+  page,
+}) => {
+  test.setTimeout(slow);
+  await page.goto('run-python/');
+  await run(page, 'print("before")\nx = 1\ny = x / 0\n');
+  await expect(consoleOf(page)).toContainText('ZeroDivisionError: division by zero');
+  const error = consoleOf(page).locator('.error');
+  const lines = (await error.innerText()).split('\n');
+  expect(lines[0]).toBe('Traceback (most recent call last):');
+  expect(lines[1]).toBe('  File "main.py", line 3, in <module>');
+  expect(lines[2]).toBe('    y = x / 0');
+  expect(await printed(page)).not.toMatch(/_pyodide|run_async/);
+  await expect(consoleOf(page).locator('.note')).toHaveCount(0);
+  await expect(consoleOf(page)).not.toContainText(notes.done);
+  await expect(page.getByRole('button', { name: notes.run, exact: true })).toBeEnabled();
+});
+
+test('a syntax error shows its line and a caret', async ({ page }) => {
+  test.setTimeout(slow);
+  await page.goto('run-python/');
+  await run(page, 'print("hi")\ndef f(:\n    pass\n');
+  await expect(consoleOf(page)).toContainText('SyntaxError: invalid syntax');
+  const shown = await printed(page);
+  expect(shown).toContain('File "main.py", line 2');
+  expect(shown).toContain('def f(:');
+  expect(shown).toMatch(/^ +\^+$/m);
+  await expect(consoleOf(page)).not.toContainText(notes.done);
+});
+
+test('a missing module gets the plain line, and no hint about installing', async ({ page }) => {
+  test.setTimeout(slow);
+  await page.goto('run-python/');
+  await run(page, 'import numpy\n');
+  await expect(consoleOf(page).locator('.note')).toHaveText(notes.onlyBuiltIn);
+  const shown = await printed(page);
+  expect(shown).toContain("ModuleNotFoundError: No module named 'numpy'");
+  expect(shown).not.toMatch(/micropip|loadPackage/);
+  // The plain line comes after Python's message, and "Done." is not shown.
+  expect(shown.trim().endsWith(notes.onlyBuiltIn)).toBe(true);
+  await expect(consoleOf(page)).not.toContainText(notes.done);
+});
+
+test('after an error Run works again and starts fresh', async ({ page }) => {
+  test.setTimeout(slow);
+  await page.goto('run-python/');
+  await run(page, 'leftover = 7\nraise ValueError("boom")');
+  await expect(consoleOf(page)).toContainText('ValueError: boom');
+  await run(page, 'print("recovered", "leftover" in dir())');
+  await expect(consoleOf(page)).toContainText('recovered False');
+  await expect(consoleOf(page)).not.toContainText('boom');
+  await expect(consoleOf(page).locator('.note')).toHaveText(notes.done);
+});
+
+test('output, an error and the plain lines pass the accessibility checks', async ({ page }) => {
+  test.setTimeout(slow);
+  await page.goto('run-python/');
+  await run(page, 'print("shown first")\nimport numpy\n');
+  await expect(consoleOf(page).locator('.note')).toHaveText(notes.onlyBuiltIn);
+  // The fixture's checks (light and dark) run when the test ends, with the error showing.
 });
 
 test('20,000 lines leave the page responsive and the Console holds the last 5,000', async ({

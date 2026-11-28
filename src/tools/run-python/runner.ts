@@ -36,6 +36,8 @@ export interface RunnerOptions {
   base: string;
   /** The plain reasons the page shows when Python is not running. */
   reasons: { didNotStart: string; stopped: string; tookTooLong: string };
+  /** The page's own words at the end of a Run: after a good one, and after a missing module. */
+  words: { done: string; missingModule: string };
   onState: (state: RunnerState) => void;
   console: ConsoleSink;
 }
@@ -98,7 +100,12 @@ export function createRunner(options: RunnerOptions): Runner {
         if (state.name === 'running') options.console.write(message.text, message.stream);
         return;
       case 'done':
-        if (state.name === 'running') setState({ name: 'ready' });
+        if (state.name !== 'running') return;
+        // The page's words go to the Console as `note`, apart from the Program's output.
+        if (message.outcome === 'ok') options.console.write(`${options.words.done}\n`, 'note');
+        else if (message.outcome === 'missingModule')
+          options.console.write(`${options.words.missingModule}\n`, 'note');
+        setState({ name: 'ready' });
         return;
       case 'failed':
         unexpectedEnd();

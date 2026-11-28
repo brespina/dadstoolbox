@@ -8,10 +8,12 @@
 // of its own to resolve a relative one against. It loads no package (ADR-0008).
 //
 // Seams: each message the page sends has a case in `onMessage`; `runProgram` is the one
-// place a Program runs, so the traceback (#126) and input() (#128) work changes only that.
+// place a Program runs, and helper.py is the Python it calls (tracebacks, #126), so
+// input() (#128) work changes those.
 
 import type { PyodideAPI } from 'pyodide';
-import { parseToWorker, type FromWorker } from './messages';
+import { parseToWorker, type FromWorker, type Outcome } from './messages';
+import helper from './helper.py?raw';
 
 const scope = self as unknown as {
   onmessage: ((event: MessageEvent) => void) | null;
@@ -19,6 +21,8 @@ const scope = self as unknown as {
 };
 
 let pyodide: PyodideAPI | undefined;
+/** `run_program` from helper.py: runs a Program and returns how it ended. */
+let runInPython: ((code: string) => Outcome) | undefined;
 let running = false;
 
 /** Turns a stream's bytes into text, keeping a letter split across two pieces whole. */
@@ -53,21 +57,22 @@ async function start(base: string) {
   });
   pyodide.setStdout({ write: (bytes: Uint8Array) => stdout.write(bytes) });
   pyodide.setStderr({ write: (bytes: Uint8Array) => stderr.write(bytes) });
+  const namespace = pyodide.globals.get('dict')();
+  pyodide.runPython(helper, { globals: namespace });
+  runInPython = namespace.get('run_program');
+  namespace.destroy();
   scope.postMessage({ type: 'ready' });
 }
 
-/** Runs a Program in a namespace of its own, so a variable from the last Run is gone. */
-async function runProgram(python: PyodideAPI, code: string) {
-  const namespace = python.globals.get('dict')();
-  namespace.set('__name__', '__main__');
+/** Runs a Program with the helper, which gives it a fresh namespace and prints any error. */
+function runProgram(run: (code: string) => Outcome, code: string): Outcome {
   try {
-    await python.runPythonAsync(code, { globals: namespace, filename: 'main.py', dedent: false });
+    return run(code);
   } catch (error) {
-    // For now the error goes to the Console as Python wrote it; tracebacks are made
-    // friendlier in #126.
+    // The helper catches whatever a Program does, so this is Python itself breaking.
     stderr.write(new TextEncoder().encode(`${(error as Error).message}\n`));
+    return 'error';
   } finally {
-    namespace.destroy();
     stdout.flush();
     stderr.flush();
   }
@@ -85,11 +90,13 @@ scope.onmessage = (event) => {
       }
       return;
     case 'run':
-      if (!pyodide || running) return;
+      if (!runInPython || running) return;
       running = true;
-      runProgram(pyodide, message.code)
-        .then(() => scope.postMessage({ type: 'done' }))
-        .finally(() => (running = false));
+      try {
+        scope.postMessage({ type: 'done', outcome: runProgram(runInPython, message.code) });
+      } finally {
+        running = false;
+      }
       return;
   }
 };

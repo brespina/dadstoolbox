@@ -51,6 +51,7 @@
         stopped: notes.stopped,
         tookTooLong: notes.tookTooLong,
       },
+      words: { done: notes.done, missingModule: notes.onlyBuiltIn },
       onState: (next) => (state = next),
       console: {
         clear() {
