@@ -574,8 +574,8 @@ choice, so the same file can be chosen twice. A refused file leaves the Program 
 puts its reason in a `role="status"` line. A file over the cap is refused from `file.size`
 without being read. **Save** hands the editor's text to `saveFiles` (`src/site/save.ts`) as
 `programFileName(chosen name)`. The page tests (`run-python-files.spec.ts`) switch sharing
-off, as `tools.spec.ts` does, to check the saved file. `tools.spec.ts` exempts this Tool
-from "a Practice Tool has no Choose or Save button".
+off, as `tools.spec.ts` does, to check the saved file. `tools.spec.ts` no longer
+asserts that a Practice Tool has no Choose or Save button, since this one has both.
 
 **What the Console says.** The worker sends `done` with an `outcome`; the runner turns it into the
 page's own words (`notes.done`, `notes.onlyBuiltIn`), written to the Console with the stream

@@ -25,23 +25,33 @@ async function open(page: Page) {
   await expect(editorOf(page)).toBeVisible({ timeout: slow });
 }
 
-/** Chooses a file the way a visitor does: press Choose, pick from the device's picker. */
-async function choose(
-  page: Page,
-  file: string | { name: string; mimeType: string; buffer: Buffer },
-) {
+type Chosen = string | { name: string; mimeType: string; buffer: Buffer };
+
+/**
+ * Chooses a file the way a visitor does (press Choose, pick from the device's picker)
+ * and waits for the page to say what it did, because reading the file takes a moment.
+ */
+async function choose(page: Page, file: Chosen, says: string) {
   const picker = page.waitForEvent('filechooser');
   await chooseButton(page).click();
   await (await picker).setFiles(file);
+  await expect(statusOf(page)).toHaveText(says);
 }
+
+const opened = fillText(notes.chosen, { name: 'run-python-sample.py' });
+
+const jpeg = {
+  name: 'photo.jpg',
+  mimeType: 'image/jpeg',
+  buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x80]),
+};
 
 test('a chosen .py file fills the editor and runs', async ({ page }) => {
   test.setTimeout(slow);
   await open(page);
   expect(await programOf(page)).toBe(notes.starter);
 
-  await choose(page, samplePath);
-  await expect(statusOf(page)).toHaveText(fillText(notes.chosen, { name: 'run-python-sample.py' }));
+  await choose(page, samplePath, opened);
   expect(await programOf(page)).toBe(sampleText);
 
   const run = page.getByRole('button', { name: notes.run, exact: true });
@@ -57,51 +67,46 @@ test('Undo brings the old Program back, and the same file can be chosen twice', 
 }) => {
   test.setTimeout(slow);
   await open(page);
-  await choose(page, samplePath);
+  await choose(page, samplePath, opened);
   expect(await programOf(page)).toBe(sampleText);
 
   await editorOf(page).click();
   await page.keyboard.press(await undoKey(page));
   expect(await programOf(page)).toBe(notes.starter);
 
-  // The same file again still works.
-  await choose(page, samplePath);
-  expect(await programOf(page)).toBe(sampleText);
+  // The same file again still works (its status line is unchanged, so wait on the editor).
+  await choose(page, samplePath, opened);
+  await expect.poll(() => programOf(page)).toBe(sampleText);
 });
 
 test('a file that is not text gets a plain reason and the Program stays', async ({ page }) => {
   test.setTimeout(slow);
   await open(page);
-  const reasonHere = page.getByRole('status').filter({ hasText: notes.notAProgram });
 
   // Bytes that are not UTF-8.
-  await choose(page, {
-    name: 'photo.jpg',
-    mimeType: 'image/jpeg',
-    buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x80]),
-  });
-  await expect(reasonHere).toBeVisible();
+  await choose(page, jpeg, notes.notAProgram);
   expect(await programOf(page)).toBe(notes.starter);
 
-  // A NUL byte, in what would otherwise be text.
-  await choose(page, {
-    name: 'nul.py',
-    mimeType: 'text/x-python',
-    buffer: Buffer.from('print(1)\u0000'),
-  });
-  await expect(reasonHere).toBeVisible();
-  expect(await programOf(page)).toBe(notes.starter);
+  // A NUL byte, in what would otherwise be text. First choose a real file, so the reason
+  // below is new and the Program it leaves alone is the sample.
+  await choose(page, samplePath, opened);
+  await expect.poll(() => programOf(page)).toBe(sampleText);
+  await choose(
+    page,
+    { name: 'nul.py', mimeType: 'text/x-python', buffer: Buffer.from('print(1)\u0000') },
+    notes.notAProgram,
+  );
+  expect(await programOf(page)).toBe(sampleText);
 });
 
 test('a file that is too big gets a plain reason and the Program stays', async ({ page }) => {
   test.setTimeout(slow);
   await open(page);
-  await choose(page, {
-    name: 'huge.py',
-    mimeType: 'text/x-python',
-    buffer: Buffer.alloc(500_001, 'x'),
-  });
-  await expect(page.getByRole('status').filter({ hasText: notes.tooBig })).toBeVisible();
+  await choose(
+    page,
+    { name: 'huge.py', mimeType: 'text/x-python', buffer: Buffer.alloc(500_001, 'x') },
+    notes.tooBig,
+  );
   expect(await programOf(page)).toBe(notes.starter);
 });
 
@@ -125,7 +130,8 @@ test('Save is named after the chosen file and holds what is in the editor', asyn
     navigator.canShare = () => false;
   });
   await open(page);
-  await choose(page, samplePath);
+  await choose(page, samplePath, opened);
+  await expect.poll(() => programOf(page)).toBe(sampleText);
   await editorOf(page).click();
   await page.keyboard.insertText('# changed\n');
 
@@ -143,12 +149,7 @@ test('on a phone the buttons are 44 px or more and nothing scrolls sideways', as
   test.setTimeout(slow);
   await page.setViewportSize({ width: 375, height: 700 });
   await open(page);
-  await choose(page, {
-    name: 'photo.jpg',
-    mimeType: 'image/jpeg',
-    buffer: Buffer.from([0xff, 0x00]),
-  });
-  await expect(page.getByRole('status').filter({ hasText: notes.notAProgram })).toBeVisible();
+  await choose(page, jpeg, notes.notAProgram);
   for (const button of [chooseButton(page), saveButton(page)]) {
     const box = (await button.boundingBox())!;
     expect(box.width).toBeGreaterThanOrEqual(44);
