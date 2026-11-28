@@ -118,6 +118,8 @@
     background: var(--bg);
     color: var(--text);
     font: inherit;
+    /* 16 px or more: iPhone Safari zooms the page in on a smaller field. */
+    font-size: 1rem;
   }
 
   .typing input:focus-visible {
