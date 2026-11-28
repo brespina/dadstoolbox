@@ -12,7 +12,7 @@ Read first, and build on these rather than re-researching them:
 
 **Save as you go.** After each passing test cycle, commit and push your branch, so a cutoff at any moment loses little.
 
-**Checks.** Run `npm run check`, `npm run format:check`, `npm test`, and `E2E_PORT={PORT} npm run test:e2e`. All must pass. `docs/agents/testing.md` covers WebKit on this machine and the slow tests.
+**Checks.** Run `npm run check`, `npm run format:check`, `npm test`, and only the page-test files you wrote or touched, in both browsers (`E2E_PORT={PORT}`; for WebKit, `npm run test:e2e:webkit -- <files>`). All must pass. CI runs the full page-test suite in both browsers and is the gate, so don't run it locally. `docs/agents/testing.md` covers WebKit on this machine and the slow tests.
 
 **Commits.** End every commit message with the attribution lines from your session instructions.
 

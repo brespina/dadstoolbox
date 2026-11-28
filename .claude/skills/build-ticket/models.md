@@ -8,14 +8,16 @@ Pass the Model and Effort below as the Agent tool's `model` and `effort`.
 
 | Role                               | Model  | Effort | Evidence                                                          |
 | ---------------------------------- | ------ | ------ | ----------------------------------------------------------------- |
-| Implementer, **pattern** ticket    | sonnet | high   | Kept: haiku lost to it 14 to 18 (log row 1)                       |
+| Implementer, **pattern** ticket    | sonnet | high   | Kept: haiku lost 14 to 18 (row 1), opus low lost 15 to 17 (row 4) |
 | Implementer, **foundation** ticket | opus   | high   | Starting guess                                                    |
 | Implementer, **hand-drawn** ticket | sonnet | high   | Downgraded: sonnet tied opus (log row 2) and won 17 to 15 (row 3) |
 | Exploration (notes folder)         | sonnet | medium | Starting guess                                                    |
 | Quick lookup (find a file or fact) | haiku  | low    | Starting guess                                                    |
-| Reviewer, one PR                   | sonnet | high   | Starting guess                                                    |
+| Reviewer, one PR                   | –      | –      | Skipped: the owner's token cut; the whole-branch review covers it |
 | Reviewer, whole branch             | opus   | high   | Starting guess                                                    |
-| Duel judge                         | opus   | high   | Fixed: the judge is the measuring stick, so it never duels        |
+| Duel judge                         | opus   | medium | Owner's token cut (row 4); the judge never duels                  |
+
+If `~/.claude/settings.json` sets `advisorModel`, every subagent inherits that advisor, so each row really means "model + advisor". Say so in the log row's Note.
 
 The lead is the user's session. Suggest Opus at medium effort, and high for grilling and spec writing.
 
@@ -50,15 +52,18 @@ A tie goes to the cheaper arm: the question is whether the cheaper model is enou
 
 - ~~Is haiku at high effort enough for **pattern** tickets?~~ No (log row 1): it copied shared code and cost more tokens. Closed.
 - ~~Is sonnet at high effort enough for **hand-drawn** tickets?~~ Yes (log rows 2 and 3): a tie, then a win. Closed.
-- Is sonnet at **medium** effort enough for **pattern** tickets? Planned duel: #113 (spec #108), sonnet high against sonnet medium.
+- Is sonnet at **medium** effort enough for **pattern** tickets? Not duelled yet: #113 duelled opus low instead (row 4).
+- ~~Is opus at **low** effort as good as sonnet at high, for fewer tokens?~~ No on one pattern duel (row 4): it scored lower, had more defects, and cost more (opus tokens count double). Closed for pattern tickets.
+- Is sonnet at high effort, with an Opus advisor, enough for **foundation** tickets? Not duelled. Spec #123 built #126, #128, #129 and #132 that way (no duel). The whole-branch review found one missed user story and small fixes, and no foundation rework.
 - Is opus at medium effort a better one-PR reviewer than sonnet at high? Not duelled yet: reviewers fix code, so a duel needs a findings-only variant.
 
 ## Log
 
 One row per duel or rescue. Tokens, tool calls and minutes come from each subagent's task notification. Judge scores are out of 20.
 
-| Date       | Spec | Ticket | Kind       | A           | B           | Checks green on first push (A / B) | Judge (A / B) | Tokens (A / B) | Minutes (A / B) | Winner                     | Note                                                                                                |
-| ---------- | ---- | ------ | ---------- | ----------- | ----------- | ---------------------------------- | ------------- | -------------- | --------------- | -------------------------- | --------------------------------------------------------------------------------------------------- |
-| 2026-10-31 | #67  | #71    | pattern    | haiku high  | sonnet high | no / yes                           | 14 / 18       | ~147k / ~92k   | 15 / 14         | B (sonnet)                 | Haiku added its own copies of the shared failure reason and file-type lookup.                       |
-| 2026-10-31 | #67  | #74    | hand-drawn | sonnet high | opus high   | yes / yes                          | 18 / 18       | ~115k / ~105k  | 44 / 36         | A (sonnet), tie to cheaper | Sonnet: fuller tests and docs; opus: leaner code. Sonnet took longer and used slightly more tokens. |
-| 2026-11-03 | #88  | #92    | hand-drawn | opus high   | sonnet high | yes / yes                          | 15 / 17       | ~107k / ~90k   | 15 / 14         | B (sonnet)                 | Opus's raw line used a different measure under the same name, and added unasked extras (318 lines). |
+| Date       | Spec | Ticket | Kind       | A           | B           | Checks green on first push (A / B) | Judge (A / B) | Tokens (A / B) | Minutes (A / B) | Winner                     | Note                                                                                                      |
+| ---------- | ---- | ------ | ---------- | ----------- | ----------- | ---------------------------------- | ------------- | -------------- | --------------- | -------------------------- | --------------------------------------------------------------------------------------------------------- |
+| 2026-10-31 | #67  | #71    | pattern    | haiku high  | sonnet high | no / yes                           | 14 / 18       | ~147k / ~92k   | 15 / 14         | B (sonnet)                 | Haiku added its own copies of the shared failure reason and file-type lookup.                             |
+| 2026-10-31 | #67  | #74    | hand-drawn | sonnet high | opus high   | yes / yes                          | 18 / 18       | ~115k / ~105k  | 44 / 36         | A (sonnet), tie to cheaper | Sonnet: fuller tests and docs; opus: leaner code. Sonnet took longer and used slightly more tokens.       |
+| 2026-11-03 | #88  | #92    | hand-drawn | opus high   | sonnet high | yes / yes                          | 15 / 17       | ~107k / ~90k   | 15 / 14         | B (sonnet)                 | Opus's raw line used a different measure under the same name, and added unasked extras (318 lines).       |
+| 2026-11-27 | #108 | #113   | pattern    | sonnet high | opus low    | no / yes                           | 17 / 15       | ~161k / ~128k  | 32 / 45         | A (sonnet)                 | Judge opus medium. Defects 4 / 6. Both arms likely had an Opus advisor. Cost index (opus ×2) 161k / 256k. |
