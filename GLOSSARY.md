@@ -49,7 +49,7 @@ One go at a Lesson: a short block of text, a cursor and a highlighted target to 
 _Avoid_: Puzzle, challenge, task
 
 **Signature**:
-A person's name as they sign it, drawn with a finger or mouse, for Sign a PDF to put on a PDF's pages (#113 adds typing it in a handwriting-style font). It is a picture of a signature, not a digital ID, and it is never kept: it is drawn afresh on each visit.
+A person's name as they sign it, drawn with a finger or mouse or typed in a handwriting-style font (whichever way was chosen last), for Sign a PDF to put on a PDF's pages in black or blue ink. It is a picture of a signature, not a digital ID, and it is never kept: it is made afresh on each visit.
 _Avoid_: E-signature, digital signature, autograph
 
 **Mark**:

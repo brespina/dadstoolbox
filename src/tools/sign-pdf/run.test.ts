@@ -4,7 +4,7 @@ import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import { ToolFailure } from '../types';
 import { openToSign } from './can-sign';
-import { tool, type Mark, type Options } from './declaration';
+import { inks, signatureFont, tool, type Mark, type Options } from './declaration';
 import { makeRun } from './run';
 import type { PaintMark } from './paint';
 import { picturesOn } from './pictures-on';
@@ -32,11 +32,17 @@ const signed = (marks: Mark[]): Options => ({ ...tool.defaultOptions, signature:
  * and each request is noted so the test can check what was asked for.
  */
 function standIn() {
-  const asked: { mark: Mark; ink: string; width: number; height: number }[] = [];
+  const asked: {
+    mark: Mark;
+    ink: string;
+    signature: Options['signature'];
+    width: number;
+    height: number;
+  }[] = [];
   const paint: PaintMark = async (mark, options) => ({
     shape: 2,
     paint: async (width, height) => {
-      asked.push({ mark, ink: options.ink, width, height });
+      asked.push({ mark, ink: options.ink, signature: options.signature, width, height });
       return new Uint8Array(PNG.sync.write(new PNG({ width, height })));
     },
   });
@@ -153,7 +159,7 @@ describe('Sign a PDF', () => {
     const mark: Mark = { kind: 'signature', page: 1, x: 0, y: 0, width: 0.5 };
     await makeRun(paint)(sample('sample.pdf'), signed([mark]));
     // 150 × 75 points is 2 1/12 × 1 1/24 inches.
-    expect(asked).toEqual([{ mark, ink: 'black', width: 625, height: 313 }]);
+    expect(asked).toEqual([{ mark, ink: 'black', signature: drawn, width: 625, height: 313 }]);
   });
 
   it('paints no side longer than 2000 pixels', async () => {
@@ -262,10 +268,76 @@ describe('Sign a PDF', () => {
     });
   });
 
+  describe('a typed Signature', () => {
+    const typed = (words: string): Options['signature'] => ({
+      kind: 'typed',
+      words,
+      font: signatureFont,
+    });
+    const mark: Mark = { kind: 'signature', page: 1, x: 0.1, y: 0.2, width: 0.5 };
+    const typedOptions = (words: string, ink: Options['ink'] = 'black'): Options => ({
+      ...tool.defaultOptions,
+      signature: typed(words),
+      ink,
+      marks: [mark],
+    });
+
+    it('is Dancing Script', () => {
+      expect(signatureFont).toBe('Dancing Script');
+    });
+
+    it('lands as a picture on its page, and the painter is given the words and the font', async () => {
+      const { paint, asked } = standIn();
+      const [result] = await makeRun(paint)(sample('sample.pdf'), typedOptions('Ada Lovelace'));
+      const doc = await PDFDocument.load(await result!.blob.arrayBuffer());
+      expect(picturesOn(doc.getPage(0))).toHaveLength(1);
+      expect(asked.map((one) => one.signature)).toEqual([
+        { kind: 'typed', words: 'Ada Lovelace', font: 'Dancing Script' },
+      ]);
+    });
+
+    it.each(['サイン', 'توقيع', 'Zoë Łukasz', ' Ana  Diaz ', '😀 x'])(
+      'gives words in any script to the painter unchanged: %j',
+      async (words) => {
+        const { paint, asked } = standIn();
+        await makeRun(paint)(sample('sample.pdf'), typedOptions(words));
+        expect(asked.map((one) => one.signature)).toEqual([typed(words)]);
+      },
+    );
+  });
+
+  describe('ink', () => {
+    it('is black unless the person chooses blue', () => {
+      expect(tool.defaultOptions.ink).toBe('black');
+      expect(Object.keys(inks)).toEqual(['black', 'blue']);
+    });
+
+    it('reaches the painter for every Mark: a drawn Signature, a typed one and Text', async () => {
+      const { paint, asked } = standIn();
+      const options = (signature: Options['signature'], marks: Mark[]): Options => ({
+        ...tool.defaultOptions,
+        signature,
+        ink: 'blue',
+        marks,
+      });
+      const sign: Mark = { kind: 'signature', page: 1, x: 0.1, y: 0.2, width: 0.3 };
+      await makeRun(paint)(sample('sample.pdf'), options(drawn, [sign, words('Ana')]));
+      await makeRun(paint)(
+        sample('sample.pdf'),
+        options({ kind: 'typed', words: 'Ana', font: signatureFont }, [sign]),
+      );
+      expect(asked.map(({ ink }) => ink)).toEqual(['blue', 'blue', 'blue']);
+    });
+
+    it('has a blue that differs from black', () => {
+      expect(inks.blue).not.toBe(inks.black);
+    });
+  });
+
   describe('what start waits for', () => {
-    const problem = (marks: Mark[], signature = drawn) =>
+    const problem = (marks: Mark[], signature: Options['signature'] = drawn) =>
       tool.optionsProblem({ ...tool.defaultOptions, signature, marks });
-    const none = tool.defaultOptions.signature;
+    const none: Options['signature'] = tool.defaultOptions.signature;
     const mark: Mark = { kind: 'signature', page: 1, x: 0, y: 0, width: 0.3 };
 
     it('asks for a signature or some text when nothing is placed', () => {
@@ -285,6 +357,21 @@ describe('Sign a PDF', () => {
     it('still wants a Signature for a Signature Mark, even beside Text', () => {
       expect(problem([mark, words('Ana')], none)).toBe(tool.notes.noSignature);
       expect(problem([mark, words('Ana')])).toBeUndefined();
+    });
+
+    it('asks to draw or type a signature when a Signature Mark has none', () => {
+      expect(problem([mark], none)).toBe('Draw or type your signature first.');
+    });
+
+    it('is satisfied by typed words, and wants them when they are only spaces', () => {
+      const typed = (words: string): Options['signature'] => ({
+        kind: 'typed',
+        words,
+        font: signatureFont,
+      });
+      expect(problem([mark], typed('Ada'))).toBeUndefined();
+      expect(problem([mark], typed('   '))).toBe(tool.notes.noSignature);
+      expect(problem([mark], typed(''))).toBe(tool.notes.noSignature);
     });
 
     it('does not throw for a Mark that has no words at all', () => {

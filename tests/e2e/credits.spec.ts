@@ -53,3 +53,16 @@ test("libheif's credit links its source and its LGPL license", async ({ page }) 
     'https://github.com/strukturag/libheif/tree/v1.23.7',
   );
 });
+
+test("Dancing Script's credit pins its version and its OFL-1.1 license", async ({ page }) => {
+  await page.goto('credits/');
+  const font = page.getByRole('listitem').filter({
+    has: page.getByRole('heading', { name: 'Dancing Script', exact: true }),
+  });
+  await expect(font).toContainText('5.3.0');
+  await expect(font).toContainText('OFL-1.1');
+  await expect(font.getByRole('link', { name: 'Dancing Script license' })).toHaveAttribute(
+    'href',
+    /^https:\/\//,
+  );
+});
