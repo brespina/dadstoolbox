@@ -9,10 +9,12 @@
 //
 // Seams: each message the page sends has a case in `onMessage`; `runProgram` is the one
 // place a Program runs, and helper.py is the Python it calls (tracebacks, #126).
-// input() waits in `createStdin` (input-channel.ts), set up in `start`.
+// input() waits in `createStdin` (input-channel.ts), set up in `start`. Stop (ADR-0009)
+// reaches a Program through Pyodide's interrupt buffer, set up there too.
 
 import type { PyodideAPI } from 'pyodide';
 import { createStdin } from './input-channel';
+import { interruptRequested } from './interrupt-channel';
 import { parseToWorker, type FromWorker, type Outcome } from './messages';
 import helper from './helper.py?raw';
 
@@ -47,7 +49,11 @@ function streamTo(stream: 'stdout' | 'stderr') {
 const stdout = streamTo('stdout');
 const stderr = streamTo('stderr');
 
-async function start(base: string, input: SharedArrayBuffer | undefined) {
+async function start(
+  base: string,
+  input: SharedArrayBuffer | undefined,
+  interrupt: SharedArrayBuffer | undefined,
+) {
   const { loadPyodide } = (await import(/* @vite-ignore */ `${base}pyodide.mjs`)) as {
     loadPyodide: typeof import('pyodide').loadPyodide;
   };
@@ -59,10 +65,16 @@ async function start(base: string, input: SharedArrayBuffer | undefined) {
   pyodide.setStdout({ write: (bytes: Uint8Array) => stdout.write(bytes) });
   pyodide.setStderr({ write: (bytes: Uint8Array) => stderr.write(bytes) });
   // input() waits for the page to send a line, or ends with EOFError where it can't.
+  // Stop writes 2 here; Python then raises KeyboardInterrupt at its next check.
+  if (interrupt) pyodide.setInterruptBuffer(new Uint8Array(interrupt));
+  const loaded = pyodide;
   pyodide.setStdin({
     stdin: createStdin(input, {
       waiting: () => scope.postMessage({ type: 'input' }),
       unavailable: () => scope.postMessage({ type: 'inputUnavailable' }),
+      interrupted: () => (interrupt ? interruptRequested(interrupt) : false),
+      // Raises KeyboardInterrupt out of input(); the only Python call a stdin function can make.
+      stopped: () => loaded.checkInterrupt(),
     }),
   });
   const namespace = pyodide.globals.get('dict')();
@@ -73,13 +85,22 @@ async function start(base: string, input: SharedArrayBuffer | undefined) {
 }
 
 /** Runs a Program with the helper, which gives it a fresh namespace and prints any error. */
-function runProgram(run: (code: string) => Outcome, code: string): Outcome {
+function runProgram(run: (code: string) => Outcome, code: string): Outcome | 'broken' {
   try {
     return run(code);
   } catch (error) {
-    // The helper catches whatever a Program does, so this is Python itself breaking.
-    stderr.write(new TextEncoder().encode(`${(error as Error).message}\n`));
-    return 'error';
+    // The helper catches whatever a Program does, so this is Python itself breaking...
+    const message = (error as Error).message ?? String(error);
+    // ...or Stop landing where the helper could not catch it (as it ended).
+    if (error instanceof pyodide!.ffi.PythonError && message.includes('KeyboardInterrupt'))
+      return 'stopped';
+    // A plain Python error from the helper is shown. Anything else (a crash in Pyodide
+    // itself, such as running out of memory) leaves Python unusable: tell the page.
+    if (error instanceof pyodide!.ffi.PythonError) {
+      stderr.write(new TextEncoder().encode(`${message}\n`));
+      return 'error';
+    }
+    return 'broken';
   } finally {
     stdout.flush();
     stderr.flush();
@@ -92,7 +113,7 @@ scope.onmessage = (event) => {
   switch (message.type) {
     case 'init':
       if (!pyodide) {
-        start(message.base, message.input).catch((error: unknown) =>
+        start(message.base, message.input, message.interrupt).catch((error: unknown) =>
           scope.postMessage({ type: 'failed', message: String(error) }),
         );
       }
@@ -101,7 +122,12 @@ scope.onmessage = (event) => {
       if (!runInPython || running) return;
       running = true;
       try {
-        scope.postMessage({ type: 'done', outcome: runProgram(runInPython, message.code) });
+        const outcome = runProgram(runInPython, message.code);
+        scope.postMessage(
+          outcome === 'broken'
+            ? { type: 'failed', message: 'Python broke while running a Program.' }
+            : { type: 'done', outcome },
+        );
       } finally {
         running = false;
       }
