@@ -22,6 +22,7 @@
     "mediabunny": "1.61.4",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "6.4.299",
+    "pyodide": "314.0.8",
     "qrcode": "^1.5.4",
     "svelte": "^5.57.3"
   },
