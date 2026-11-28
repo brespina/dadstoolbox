@@ -1,7 +1,7 @@
 <script lang="ts">
   // The buttons a chosen Mark shows: Smaller, Bigger and Remove. They work for any kind
   // of Mark, since they only ask for a change; `children` adds a kind's own controls
-  // (such as a Text Mark's words, #112) after them. Each button is named for the Mark it
+  // (such as a Text Mark's words) after them. Each button is named for the Mark it
   // acts on, starting with its visible words.
   import type { Snippet } from 'svelte';
   import { fillText as fill } from '../../text';

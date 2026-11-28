@@ -117,6 +117,17 @@ export const credits: Credit[] = [
     licenseUrl: 'https://github.com/adobe-type-tools/cmap-resources/blob/master/LICENSE.md',
   },
   {
+    name: 'Dancing Script',
+    package: '@fontsource/dancing-script',
+    version: '5.3.0',
+    license: 'OFL-1.1',
+    does: 'The handwriting-style letters for a signature you type.',
+    // The font's files as Fontsource packages them; its own licence text is in each copy.
+    codeUrl: 'https://github.com/fontsource/font-files/tree/main/fonts/google/dancing-script',
+    licenseUrl:
+      'https://github.com/fontsource/font-files/blob/main/fonts/google/dancing-script/LICENSE',
+  },
+  {
     name: 'qrcode',
     package: 'qrcode',
     version: '1.5.4',

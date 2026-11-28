@@ -449,17 +449,28 @@ PDF's pages ([ADR-0006](adr/0006-pdf-pages-are-shown-with-pdfjs.md),
 that builds on it:
 
 - **The options.** The Signature (see the glossary) and the ink are page options, set by
-  the pad in `Options.svelte`: drawn strokes are lists of `[x, y]` points as fractions of
-  the pad, whose shape is `padShape`. The Marks are the file option `marks`, set by the page
+  `Options.svelte`. The Signature is `{ kind: 'drawn', strokes }` (lists of `[x, y]` points
+  as fractions of the pad, whose shape is `padShape`) or `{ kind: 'typed', words, font }`
+  (`font` is `signatureFont`, Dancing Script), whichever way the person chose last: "Type
+  it instead" swaps the pad for a box, and each way keeps what it held while the other
+  shows. The ink is `black` (the default) or `blue` (`inks` in `declaration.ts`) and
+  applies to every Mark. The Marks are the file option `marks`, set by the page
   editor in `FileOptions.svelte`. Everything is plain data and nothing is stored.
-- **The Mark** (`declaration.ts`) is `{ kind, page, x, y, width }`: `page` counts from 1,
-  and `x`, `y` (its top-left corner, `y` down from the top) and `width` are fractions of the
-  page as shown. It has no stored height: its height always follows from its picture's
-  shape.
+- **The Mark** (`declaration.ts`) is `{ kind, page, x, y, width }`, a Signature (`kind:
+  'signature'`) or a Text Mark (`kind: 'text'`, with its `text`, kept exactly as typed):
+  `page` counts from 1, and `x`, `y` (its top-left corner, `y` down from the top) and `width`
+  are fractions of the page as shown. It has no stored height: its height always follows from
+  its picture's shape. Today's date is not a kind: the editor adds a Text Mark filled with
+  `new Date().toLocaleDateString()` when it is added. A Text Mark with no words (or only
+  spaces) is not `isFilled`: it counts as nothing placed for `optionsProblem` and `run` leaves
+  it out.
 - **Moving and resizing Marks** (`marks.ts`). The rules are plain functions, unit-tested in
   `marks.test.ts`: `nudge` (arrow keys: 1% of the page, 10% with Shift), `resize` (Smaller
   and Bigger: a tenth, about the centre, from `smallest` to the page's width), `dragTo`,
-  `placeCentred` (a tap) and `placeLowerMiddle` ("Add to page"), and `actionFor`, which turns
+  `placeCentred` (a tap) and `placeLowerMiddle` ("Add to page"), both for a `Choice`
+  (Signature, Text or Today's date, each with its own `startingWidth`), `withWords` (a Text
+  Mark's new words: the letters keep their size, so the width follows the words and the
+  height holds) and `actionFor`, which turns
   a key press into an action (or nothing, so shortcuts stay the browser's). Each takes a
   `Fit`, the picture's shape and the page's shape, because a Mark's height is never stored;
   every result is kept inside the page. They change only `x`, `y` and `width`.
@@ -467,18 +478,32 @@ that builds on it:
   pointer (with `touch-action: none` on Marks only, so a finger elsewhere still scrolls the
   pages) and takes the keys, and draws the kind's picture from its `children`.
   `MarkControls.svelte` is the chosen Mark's Smaller, Bigger and Remove buttons, and
-  takes a kind's own controls as `children`. A new kind (#112 adds Text) adds its name to
-  `notes` and `kindNames`, its choice to the Add choice, its starting width to
-  `startingWidth`, its picture to the `PlacedMark` in `FileOptions.svelte`, and its own
-  shape to `fitOf` there (today every Mark has the Signature's shape). When a picture's
-  shape changes after its Marks were placed, the editor and `run` fit them back inside
-  the page with `keepInside`.
+  takes a kind's own controls as `children` (a Text Mark's words box is one, outside the
+  Mark's button so the keys typed in it are the box's). A new kind adds its name to `notes`
+  and `kindNames`, its choice to the Add choice, its starting width to `startingWidth`, its
+  painting and its shape to `paint.ts`, and its own controls to the `MarkControls` in
+  `FileOptions.svelte`. Every Mark has a picture and a shape of its own: the editor keeps
+  each picture by what it shows (the words and ink, or the Signature as drawn), never by the
+  Mark's place in the list, and `fitOf` takes the Mark. A Mark is never smaller than 24 CSS
+  pixels to tap (the box reaches past a very small picture). When a picture's shape changes
+  after its Marks were placed, the editor and `run` fit them back inside the page with
+  `keepInside`.
 - **The painter seam** (`paint.ts`). `PaintMark` gives a Mark's picture from the Mark and
   the page's options: its `shape` (width ÷ height) and `paint(width, height)`, a
   see-through PNG. `run` (`makeRun(paint)`) works out the place and paints at 300 dots an
   inch of the Mark's size on the page, longest side at most 2000 pixels; the editor uses
-  the same painter to show the Mark. `paintOnCanvas` is the browser's own painting, so the
-  Tool runs with `worker: false`; `run.test.ts` passes a stand-in. `pictures-on.ts` reads
+  the same painter to show the Mark, and `shapeOf` (the same shape, worked out at once) to
+  lay a Mark out before its picture is painted. Text is measured and painted at one size and
+  scaled to the Mark, in the device's `system-ui, sans-serif` (a typed Signature: Dancing
+  Script, then the same device font for letters it lacks), left to right or right to left
+  by its first letter. The font (`signature-font.ts`, its latin, latin-ext and vietnamese
+  files, each with its `unicodeRange`) is bundled with `?url` and loaded with `FontFace` by
+  `loadSignatureFont()` only once "Type it instead" is chosen, with "Getting ready…" on the
+  button meanwhile; the options take typed words only after it has loaded (or failed to,
+  when the device's font stands in everywhere), and `paintOnCanvas` waits for it, so the
+  editor's `shapeOf` and `run` measure the same letters. Never import the package's CSS:
+  its `@font-face` would fetch the files eagerly. `paintOnCanvas` is the browser's own
+  painting, so the Tool runs with `worker: false`; `run.test.ts` passes a stand-in. `pictures-on.ts` reads
   back where a saved PDF's pictures landed, for tests.
 - **The shared check** (`can-sign.ts`). `openToSign(bytes)` opens the PDF with pdf-lib,
   or throws a `ToolFailure` with the reason it can't be signed here: a password, or a

@@ -4,9 +4,10 @@
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { degrees, PDFDocument, StandardFonts } from 'pdf-lib';
 import { test, expect } from './fixtures';
+import { text } from '../../src/text';
 import { tool } from '../../src/tools/sign-pdf/declaration';
 import { picturesOn } from '../../src/tools/sign-pdf/pictures-on';
 
@@ -374,8 +375,9 @@ test('a Mark stays inside the page, and its size has a smallest and a largest', 
   expect(largest.y).toBeGreaterThanOrEqual(-0.001);
   expect(largest.y + largest.height).toBeLessThanOrEqual(1.001);
   for (let i = 0; i < 60; i++) await page.keyboard.press('-');
-  const smallest = await placeOnPageOne(page, mark);
-  expect(smallest.width).toBeCloseTo(0.05, 2);
+  // A twentieth of the page wide, though a Mark's tap area is never under 24 px.
+  const smallest = await mark.evaluate((element) => parseFloat(element.style.width) / 100);
+  expect(smallest).toBeCloseTo(0.05, 3);
 });
 
 test('Smaller, Bigger and Remove are at least 44 px, and named for their Mark', async ({
@@ -705,4 +707,425 @@ test('a PDF that uses the standard fonts without holding them still shows its wo
   for (const band of [0, 1, 2]) {
     await expect.poll(() => inked(band), { message: `ink in band ${band}` }).toBeGreaterThan(100);
   }
+});
+
+/** The Text Mark's words box, which shows for the chosen Text Mark. */
+const wordsOn = (page: Page, number: number) =>
+  page.getByRole('textbox', { name: `Words: Text on page ${number}`, exact: true });
+
+/** A page's Text Marks, by their label (Today's date is one too). */
+const textOn = (page: Page, number: number) =>
+  page.getByRole('button', { name: `Text on page ${number}`, exact: true });
+
+/** Moves the page's last Text Mark up out of the way, 20% of the page. */
+async function moveUp(page: Page, number: number) {
+  await textOn(page, number).last().focus();
+  await page.keyboard.press('Shift+ArrowUp');
+  await page.keyboard.press('Shift+ArrowUp');
+}
+
+const kindRadio = (page: Page, name: string) => page.getByRole('radio', { name, exact: true });
+
+test("adds Text and Today's date, edits the words, signs and saves", async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  // The choice has all three kinds, Signature first.
+  await expect(kindRadio(page, 'Signature')).toBeChecked();
+  await expect(kindRadio(page, 'Text')).not.toBeChecked();
+  await expect(kindRadio(page, "Today's date")).not.toBeChecked();
+  await expect(page.getByText(tool.notes.nothingPlaced!, { exact: true })).toBeVisible();
+  await expect(start(page)).toBeDisabled();
+
+  // Text: a dashed box that names itself, and the words box ready to type in. With no
+  // words it still counts as nothing placed.
+  await kindRadio(page, 'Text').check();
+  await addTo(page, 1).click();
+  await expect(wordsOn(page, 1)).toBeFocused();
+  await expect(textOn(page, 1)).toHaveText('Text');
+  await expect(textOn(page, 1)).toHaveClass(/blank/);
+  await expect(page.getByText(tool.notes.nothingPlaced!, { exact: true })).toBeVisible();
+  await expect(start(page)).toBeDisabled();
+
+  // Typing shows the words in the Mark and lets start go. Mark keys typed in the box
+  // belong to the box: the minus and plus are letters here, and Backspace deletes one.
+  await page.keyboard.type('Ana Diaz-+x');
+  await page.keyboard.press('Backspace');
+  await expect(wordsOn(page, 1)).toHaveValue('Ana Diaz-+');
+  await expect(textOn(page, 1)).toHaveCount(1);
+  await expect(textOn(page, 1).locator('img')).toHaveCount(1);
+  await expect(textOn(page, 1)).not.toHaveClass(/blank/);
+  await expect(start(page)).toBeEnabled();
+  await wordsOn(page, 1).fill('Ana Diaz');
+  await moveUp(page, 1);
+  // A Mark's own picture is its place; a small Mark's tap area may reach past it.
+  const name = await placeOnPageOne(page, textOn(page, 1).locator('img'));
+
+  // Today's date: filled in, and still editable.
+  await kindRadio(page, "Today's date").check();
+  await addTo(page, 1).click();
+  await expect(textOn(page, 1)).toHaveCount(2);
+  await expect(textOn(page, 1).nth(1)).toBeFocused();
+  const date = await wordsOn(page, 1).inputValue();
+  expect(date).toMatch(/\d/);
+  await wordsOn(page, 1).fill('4 March');
+  await expect(wordsOn(page, 1)).toHaveValue('4 March');
+  const second = await placeOnPageOne(page, textOn(page, 1).nth(1).locator('img'));
+  expect(second.width).toBeLessThan(name.width);
+
+  // Choosing the first Mark brings its words back.
+  await textOn(page, 1).first().click();
+  await expect(wordsOn(page, 1)).toHaveValue('Ana Diaz');
+
+  const saved = await savedPdf(page);
+  const pictures = picturesOn(saved.getPage(0));
+  expect(pictures).toHaveLength(2);
+  expectSavedAt(pictures[0]!, name);
+  expectSavedAt(pictures[1]!, second);
+  // Words are wider than they are high.
+  expect(pictures[0]!.width).toBeGreaterThan(pictures[0]!.height * 2);
+  expect(picturesOn(saved.getPage(1))).toEqual([]);
+  expect(await page.evaluate(() => (window as unknown as { blocked: string[] }).blocked)).toEqual(
+    [],
+  );
+});
+
+test('words keep their size as they grow, and a Mark with them removed is left out', async ({
+  page,
+}) => {
+  await page.goto('sign-pdf/');
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  await kindRadio(page, 'Text').check();
+  await addTo(page, 1).click();
+  await page.keyboard.type('Ana');
+  const short = await placeOnPageOne(page, textOn(page, 1).locator('img'));
+  await page.keyboard.type(' Diaz Lopez');
+  const long = await placeOnPageOne(page, textOn(page, 1).locator('img'));
+  expect(long.width).toBeGreaterThan(short.width * 2);
+  // The letters are the same size: the height holds.
+  expect(long.height).toBeCloseTo(short.height, 2);
+
+  // Emptied, it is nothing again, and a second Mark with words is all that is saved.
+  await wordsOn(page, 1).fill('   ');
+  await expect(start(page)).toBeDisabled();
+  await kindRadio(page, "Today's date").check();
+  await addTo(page, 1).click();
+  await expect(start(page)).toBeEnabled();
+  const saved = await savedPdf(page);
+  expect(picturesOn(saved.getPage(0))).toHaveLength(1);
+});
+
+test('words in Japanese and Arabic are kept as typed, shown and saved', async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  await kindRadio(page, 'Text').check();
+  for (const words of ['サイン', 'توقيع']) {
+    await addTo(page, 1).click();
+    await wordsOn(page, 1).fill(words);
+    await expect(wordsOn(page, 1)).toHaveValue(words);
+    // Out of the way of the next.
+    if (words === 'サイン') await moveUp(page, 1);
+  }
+  await expect(textOn(page, 1)).toHaveCount(2);
+  await expect(textOn(page, 1).nth(1).locator('img')).toHaveCount(1);
+  // Each Mark has a picture of its own: the first Mark's words didn't change.
+  await textOn(page, 1).first().click();
+  await expect(wordsOn(page, 1)).toHaveValue('サイン');
+  const saved = await savedPdf(page);
+  expect(picturesOn(saved.getPage(0))).toHaveLength(2);
+});
+
+test('a tap places Text with its box ready, and nothing scrolls sideways at 375 px', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 700 });
+  await page.goto('sign-pdf/');
+  await choose(page, [sample]);
+  await kindRadio(page, 'Text').check();
+  await tapPageOne(page, 0.5, 0.4);
+  await expect(wordsOn(page, 1)).toBeFocused();
+  await page.keyboard.type('A name that is rather long to print on a small page');
+  const box = (await wordsOn(page, 1).boundingBox())!;
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(box.x + box.width).toBeLessThanOrEqual(375);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+  ).toBeLessThanOrEqual(0);
+  // The Mark stays inside the page however long the words.
+  const place = await placeOnPageOne(page, textOn(page, 1).locator('img'));
+  expect(place.x).toBeGreaterThanOrEqual(-0.001);
+  expect(place.x + place.width).toBeLessThanOrEqual(1.001);
+  expect(place.y + place.height).toBeLessThanOrEqual(1.001);
+});
+
+test("arrow and Delete keys typed in a Text Mark's words belong to the box", async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  await kindRadio(page, 'Text').check();
+  await addTo(page, 1).click();
+  await page.keyboard.type('Ana Diaz');
+  const before = await placeOnPageOne(page, textOn(page, 1).locator('img'));
+  // The arrows move the caret and Delete takes the letter after it: the Mark stays where
+  // it is and is not removed, even with Shift (which would move a Mark ten percent).
+  for (const key of ['ArrowLeft', 'ArrowLeft', 'ArrowLeft', 'Delete']) {
+    await page.keyboard.press(key);
+  }
+  for (const key of [
+    'ArrowUp',
+    'ArrowDown',
+    'Shift+ArrowUp',
+    'Shift+ArrowDown',
+    'Shift+ArrowLeft',
+  ]) {
+    await page.keyboard.press(key);
+  }
+  await expect(wordsOn(page, 1)).toHaveValue('Ana Daz');
+  await expect(textOn(page, 1)).toHaveCount(1);
+  const after = await placeOnPageOne(page, textOn(page, 1).locator('img'));
+  expect(after.x).toBeCloseTo(before.x, 2);
+  expect(after.y).toBeCloseTo(before.y, 2);
+});
+
+// 4 March 2026 at ten in the morning, UTC: the same day anywhere a person might be.
+const fixedDay = new Date('2026-03-04T10:00:00Z');
+
+for (const [locale, expected] of [
+  ['en-GB', '04/03/2026'],
+  ['en-US', '3/4/2026'],
+] as const) {
+  test.describe(`on a device set to ${locale}`, () => {
+    test.use({ locale, timezoneId: 'UTC' });
+
+    test("Today's date is the device's short date", async ({ page }) => {
+      // The words as the browser's own formatting gives them, from a fixed day.
+      expect(fixedDay.toLocaleDateString(locale, { timeZone: 'UTC' })).toBe(expected);
+      await page.clock.setFixedTime(fixedDay);
+      await page.goto('sign-pdf/');
+      await choose(page, [sample]);
+      await expect(pageOne(page)).toBeVisible();
+      await kindRadio(page, "Today's date").check();
+      await addTo(page, 1).click();
+      await expect(wordsOn(page, 1)).toHaveValue(expected);
+      // And it is what is saved: a picture where the Mark is.
+      expect(picturesOn((await savedPdf(page)).getPage(0))).toHaveLength(1);
+    });
+  });
+}
+
+/** The Dancing Script file: any request for it, by its name. */
+const isTypedFont = (url: string) => /dancing-script.*\.woff2/.test(url);
+
+/** The mean colour of a picture's solid pixels, or null if it has none. */
+const inkOf = (picture: Locator) =>
+  picture.evaluate(async (image: HTMLImageElement) => {
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d')!;
+    context.drawImage(image, 0, 0);
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    const sum = [0, 0, 0];
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3]! < 250) continue;
+      for (const channel of [0, 1, 2]) sum[channel]! += data[i + channel]!;
+      count++;
+    }
+    return count === 0 ? null : sum.map((total) => Math.round(total / count));
+  });
+
+const typeInstead = (page: Page) =>
+  page.getByRole('button', { name: notes.typeItInstead, exact: true });
+const typedBox = (page: Page) => page.getByRole('textbox', { name: notes.typedLabel });
+
+test('Type it instead loads the font only then, and a typed Signature is placed, signed and saved', async ({
+  page,
+}) => {
+  const fontRequests: string[] = [];
+  page.context().on('request', (request) => {
+    if (isTypedFont(request.url())) fontRequests.push(request.url());
+  });
+  await page.goto('sign-pdf/');
+  await expect(page.getByRole('img', { name: notes.padLabel })).toBeVisible();
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  await addTo(page, 1).click();
+  await expect(markOn(page, 1)).toBeVisible();
+  // Nothing has asked for the font yet, and a Signature is still wanted.
+  expect(fontRequests).toEqual([]);
+  await expect(page.getByText(tool.notes.noSignature!, { exact: true })).toBeVisible();
+
+  // The font's files are held back, so "Getting ready…" shows while they come.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(
+    (url) => isTypedFont(url.href),
+    async (route) => {
+      await held;
+      await route.continue();
+    },
+  );
+  await typeInstead(page).click();
+  const swapButton = page.getByRole('button', { name: text.tool.gettingReady, exact: true });
+  await expect(swapButton).toBeVisible();
+  await expect(typedBox(page)).toHaveCount(0);
+  release();
+  await expect(typedBox(page)).toBeFocused();
+  await expect(swapButton).toHaveCount(0);
+  await expect(page.getByRole('img', { name: notes.padLabel })).toHaveCount(0);
+  // Words are still wanted: the box is empty.
+  await expect(page.getByText(tool.notes.noSignature!, { exact: true })).toBeVisible();
+  await expect(start(page)).toBeDisabled();
+  // One request for each of the font's files (latin, latin-ext, vietnamese), all the Site's own.
+  expect(fontRequests).toHaveLength(3);
+  for (const url of fontRequests) expect(new URL(url).origin).toBe(new URL(page.url()).origin);
+
+  await page.keyboard.type('Ada Lovelace');
+  await expect(typedBox(page)).toHaveValue('Ada Lovelace');
+  await expect(start(page)).toBeEnabled();
+  await expect(markOn(page, 1).locator('img')).toHaveCount(1);
+  // The font is the page's own, loaded, for its box and for painting.
+  expect(
+    await page.evaluate(() =>
+      [...document.fonts].some(
+        (face) => face.family.includes('Dancing Script') && face.status === 'loaded',
+      ),
+    ),
+  ).toBe(true);
+  // The box does not suggest, fill in or spell-check the Signature.
+  await expect(typedBox(page)).toHaveAttribute('autocomplete', 'off');
+
+  const shown = await placeOnPageOne(page, markOn(page, 1).locator('img'));
+  const [picture, ...more] = picturesOn((await savedPdf(page)).getPage(0));
+  expect(more).toEqual([]);
+  expectSavedAt(picture!, shown);
+  // Words are wider than they are high.
+  expect(picture!.width).toBeGreaterThan(picture!.height * 2);
+  // No more requests for the font, and the browser lock was never hit.
+  expect(fontRequests).toHaveLength(3);
+  expect(await page.evaluate(() => (window as unknown as { blocked: string[] }).blocked)).toEqual(
+    [],
+  );
+});
+
+test('Draw it instead brings the pad back with its lines, and the Signature is the way chosen last', async ({
+  page,
+}) => {
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await choose(page, [sample]);
+  await tapPageOne(page, 0.5, 0.5);
+  await expect(start(page)).toBeEnabled();
+
+  await typeInstead(page).click();
+  // Typing is the Signature now, and it is empty.
+  await expect(page.getByText(tool.notes.noSignature!, { exact: true })).toBeVisible();
+  await expect(start(page)).toBeDisabled();
+  await typedBox(page).fill('Ada');
+  await expect(start(page)).toBeEnabled();
+
+  await page.getByRole('button', { name: notes.drawItInstead, exact: true }).click();
+  await expect(page.getByRole('img', { name: notes.padLabel })).toBeVisible();
+  await expect(typedBox(page)).toHaveCount(0);
+  // The lines drawn before are still there, and are the Signature again.
+  await expect.poll(() => padHasInk(page)).toBe(true);
+  await expect(start(page)).toBeEnabled();
+
+  // And the words typed before come back.
+  await typeInstead(page).click();
+  await expect(typedBox(page)).toHaveValue('Ada');
+});
+
+test('words in other scripts are kept as typed in a typed Signature', async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await typeInstead(page).click();
+  await typedBox(page).fill('Zoë サイン توقيع');
+  await choose(page, [sample]);
+  await tapPageOne(page, 0.5, 0.5);
+  await expect(typedBox(page)).toHaveValue('Zoë サイン توقيع');
+  await expect(markOn(page, 1).locator('img')).toHaveCount(1);
+  const picture = picturesOn((await savedPdf(page)).getPage(0));
+  expect(picture).toHaveLength(1);
+});
+
+test('ink is black unless Blue is chosen, and blue shows on a drawn Signature, a typed one and Text', async ({
+  page,
+}) => {
+  await page.goto('sign-pdf/');
+  const radio = (name: string) => page.getByRole('radio', { name, exact: true });
+  await expect(radio(notes.inkBlack!)).toBeChecked();
+  await expect(radio(notes.inkBlue!)).not.toBeChecked();
+  await drawSignature(page);
+  await choose(page, [sample]);
+  await tapPageOne(page, 0.5, 0.3);
+  const drawnMark = markOn(page, 1).locator('img');
+  await expect(drawnMark).toHaveCount(1);
+  await expect.poll(() => inkOf(drawnMark)).toEqual([0, 0, 0]);
+
+  // Blue repaints the Mark already placed.
+  await radio(notes.inkBlue!).check();
+  const blue = [26, 63, 176];
+  await expect.poll(() => inkOf(drawnMark)).toEqual(blue);
+  // The pad shows it too.
+  expect(
+    await page.getByRole('img', { name: notes.padLabel }).evaluate((canvas: HTMLCanvasElement) => {
+      const { data } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
+      const solid = Array.from({ length: data.length / 4 }, (_, i) => i * 4).find(
+        (i) => data[i + 3]! === 255,
+      );
+      return solid === undefined ? null : [data[solid]!, data[solid + 1]!, data[solid + 2]!];
+    }),
+  ).toEqual(blue);
+
+  // A typed Signature, in the same ink: every Signature Mark follows it.
+  const drawnPicture = await drawnMark.getAttribute('src');
+  await typeInstead(page).click();
+  await typedBox(page).fill('Ada');
+  await expect(typedBox(page)).toHaveCSS('color', 'rgb(26, 63, 176)');
+  // The typed Signature's own picture, not the drawn one's.
+  await expect(drawnMark).toHaveCount(1);
+  await expect(drawnMark).not.toHaveAttribute('src', drawnPicture!);
+  await expect.poll(() => inkOf(drawnMark)).toEqual(blue);
+
+  // Text, in the same ink.
+  await page.getByRole('radio', { name: 'Text', exact: true }).check();
+  await addTo(page, 1).click();
+  await page.keyboard.type('Ada Lovelace');
+  const textMark = page.getByRole('button', { name: 'Text on page 1', exact: true }).locator('img');
+  await expect(textMark).toHaveCount(1);
+  await expect.poll(() => inkOf(textMark)).toEqual(blue);
+  await expect(start(page)).toBeEnabled();
+});
+
+test('no Signature, drawn or typed, is stored anywhere', async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await drawSignature(page);
+  await typeInstead(page).click();
+  await typedBox(page).fill('Ada Lovelace');
+  await choose(page, [sample]);
+  await tapPageOne(page, 0.5, 0.5);
+  await expect(start(page)).toBeEnabled();
+  const stored = () =>
+    page.evaluate(async () => ({
+      local: localStorage.length,
+      session: sessionStorage.length,
+      cookie: document.cookie,
+      databases: (await indexedDB.databases()).length,
+      caches: (await caches.keys()).length,
+      hash: location.hash + location.search,
+    }));
+  const none = { local: 0, session: 0, cookie: '', databases: 0, caches: 0, hash: '' };
+  expect(await stored()).toEqual(none);
+
+  // A new visit starts empty: no pad lines, no words.
+  await page.reload();
+  await expect(page.getByRole('img', { name: notes.padLabel })).toBeVisible();
+  expect(await padHasInk(page)).toBe(false);
+  await typeInstead(page).click();
+  await expect(typedBox(page)).toHaveValue('');
+  expect(await stored()).toEqual(none);
 });
