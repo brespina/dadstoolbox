@@ -12,13 +12,18 @@ const editorOf = (page: Page) => page.getByLabel(tool.areaLabel, { exact: true }
 const linesOf = (page: Page) => page.locator('.cm-content .cm-line');
 const programOf = async (page: Page) => (await linesOf(page).allTextContents()).join('\n');
 
-/** Opens the page, waits for the editor, and clears it ready for typing. */
-async function openEmpty(page: Page) {
+/**
+ * Opens the page, waits for the editor, and selects the starter Program, so that the first
+ * thing typed replaces it. Do not clear it with Delete or Backspace: on an iPhone CodeMirror
+ * holds those keys back until it has read the browser's own edit, and while it waits the
+ * browser's selection change can reach it first and shrink the selection to a cursor, so
+ * only one character goes. Typing over a selection has no such wait.
+ */
+async function openSelected(page: Page) {
   await page.goto('run-python/');
   await expect(editorOf(page)).toBeVisible({ timeout: slow });
   await editorOf(page).click();
   await page.keyboard.press(await selectAllKey(page));
-  await page.keyboard.press('Delete');
 }
 
 test('Python words are in colour, with line numbers, and the lock logs nothing', async ({
@@ -54,10 +59,11 @@ test('Python words are in colour, with line numbers, and the lock logs nothing',
 
 test('a block indents the next line; Shift+Tab, undo and redo work', async ({ page }) => {
   test.setTimeout(slow);
-  await openEmpty(page);
+  await openSelected(page);
   await page.keyboard.type('for i in range(3):');
   await page.keyboard.press('Enter');
-  // Chrome on Android holds Enter back a moment, so wait for the new line before typing.
+  // Chrome on Android and iPhone Safari hold Enter back a moment, so wait for the new line
+  // before typing.
   await expect(linesOf(page)).toHaveCount(2);
   await page.keyboard.type('print(i)');
   expect(await programOf(page)).toBe('for i in range(3):\n    print(i)');
@@ -76,7 +82,7 @@ test('a block indents the next line; Shift+Tab, undo and redo work', async ({ pa
 
 test('Tab indents, and Escape then Tab leaves the editor', async ({ page }) => {
   test.setTimeout(slow);
-  await openEmpty(page);
+  await openSelected(page);
   await page.keyboard.type('x');
   await page.keyboard.press('Tab');
   expect(await programOf(page)).toContain('x');
@@ -93,7 +99,7 @@ test('Tab indents, and Escape then Tab leaves the editor', async ({ page }) => {
 test('on a phone there is no sideways scroll, and a long line wraps', async ({ page }) => {
   test.setTimeout(slow);
   await page.setViewportSize({ width: 375, height: 700 });
-  await openEmpty(page);
+  await openSelected(page);
   await page.keyboard.insertText(`print("${'word '.repeat(60)}")`);
   const line = linesOf(page).first();
   const lineHeight = await line.evaluate((element) =>
@@ -113,7 +119,7 @@ test('on a phone there is no sideways scroll, and a long line wraps', async ({ p
 
 test('what is typed in the editor runs', async ({ page }) => {
   test.setTimeout(slow);
-  await openEmpty(page);
+  await openSelected(page);
   await page.keyboard.insertText('print("typed", 6 * 7)');
   const run = page.getByRole('button', { name: notes.run, exact: true });
   await expect(run).toBeEnabled({ timeout: slow });
