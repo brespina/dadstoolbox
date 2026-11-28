@@ -859,6 +859,35 @@ test('a tap places Text with its box ready, and nothing scrolls sideways at 375 
   expect(place.y + place.height).toBeLessThanOrEqual(1.001);
 });
 
+test("arrow and Delete keys typed in a Text Mark's words belong to the box", async ({ page }) => {
+  await page.goto('sign-pdf/');
+  await choose(page, [sample]);
+  await expect(pageOne(page)).toBeVisible();
+  await kindRadio(page, 'Text').check();
+  await addTo(page, 1).click();
+  await page.keyboard.type('Ana Diaz');
+  const before = await placeOnPageOne(page, textOn(page, 1).locator('img'));
+  // The arrows move the caret and Delete takes the letter after it: the Mark stays where
+  // it is and is not removed, even with Shift (which would move a Mark ten percent).
+  for (const key of ['ArrowLeft', 'ArrowLeft', 'ArrowLeft', 'Delete']) {
+    await page.keyboard.press(key);
+  }
+  for (const key of [
+    'ArrowUp',
+    'ArrowDown',
+    'Shift+ArrowUp',
+    'Shift+ArrowDown',
+    'Shift+ArrowLeft',
+  ]) {
+    await page.keyboard.press(key);
+  }
+  await expect(wordsOn(page, 1)).toHaveValue('Ana Daz');
+  await expect(textOn(page, 1)).toHaveCount(1);
+  const after = await placeOnPageOne(page, textOn(page, 1).locator('img'));
+  expect(after.x).toBeCloseTo(before.x, 2);
+  expect(after.y).toBeCloseTo(before.y, 2);
+});
+
 // 4 March 2026 at ten in the morning, UTC: the same day anywhere a person might be.
 const fixedDay = new Date('2026-03-04T10:00:00Z');
 
