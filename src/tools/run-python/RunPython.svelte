@@ -22,6 +22,9 @@
 
   const { notes } = tool;
 
+  /** Whether the page is cross-origin isolated (Practice.svelte decides, ADR-0009). */
+  const { isolated = false }: { isolated?: boolean } = $props();
+
   let program = $state(notes.starter);
   let state: RunnerState = $state.raw({ name: 'gettingReady' });
   let runs: ConsoleRun[] = $state.raw([]);
@@ -92,6 +95,10 @@
   {/if}
 </div>
 
+{#if !isolated}
+  <p class="limit">{notes.noIsolation}</p>
+{/if}
+
 <Console {runs} {removed} />
 
 <style>
@@ -121,6 +128,11 @@
     color: var(--muted);
     border: 1px solid var(--line);
     cursor: default;
+  }
+
+  .limit {
+    margin: 0 0 0.75rem;
+    color: var(--muted);
   }
 
   .problem {
