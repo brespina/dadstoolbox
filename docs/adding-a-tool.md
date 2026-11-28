@@ -533,6 +533,53 @@ adding an outside address is not just filling in a field. It is a decision about
 Promise: record it in an ADR, then change those checks on purpose. Never send a visitor's
 files to an outside address.
 
+## Run Python
+
+Run Python (`src/tools/run-python/`) is a Practice Tool
+([ADR-0012](adr/0012-run-python-is-a-practice-tool.md)) that runs a visitor's own Python
+with Pyodide ([ADR-0008](adr/0008-python-runs-in-the-browser-with-pyodide.md)). Its pieces:
+
+| File                            | What it holds                                                                                                                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `declaration.ts`                | Plain data, as for any Tool. Every word the page shows is in `notes`, including the starter Program.                                                                           |
+| `Practice.svelte`               | A small shell: `PracticeToolPage.svelte` loads every Practice page into every Practice Tool's page, so the shell loads `RunPython.svelte` with `import()` once the page opens. |
+| `RunPython.svelte`              | The page: editor, Run button, Console. It owns the Program text and turns the runner's state into buttons and words.                                                           |
+| `ProgramEditor.svelte`          | **The editor seam.** `value` in, `onchange(value)` out, `focus()`, named by `areaLabel`. The CodeMirror ticket replaces the inside of this file only.                          |
+| `Console.svelte`                | Draws the Console: a labelled live region (`role="log"`), text only (never HTML). Error runs get a bar and a hidden "Error:" for screen readers.                              |
+| `console-buffer.ts`             | Pure. The lines, partial lines, the 5,000-line cap and the one "older lines removed" note. Tested with Vitest.                                                                  |
+| `messages.ts`                   | **The message protocol** between page and worker, and `parseToWorker` / `parseFromWorker`, which let in nothing else.                                                          |
+| `runner.ts`                     | **The page's side of a Run.** States `gettingReady`, `ready`, `running`, `failed`; takes the worker (`makeWorker`) and a `ConsoleSink` as arguments, so Vitest passes fakes. |
+| `python-worker.ts`              | The worker. Loads Pyodide by the absolute address the page sends, runs each Program in a fresh namespace, and streams output as `out` messages.                               |
+| `files.ts`                      | The pinned Pyodide version and the Site folder its files are served from (`files.test.ts` keeps it equal to the installed package).                                           |
+| `src/site/pyodide-files.ts`     | Build integration, like `pdfjs-files.ts`: serves and copies the five Pyodide files to `run-python/pyodide/<version>/`. They are not committed.                                |
+
+**To extend a Run:** add a message type to `messages.ts` (with a case in its parse function
+and a line in `messages.test.ts`), handle it in `python-worker.ts`, and give `runner.ts` a
+method that sends it or a case in `onMessage` that turns it into a state change or a
+Console call. Python's output reaches the page as `out` chunks, added to the buffer as they
+come and drawn once per animation frame; `runProgram` in the worker is the one place a
+Program runs.
+
+**A Tool that runs a visitor's own program must use a blob worker** (ADR-0010). A worker
+loaded from a normal address is not bound by the page's browser lock, so a Program could
+send things to other sites; a worker made from a `blob:` URL inherits the lock. Here that
+is `import PythonWorker from './python-worker?worker&inline'`. Keep the worker one
+self-contained file: it has no address of its own, so every address it uses (`pyodide.mjs`
+and the folder Pyodide loads the rest from) is absolute and sent by the page.
+
+**The per-page lock.** Python's WebAssembly needs `'wasm-unsafe-eval'` in `script-src`. It
+is added for this page only, in `src/pages/run-python.astro`, with
+`Astro.csp?.insertScriptResource("'wasm-unsafe-eval'")`, which merges it into Astro's own
+`script-src` (a second `script-src` directive would be ignored by the browser). Never add
+it in `src/site/csp.ts`, which every page shares. `tests/e2e/run-python.spec.ts` checks
+that this page has it and the home page and other Tools do not. Without it Pyodide waits
+for ever and says nothing, so the runner gives up after 3 minutes and shows a reason with
+a "Try again" button.
+
+Tests: Vitest for `console-buffer`, `messages`, `runner` (with a fake worker) and `files`;
+`tests/e2e/run-python.spec.ts` for the real thing, with a longer timeout because Python
+takes 10 to 20 seconds to load.
+
 ## Words on the page
 
 Every line a visitor reads follows the wording rules (issue #13):
